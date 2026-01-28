@@ -1,0 +1,364 @@
+// Default Report Template for Reserve Study + Preventive Maintenance
+
+export const DEFAULT_REPORT_TEMPLATE = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>{projectName} - Reserve Study Report</title>
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      .page-break { page-break-before: always; }
+    }
+    
+    body {
+      font-family: 'Times New Roman', serif;
+      font-size: 12pt;
+      line-height: 1.6;
+      color: #333;
+      max-width: 8.5in;
+      margin: 0 auto;
+      padding: 1in;
+    }
+    
+    h1 { font-size: 24pt; text-align: center; color: #1a365d; margin-bottom: 0.5em; }
+    h2 { font-size: 16pt; color: #2c5282; border-bottom: 2px solid #2c5282; padding-bottom: 0.25em; margin-top: 1.5em; }
+    h3 { font-size: 14pt; color: #2d3748; margin-top: 1em; }
+    
+    .cover-page {
+      text-align: center;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    
+    .cover-title { font-size: 28pt; font-weight: bold; color: #1a365d; margin-bottom: 2em; }
+    .cover-subtitle { font-size: 18pt; color: #4a5568; margin-bottom: 3em; }
+    .cover-info { font-size: 14pt; margin-top: 2em; }
+    
+    .toc { margin: 2em 0; }
+    .toc-item { display: flex; justify-content: space-between; padding: 0.25em 0; border-bottom: 1px dotted #ccc; }
+    
+    table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 10pt; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #2c5282; color: white; font-weight: bold; }
+    tr:nth-child(even) { background-color: #f7fafc; }
+    
+    .financial-highlight { background-color: #ebf8ff; padding: 1em; border-left: 4px solid #3182ce; margin: 1em 0; }
+    .recommendation-box { background-color: #fffff0; padding: 1em; border: 2px solid #d69e2e; margin: 1em 0; }
+    
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin: 1em 0; }
+    .info-item { padding: 0.5em; background: #f7fafc; border-radius: 4px; }
+    .info-label { font-weight: bold; color: #4a5568; font-size: 10pt; }
+    .info-value { font-size: 14pt; color: #1a202c; }
+    
+    .editable-section { border: 1px dashed #cbd5e0; padding: 1em; margin: 0.5em 0; min-height: 50px; }
+    .editable-section:focus { border-color: #3182ce; outline: none; background: #ebf8ff; }
+  </style>
+</head>
+<body>
+
+<!-- COVER PAGE -->
+<div class="cover-page">
+  <div class="cover-title">{projectName}</div>
+  <div class="cover-subtitle">
+    RESERVE STUDY UPDATE<br>&<br>PREVENTIVE MAINTENANCE SCHEDULE
+  </div>
+  <div class="cover-info">
+    <p><strong>PREPARED BY:</strong> {companyName}</p>
+    <p><strong>SUBMITTED:</strong> {currentDate}</p>
+    <p style="margin-top: 2em; font-style: italic;">
+      Complies with New Jersey Residential Housing Bill S2760/A4384
+    </p>
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- TABLE OF CONTENTS -->
+<h1>TABLE OF CONTENTS</h1>
+<div class="toc">
+  <div class="toc-item"><span>Introduction</span><span>3</span></div>
+  <div class="toc-item"><span>Description of Development</span><span>4</span></div>
+  <div class="toc-item"><span>Reserve Study Chart</span><span>5</span></div>
+  <div class="toc-item"><span>Preventive Maintenance Fund Information</span><span>5</span></div>
+  <div class="toc-item"><span>Terms and Definitions</span><span>6</span></div>
+  <div class="toc-item"><span>Physical Analysis</span><span>9</span></div>
+  <div class="toc-item"><span>Component Schedule Summary</span><span>10</span></div>
+  <div class="toc-item"><span>Capital Items / Components</span><span>11</span></div>
+  <div class="toc-item"><span>Component Notes</span><span>12</span></div>
+  <div class="toc-item"><span>Financial Results</span><span>13</span></div>
+  <div class="toc-item"><span>Thirty Year Cash Flow</span><span>14</span></div>
+  <div class="toc-item"><span>Thirty Year Threshold Funding</span><span>15</span></div>
+  <div class="toc-item"><span>Expenditures</span><span>16</span></div>
+  <div class="toc-item"><span>Preventive Maintenance</span><span>17</span></div>
+  <div class="toc-item"><span>Recommendations</span><span>18</span></div>
+  <div class="toc-item"><span>Disclosures</span><span>19</span></div>
+  <div class="toc-item"><span>Bibliography</span><span>20</span></div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- INTRODUCTION -->
+<h2 id="introduction">INTRODUCTION</h2>
+
+<h3>Financial Planning</h3>
+<div class="editable-section" data-section="intro-financial-planning">
+One of the key responsibilities of the Board of Trustees or Directors is to ensure that the property is properly protected and maintained. Effective financial planning and budgeting are essential to maintaining the property and ensuring that sufficient funds are available to meet ongoing and future needs.
+
+The main objective of capital reserve planning is to ensure adequate funding for the future replacement of capital components within the community. Thoughtful planning helps distribute the cost of these projects evenly over time among owners, ensuring funds are available when needed. A well-funded reserve reduces the likelihood of significant fee increases, special assessments, or the need for loans.
+</div>
+
+<h3>Capital Reserve Study</h3>
+<div class="editable-section" data-section="intro-capital-reserve">
+A Capital Reserve Study serves as a financial planning tool that estimates the amount of money the Community Association should set aside for the future replacement of common area components. This report has been developed in accordance with the Community Associations Institute (CAI) National Reserve Study Standards. It provides guidance in evaluating and establishing a stable reserve funding strategy for anticipated repairs and replacements.
+</div>
+
+<h3>Level of Service Provided</h3>
+<div class="editable-section" data-section="intro-level-service">
+This report includes a <strong>Reserve Update</strong>, With Site Visit/On-Site Review. A reserve study update consists of the following five key tasks:
+<ul>
+  <li><strong>Component Inventory</strong></li>
+  <li><strong>Condition Assessment</strong> (based on on-site visual inspections)</li>
+  <li><strong>Life and Valuation Estimates</strong></li>
+  <li><strong>Fund Status Evaluation</strong></li>
+  <li><strong>Development of a Funding Plan</strong></li>
+</ul>
+</div>
+
+<div class="page-break"></div>
+
+<!-- DESCRIPTION OF DEVELOPMENT -->
+<h2 id="description">DESCRIPTION OF DEVELOPMENT</h2>
+<div class="editable-section" data-section="description">
+{projectName} consists of a {buildingType} comprising {totalUnits} residential units. The community is located in {projectLocation}.
+
+{physicalDescription}
+</div>
+
+<div class="page-break"></div>
+
+<!-- RESERVE STUDY CHART -->
+<h2 id="reserve-chart">RESERVE STUDY CHART</h2>
+
+<div class="info-grid">
+  <div class="info-item"><div class="info-label">Beginning Reserve Balance</div><div class="info-value">{beginningReserveBalance}</div></div>
+  <div class="info-item"><div class="info-label">Current Annual Contribution</div><div class="info-value">{currentAnnualContribution}</div></div>
+  <div class="info-item"><div class="info-label">Current Percent Funded</div><div class="info-value">{percentFunded}</div></div>
+  <div class="info-item"><div class="info-label">Recommended Annual Funding</div><div class="info-value">{recommendedAnnualFunding}</div></div>
+  <div class="info-item"><div class="info-label">Total Components</div><div class="info-value">{totalComponents}</div></div>
+  <div class="info-item"><div class="info-label">Total Replacement Cost</div><div class="info-value">{totalReplacementCost}</div></div>
+</div>
+
+<!-- PREVENTIVE MAINTENANCE FUND INFORMATION -->
+<h2 id="pm-info">PREVENTIVE MAINTENANCE FUND INFORMATION</h2>
+
+<div class="info-grid">
+  <div class="info-item"><div class="info-label">Beginning PM Balance</div><div class="info-value">{pmBeginningBalance}</div></div>
+  <div class="info-item"><div class="info-label">Current Annual PM Contribution</div><div class="info-value">{pmCurrentContribution}</div></div>
+  <div class="info-item"><div class="info-label">Current PM Percent Funded</div><div class="info-value">{pmPercentFunded}</div></div>
+  <div class="info-item"><div class="info-label">Recommended PM Funding</div><div class="info-value">{pmRecommendedFunding}</div></div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- TERMS AND DEFINITIONS -->
+<h2 id="terms">TERMS AND DEFINITIONS</h2>
+
+<div class="editable-section" data-section="terms">
+<p><strong>Capital Improvements</strong><br>
+Additions to the association's common elements that were not previously part of the community.</p>
+
+<p><strong>Component</strong><br>
+Individual items listed in the reserve study as identified through the physical analysis.</p>
+
+<p><strong>Fully Funded Balance (FFB)</strong><br>
+An ideal benchmark reserve balance. Formula: FFB = Current Cost × (Effective Age ÷ Useful Life)</p>
+
+<p><strong>Percent Funded</strong><br>
+The ratio of the actual reserve balance to the fully funded balance.</p>
+
+<p><strong>Remaining Useful Life (RUL)</strong><br>
+The estimated number of years a component will continue to function before replacement.</p>
+
+<p><strong>Replacement Cost</strong><br>
+The total cost to repair, restore, or replace a component to its original functional condition.</p>
+
+<p><strong>Threshold Funding</strong><br>
+Maintain reserve balances above a specific dollar amount or funding percentage.</p>
+
+<p><strong>Full Funding</strong><br>
+Aim to keep reserves at or near 100% funded.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- PHYSICAL ANALYSIS -->
+<h2 id="physical-analysis">PHYSICAL ANALYSIS</h2>
+
+<div class="editable-section" data-section="physical-analysis">
+The quantities used in the replacement cost estimates were generated from field measurements taken during our site visit on {inspectionDate}.
+
+Current replacement costs were estimated using published construction cost data referenced in the Bibliography section.
+
+Please note that these estimates are based on the professional judgment and experience of this firm.
+</div>
+
+<div class="page-break"></div>
+
+<!-- COMPONENT SCHEDULE SUMMARY -->
+<h2 id="component-summary">COMPONENT SCHEDULE SUMMARY</h2>
+{componentSummaryTable}
+
+<div class="page-break"></div>
+
+<!-- CAPITAL ITEMS / COMPONENTS BY CATEGORY -->
+<h2 id="components">CAPITAL ITEMS / COMPONENTS</h2>
+
+<div class="editable-section" data-section="components-intro">
+The following notes provide information on the location, condition, and replacement cost of the components listed in the tables.
+</div>
+
+<h3>Sitework Components</h3>
+{siteworkTable}
+
+<h3>Building Components</h3>
+{buildingTable}
+
+<h3>Building Exterior Components</h3>
+{exteriorTable}
+
+<h3>Interior Components</h3>
+{interiorTable}
+
+<h3>Electrical Components</h3>
+{electricalTable}
+
+<h3>Mechanical Components</h3>
+{mechanicalTable}
+
+<h3>Special Components</h3>
+{specialTable}
+
+<div class="page-break"></div>
+
+<!-- COMPONENT NOTES -->
+<h2 id="component-notes">COMPONENT NOTES</h2>
+<p><em>*EA = Each, *LF = Linear Foot, *LS = Lump Sum, *SF = Square Feet, *SY = Square Yard</em></p>
+{componentNotesTable}
+
+<div class="page-break"></div>
+
+<!-- FINANCIAL RESULTS -->
+<h2 id="financial-results">FINANCIAL RESULTS</h2>
+
+<div class="editable-section" data-section="financial-intro">
+The primary goal of capital reserve planning is to provide adequate funding for the replacement of the capital components within the community.
+</div>
+
+<div class="financial-highlight">
+  <h3>Reserve Fund Summary</h3>
+  <div class="info-grid">
+    <div class="info-item"><div class="info-label">Current Annual Contribution</div><div class="info-value">{currentAnnualContribution}</div></div>
+    <div class="info-item"><div class="info-label">Full Funding Annual Contribution</div><div class="info-value">{fullFundingContribution}</div></div>
+    <div class="info-item"><div class="info-label">Average Annual Contribution (30 years)</div><div class="info-value">{averageAnnualContribution}</div></div>
+    <div class="info-item"><div class="info-label">Threshold Funding Contribution</div><div class="info-value">{thresholdContribution}</div></div>
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- CASH FLOW -->
+<h2 id="cash-flow">RESERVE FUND - THIRTY YEAR CASH FLOW</h2>
+{reserveCashFlowTable}
+
+<div class="page-break"></div>
+
+<!-- THRESHOLD -->
+<h2 id="threshold">RESERVE FUND - THIRTY YEAR THRESHOLD FUNDING</h2>
+{thresholdProjectionTable}
+
+<div class="page-break"></div>
+
+<!-- EXPENDITURE SCHEDULE -->
+<h2 id="expenditures">EXPENDITURE SCHEDULE</h2>
+{expenditureScheduleTable}
+
+<div class="page-break"></div>
+
+<!-- PREVENTIVE MAINTENANCE -->
+<h2 id="pm-section">PREVENTIVE MAINTENANCE</h2>
+
+<h3>Component Schedule Summary</h3>
+{pmComponentSummaryTable}
+
+<h3>Preventive Maintenance Thirty Year Cash Flow</h3>
+{pmCashFlowTable}
+
+<div class="page-break"></div>
+
+<!-- RECOMMENDATIONS -->
+<h2 id="recommendations">RECOMMENDATIONS</h2>
+
+<div class="recommendation-box">
+  <h3>Financial Recommendation - Reserve Funding</h3>
+  <div class="editable-section" data-section="recommendation-reserve">
+The current annual contribution of {currentAnnualContribution} is {fundingAssessment}.
+
+{companyName} recommends {fundingRecommendation}.
+  </div>
+</div>
+
+<div class="recommendation-box">
+  <h3>Financial Recommendation - Preventive Maintenance</h3>
+  <div class="editable-section" data-section="recommendation-pm">
+Current Annual PM Contribution: {pmCurrentContribution}<br>
+Recommended Annual PM Contribution: {pmRecommendedFunding}
+  </div>
+</div>
+
+<div class="recommendation-box">
+  <h3>Updating the Reserve Study</h3>
+  <div class="editable-section" data-section="recommendation-update">
+{companyName} recommends the association update the reserve study <strong>Every Three (3) Years</strong>.<br>
+New Jersey Law Requires Reserve Studies to be Updated at a Maximum of <strong>Every Five (5) Years</strong>.
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- DISCLOSURES -->
+<h2 id="disclosures">DISCLOSURES</h2>
+
+<div class="editable-section" data-section="disclosures">
+{companyName} is not aware of any involvement with {projectName} that could result in any actual or perceived conflicts of interest.
+
+The physical on-site observations performed in the preparation of this study were cursory in nature.
+
+This study has been prepared by {preparedBy}, {companyName}.
+
+The actual or projected total presented in the Reserve Study is based upon the information provided and was not audited.
+</div>
+
+<div class="page-break"></div>
+
+<!-- BIBLIOGRAPHY -->
+<h2 id="bibliography">BIBLIOGRAPHY</h2>
+
+<div class="editable-section" data-section="bibliography">
+<ol>
+  <li>Master Deed of {projectName}</li>
+  <li>Best Practices for Reserve Studies/Management - Foundation for Community Association Research, 2023</li>
+  <li>National Reserve Study Standards - Community Associations Institute, 2023</li>
+  <li>Cost Works - R.S. Means Company, 2025</li>
+  <li>New Jersey Reserve Study Law (NJ Senate Bill S2760 and NJ Assembly Bill A4384), 2024</li>
+</ol>
+</div>
+
+</body>
+</html>
+`;
+
+export default DEFAULT_REPORT_TEMPLATE;

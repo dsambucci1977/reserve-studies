@@ -1,0 +1,717 @@
+// src/app/sites/[id]/calculate/page.js
+// DUAL FUND SYSTEM - Separate Reserve and PM Calculations
+
+'use client';
+
+import { useEffect, useState } from 'react';
+import { auth } from '@/lib/firebase';
+import { getSite, getComponents, updateSite, saveProjections } from '@/lib/db';
+import { calculateReserveStudy } from '@/lib/calculations';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+
+export default function CalculatePage() {
+  const [site, setSite] = useState(null);
+  const [components, setComponents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [calculating, setCalculating] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [calculationResults, setCalculationResults] = useState(null);
+  const params = useParams();
+  const router = useRouter();
+  const siteId = params.id;
+
+  useEffect(() => {
+    const loadData = async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        router.push('/');
+        return;
+      }
+      
+      try {
+        const [siteData, componentsData] = await Promise.all([
+          getSite(siteId),
+          getComponents(siteId)
+        ]);
+        
+        setSite(siteData);
+        setComponents(componentsData);
+        
+        console.log('🔵 DUAL FUND SYSTEM LOADED');
+        console.log('Total components:', componentsData.length);
+        console.log('PM components:', componentsData.filter(c => c.isPreventiveMaintenance).length);
+        
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error loading data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [siteId, router]);
+
+  const handleCalculate = async () => {
+    if (!site || components.length === 0) {
+      alert('Missing required data');
+      return;
+    }
+
+    setCalculating(true);
+    setProgress('Starting dual-fund calculations...');
+
+    try {
+      setProgress('Preparing data...');
+      
+      // Map component fields
+      const mappedComponents = components.map(comp => ({
+        ...comp,
+        costPerUnit: comp.unitCost || 0,
+        estimatedRemainingLife: comp.remainingUsefulLife || 0,
+        typicalUsefulLife: comp.usefulLife || 0,
+        quantity: comp.quantity || 0,
+        description: comp.description || '',
+        category: comp.category || '',
+        componentType: comp.isPreventiveMaintenance ? 'Preventive Maintenance' : (comp.category || ''),
+        itemName: comp.description || '',
+        isPreventiveMaintenance: comp.isPreventiveMaintenance || false,
+      }));
+
+      // SPLIT INTO RESERVE AND PM COMPONENTS
+      const reserveComponents = mappedComponents.filter(c => !c.isPreventiveMaintenance);
+      const pmComponents = mappedComponents.filter(c => c.isPreventiveMaintenance);
+
+      console.log('========================================');
+      console.log('🔵 DUAL FUND CALCULATION SYSTEM');
+      console.log('========================================');
+      console.log('Total Components:', mappedComponents.length);
+      console.log('Reserve Components (non-PM):', reserveComponents.length);
+      console.log('PM Components:', pmComponents.length);
+      console.log('');
+      console.log('PM COMPONENT DETAILS:');
+      pmComponents.forEach((comp, i) => {
+        console.log(`PM ${i + 1}:`, {
+          description: comp.description,
+          unitCost: comp.unitCost,
+          costPerUnit: comp.costPerUnit,
+          quantity: comp.quantity,
+          totalCost: comp.totalCost,
+          usefulLife: comp.usefulLife,
+          typicalUsefulLife: comp.typicalUsefulLife,
+          remainingLife: comp.remainingUsefulLife,
+          estimatedRemainingLife: comp.estimatedRemainingLife,
+          category: comp.category,
+          componentType: comp.componentType,
+        });
+      });
+
+      // ========================================
+      // RESERVE FUND CALCULATION
+      // ========================================
+      setProgress(`Calculating Reserve Fund (${reserveComponents.length} components)...`);
+      
+      const reserveProjectInfo = {
+        beginningYear: site.beginningYear || new Date().getFullYear(),
+        projectionYears: site.projectionYears || 30,
+        beginningReserveBalance: site.beginningReserveBalance || 0,
+        currentAnnualContribution: site.currentAnnualContribution || 0,
+        inflationRate: (site.inflationRate || 0) / 100,
+        interestRate: (site.interestRate || 0) / 100,
+        costAdjustmentFactor: site.costAdjustmentFactor || 1.15,
+        pmBeginningBalance: 0,
+        pmAnnualContribution: 0,
+        pmAveragingLength: 30,
+      };
+
+      const reserveResults = calculateReserveStudy(reserveProjectInfo, reserveComponents);
+      
+      console.log('========================================');
+      console.log('💰 RESERVE FUND RESULTS:');
+      console.log('========================================');
+      console.log('Components:', reserveComponents.length);
+      console.log('Total Replacement Cost:', reserveResults.summary.totalReplacementCost);
+      console.log('Percent Funded:', (reserveResults.years[0].reserveBalance?.percentFunded || 0) * 100);
+      console.log('Fully Funded Balance:', reserveResults.years[0].totals?.overall?.fullFundingBalance);
+      console.log('Recommended Contribution:', reserveResults.summary.recommendedAnnualFunding);
+
+      // ========================================
+      // PM FUND CALCULATION
+      // ========================================
+      setProgress(`Calculating PM Fund (${pmComponents.length} components)...`);
+      
+      const pmProjectInfo = {
+        beginningYear: site.beginningYear || new Date().getFullYear(),
+        projectionYears: site.projectionYears || 30,
+        beginningReserveBalance: site.pmBeginningBalance || 0,
+        currentAnnualContribution: site.pmAnnualContribution || 0,
+        inflationRate: (site.inflationRate || 0) / 100,
+        interestRate: (site.interestRate || 0) / 100,
+        costAdjustmentFactor: site.costAdjustmentFactor || 1.15,
+        pmBeginningBalance: 0,
+        pmAnnualContribution: 0,
+        pmAveragingLength: 30,
+      };
+
+      const pmResults = calculateReserveStudy(pmProjectInfo, pmComponents);
+      
+      console.log('========================================');
+      console.log('🟣 PM FUND RESULTS:');
+      console.log('========================================');
+      console.log('Components:', pmComponents.length);
+      console.log('Total Replacement Cost:', pmResults.summary.totalReplacementCost);
+      console.log('Percent Funded:', (pmResults.years[0].reserveBalance?.percentFunded || 0) * 100);
+      console.log('Fully Funded Balance:', pmResults.years[0].totals?.overall?.fullFundingBalance);
+      console.log('Recommended Contribution:', pmResults.summary.recommendedAnnualFunding);
+
+      // ========================================
+      // BUILD CASH FLOW WITH EXPENDITURES
+      // ========================================
+      
+      // Helper function to build cash flow with actual expenditures
+      const buildCashFlowWithExpenditures = (components, projectInfo, fundType) => {
+        const cashFlow = [];
+        const startYear = projectInfo.beginningYear;
+        let runningBalance = projectInfo.beginningReserveBalance;
+        
+        for (let year = 0; year < 30; year++) {
+          const fiscalYear = startYear + year;
+          
+          // Calculate expenditures for this year
+          let yearExpenditures = 0;
+          components.forEach(comp => {
+            const replacementYear = comp.replacementYear || (startYear + (comp.remainingUsefulLife || 0));
+            
+            if (replacementYear === fiscalYear) {
+              // Component is replaced this year
+              const yearsFromNow = year;
+              const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, yearsFromNow);
+              const inflatedCost = (comp.totalCost || 0) * projectInfo.costAdjustmentFactor * inflationMultiplier;
+              yearExpenditures += inflatedCost;
+            }
+          });
+          
+          // Calculate this year's cash flow
+          const beginningBalance = runningBalance;
+          const contributions = projectInfo.currentAnnualContribution;
+          const interest = beginningBalance * projectInfo.interestRate;
+          const expenditures = yearExpenditures;
+          const endingBalance = beginningBalance + contributions + interest - expenditures;
+          
+          cashFlow.push({
+            year: fiscalYear,
+            beginningBalance: Math.round(beginningBalance),
+            contributions: Math.round(contributions),
+            interest: Math.round(interest),
+            expenditures: Math.round(expenditures),
+            endingBalance: Math.round(endingBalance),
+          });
+          
+          runningBalance = endingBalance;
+        }
+        
+        return cashFlow;
+      };
+      
+      // Build Reserve Fund cash flow with actual expenditures
+      const reserveCashFlowWithExpend = buildCashFlowWithExpenditures(
+        reserveComponents,
+        reserveProjectInfo,
+        'reserve'
+      );
+      
+      // Build PM Fund cash flow with actual expenditures
+      const pmCashFlowWithExpend = buildCashFlowWithExpenditures(
+        pmComponents,
+        pmProjectInfo,
+        'pm'
+      );
+      
+      console.log('✅ Cash flows built with year-by-year expenditures');
+      console.log('Reserve Fund total expenditures over 30 years:', 
+        reserveCashFlowWithExpend.reduce((sum, y) => sum + y.expenditures, 0));
+      console.log('PM Fund total expenditures over 30 years:', 
+        pmCashFlowWithExpend.reduce((sum, y) => sum + y.expenditures, 0));
+      
+      // ========================================
+      // CALCULATE NJ THRESHOLD PROJECTIONS
+      // ========================================
+      setProgress('Calculating NJ threshold projections...');
+      
+      const thresholdResults = calculateThresholdMultipliers(
+        reserveProjectInfo,
+        reserveComponents,
+        site.beginningReserveBalance || 0
+      );
+      
+      // ========================================
+      // COMBINE RESULTS FOR DISPLAY
+      // ========================================
+      const displayResults = {
+        // Reserve Fund Results
+        reserveFund: {
+          percentFunded: (reserveResults.years[0].reserveBalance?.percentFunded || 0) * 100,
+          fullyFundedBalance: reserveResults.years[0].totals?.overall?.fullFundingBalance || 0,
+          recommendedContribution: reserveResults.summary.recommendedAnnualFunding || 0,
+          currentBalance: site.beginningReserveBalance || 0,
+          currentContribution: site.currentAnnualContribution || 0,
+          componentCount: reserveComponents.length,
+          totalReplacementCost: reserveResults.summary.totalReplacementCost || 0,
+        },
+        // PM Fund Results
+        pmFund: {
+          percentFunded: (pmResults.years[0].reserveBalance?.percentFunded || 0) * 100,
+          fullyFundedBalance: pmResults.years[0].totals?.overall?.fullFundingBalance || 0,
+          recommendedContribution: pmResults.summary.recommendedAnnualFunding || 0,
+          currentBalance: site.pmBeginningBalance || 0,
+          currentContribution: site.pmAnnualContribution || 0,
+          componentCount: pmComponents.length,
+          totalReplacementCost: pmResults.summary.totalReplacementCost || 0,
+        },
+        // NJ Threshold Projections
+        thresholds: {
+          multiplier10: thresholdResults.multiplier10,
+          multiplier5: thresholdResults.multiplier5,
+          multiplierBaseline: thresholdResults.multiplierBaseline,
+          minBalance10: thresholdResults.minBalance10,
+          minBalance5: thresholdResults.minBalance5,
+          minBalanceBaseline: thresholdResults.minBalanceBaseline,
+          percentOfBeginning10: thresholdResults.percentOfBeginning10,
+          percentOfBeginning5: thresholdResults.percentOfBeginning5,
+          percentOfBeginningBaseline: thresholdResults.percentOfBeginningBaseline,
+          compliant10: thresholdResults.compliant10,
+          compliant5: thresholdResults.compliant5,
+          projection10: thresholdResults.projection10,
+          projection5: thresholdResults.projection5,
+          projectionBaseline: thresholdResults.projectionBaseline,
+        },
+        // Keep legacy summary for compatibility
+        summary: {
+          percentFunded: (reserveResults.years[0].reserveBalance?.percentFunded || 0) * 100,
+          recommendedContribution: reserveResults.summary.recommendedAnnualFunding || 0,
+          currentReserveBalance: site.beginningReserveBalance || 0,
+          fullyFundedBalance: reserveResults.years[0].totals?.overall?.fullFundingBalance || 0,
+          asOfYear: site.beginningYear || new Date().getFullYear(),
+          totalComponents: mappedComponents.length,
+        },
+        // Cash flows WITH EXPENDITURES
+        reserveCashFlow: reserveCashFlowWithExpend,
+        pmCashFlow: pmCashFlowWithExpend,
+        // Legacy cash flow (Reserve only for compatibility)
+        cashFlow: reserveCashFlowWithExpend,
+        // Replacement schedule (all components with fund designation)
+        replacementSchedule: buildReplacementSchedule(components, site.beginningYear || new Date().getFullYear()),
+      };
+      
+      console.log('========================================');
+      console.log('✅ DUAL FUND CALCULATIONS COMPLETE');
+      console.log('========================================');
+      
+      setProgress('Saving results...');
+      await saveProjections(siteId, displayResults);
+      await updateSite(siteId, { 
+        status: 'calculated',
+        lastCalculated: new Date().toISOString()
+      });
+      
+      setProgress('Complete!');
+      setCalculationResults(displayResults);
+      setCalculating(false);
+      
+    } catch (error) {
+      console.error('========================================');
+      console.error('ERROR:', error);
+      console.error('========================================');
+      alert(`Error: ${error.message}`);
+      setCalculating(false);
+      setProgress('');
+    }
+  };
+
+  const buildReplacementSchedule = (components, beginningYear) => {
+    const schedule = [];
+    components.forEach(component => {
+      const replacementYear = component.replacementYear || (beginningYear + (component.remainingUsefulLife || 0));
+      schedule.push({
+        year: replacementYear,
+        description: component.description,
+        cost: component.totalCost || 0,
+        category: component.category,
+        isPM: component.isPreventiveMaintenance || false,
+      });
+    });
+    schedule.sort((a, b) => a.year - b.year);
+    return schedule;
+  };
+
+  // ========================================
+  // THRESHOLD PROJECTION CALCULATIONS (NJ Requirement)
+  // ========================================
+
+  /**
+   * Project a threshold scenario with given multiplier
+   * Returns 30-year projection with ending balances
+   */
+  const projectThresholdScenario = (projectInfo, components, beginningBalance, multiplier) => {
+    const projection = [];
+    const startYear = projectInfo.beginningYear;
+    const reducedContribution = (projectInfo.currentAnnualContribution || 0) * multiplier;
+    let runningBalance = beginningBalance;
+    
+    for (let year = 0; year < 30; year++) {
+      const fiscalYear = startYear + year;
+      
+      // Calculate expenditures for this year
+      let yearExpenditures = 0;
+      components.forEach(comp => {
+        const replacementYear = comp.replacementYear || (startYear + (comp.remainingUsefulLife || 0));
+        
+        if (replacementYear === fiscalYear) {
+          const yearsFromNow = year;
+          const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, yearsFromNow);
+          const inflatedCost = (comp.totalCost || 0) * projectInfo.costAdjustmentFactor * inflationMultiplier;
+          yearExpenditures += inflatedCost;
+        }
+      });
+      
+      // Calculate this year's balance
+      const beginningBalanceYear = runningBalance;
+      const contributions = reducedContribution;
+      const interest = beginningBalanceYear * projectInfo.interestRate;
+      const expenditures = yearExpenditures;
+      const endingBalance = beginningBalanceYear + contributions + interest - expenditures;
+      
+      projection.push({
+        year: fiscalYear,
+        beginningBalance: beginningBalanceYear,
+        contributions,
+        interest,
+        expenditures,
+        endingBalance
+      });
+      
+      runningBalance = endingBalance;
+    }
+    
+    return projection;
+  };
+
+  /**
+   * Binary search to find optimal threshold multiplier (Goal Seek approach)
+   */
+  const findThresholdMultiplier = (projectInfo, components, beginningBalance, thresholdPercent, label) => {
+    const targetBalance = beginningBalance * thresholdPercent;
+    let low = 0.5;   // Minimum possible multiplier
+    let high = 1.0;  // Maximum possible multiplier
+    let iterations = 0;
+    const maxIterations = 50;
+    
+    console.log(`  Searching for ${label} threshold (target: $${Math.round(targetBalance).toLocaleString()})...`);
+    
+    while (iterations < maxIterations && (high - low) > 0.0001) {
+      const testMultiplier = (low + high) / 2;
+      
+      // Test this multiplier
+      const projection = projectThresholdScenario(
+        projectInfo,
+        components,
+        beginningBalance,
+        testMultiplier
+      );
+      
+      const minBalance = Math.min(...projection.map(year => year.endingBalance));
+      const hasNegatives = projection.some(year => year.endingBalance < 0);
+      const meetsTarget = !hasNegatives && minBalance >= targetBalance;
+      
+      if (meetsTarget) {
+        high = testMultiplier;  // Can go lower
+      } else {
+        low = testMultiplier;   // Need to go higher
+      }
+      
+      iterations++;
+      
+      if (iterations % 10 === 0) {
+        console.log(`    Iteration ${iterations}: Testing ${testMultiplier.toFixed(4)}, Min Balance: $${Math.round(minBalance).toLocaleString()}`);
+      }
+    }
+    
+    console.log(`    ${label} complete: ${high.toFixed(4)} after ${iterations} iterations`);
+    
+    return high;
+  };
+
+  /**
+   * Calculate all threshold multipliers using binary search
+   */
+  const calculateThresholdMultipliers = (projectInfo, components, beginningBalance) => {
+    console.log('========================================');
+    console.log('🎯 CALCULATING NJ THRESHOLD MULTIPLIERS');
+    console.log('========================================');
+    
+    // Calculate 10% threshold multiplier
+    const multiplier10 = findThresholdMultiplier(
+      projectInfo,
+      components,
+      beginningBalance,
+      0.10,
+      '10% Threshold'
+    );
+    
+    // Calculate 5% threshold multiplier
+    const multiplier5 = findThresholdMultiplier(
+      projectInfo,
+      components,
+      beginningBalance,
+      0.05,
+      '5% Threshold'
+    );
+    
+    // Calculate baseline (0%) threshold multiplier
+    const multiplierBaseline = findThresholdMultiplier(
+      projectInfo,
+      components,
+      beginningBalance,
+      0.00,
+      'Baseline (0%)'
+    );
+    
+    console.log('========================================');
+    console.log('✅ THRESHOLD MULTIPLIERS CALCULATED:');
+    console.log(`  10% Threshold: ${multiplier10.toFixed(4)}`);
+    console.log(`  5% Threshold: ${multiplier5.toFixed(4)}`);
+    console.log(`  Baseline: ${multiplierBaseline.toFixed(4)}`);
+    console.log('========================================');
+    
+    // Generate full projections for each threshold
+    const projection10 = projectThresholdScenario(projectInfo, components, beginningBalance, multiplier10);
+    const projection5 = projectThresholdScenario(projectInfo, components, beginningBalance, multiplier5);
+    const projectionBaseline = projectThresholdScenario(projectInfo, components, beginningBalance, multiplierBaseline);
+    
+    // Calculate minimum balances
+    const minBalance10 = Math.min(...projection10.map(y => y.endingBalance));
+    const minBalance5 = Math.min(...projection5.map(y => y.endingBalance));
+    const minBalanceBaseline = Math.min(...projectionBaseline.map(y => y.endingBalance));
+    
+    // Check compliance
+    const compliant10 = !projection10.some(y => y.endingBalance < 0) && minBalance10 >= beginningBalance * 0.10;
+    const compliant5 = !projection5.some(y => y.endingBalance < 0) && minBalance5 >= beginningBalance * 0.05;
+    
+    return {
+      multiplier10,
+      multiplier5,
+      multiplierBaseline,
+      minBalance10,
+      minBalance5,
+      minBalanceBaseline,
+      percentOfBeginning10: (minBalance10 / beginningBalance) * 100,
+      percentOfBeginning5: (minBalance5 / beginningBalance) * 100,
+      percentOfBeginningBaseline: (minBalanceBaseline / beginningBalance) * 100,
+      compliant10,
+      compliant5,
+      projection10,
+      projection5,
+      projectionBaseline
+    };
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-xl text-gray-900">Loading...</div>
+      </div>
+    );
+  }
+
+  const hasRequiredData = site?.beginningReserveBalance !== undefined && components.length > 0;
+  const pmComponentCount = components.filter(c => c.isPreventiveMaintenance).length;
+  const reserveComponentCount = components.length - pmComponentCount;
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <Link href={`/sites/${siteId}`} className="text-red-600 hover:text-red-700 font-medium">
+          ← Back to Site
+        </Link>
+        
+        <div className="mt-6 mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">Run Calculations</h1>
+          <p className="text-gray-700 mt-2">{site?.siteName}</p>
+          <p className="text-sm text-purple-600 mt-1">🔵 Dual Fund System (NJ Compliant)</p>
+        </div>
+
+        {calculationResults && (
+          <div className="mb-6 space-y-6">
+            {/* Reserve Fund Results */}
+            <div className="bg-blue-50 border-2 border-blue-500 rounded-lg p-6">
+              <h2 className="text-2xl font-bold text-blue-900 mb-4">💰 Reserve Fund Results</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white rounded p-4">
+                  <div className="text-sm text-gray-600">Percent Funded</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {calculationResults.reserveFund.percentFunded?.toFixed(2)}%
+                  </div>
+                </div>
+                <div className="bg-white rounded p-4">
+                  <div className="text-sm text-gray-600">Fully Funded</div>
+                  <div className="text-xl font-bold text-gray-900">
+                    ${Math.round(calculationResults.reserveFund.fullyFundedBalance || 0).toLocaleString()}
+                  </div>
+                </div>
+                <div className="bg-white rounded p-4">
+                  <div className="text-sm text-gray-600">Recommended</div>
+                  <div className="text-xl font-bold text-gray-900">
+                    ${Math.round(calculationResults.reserveFund.recommendedContribution || 0).toLocaleString()}
+                  </div>
+                </div>
+                <div className="bg-white rounded p-4">
+                  <div className="text-sm text-gray-600">Components</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {calculationResults.reserveFund.componentCount}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* PM Fund Results */}
+            <div className="bg-purple-50 border-2 border-purple-500 rounded-lg p-6">
+              <h2 className="text-2xl font-bold text-purple-900 mb-4">🟣 PM Fund Results</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white rounded p-4">
+                  <div className="text-sm text-gray-600">Percent Funded</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {calculationResults.pmFund.percentFunded?.toFixed(2)}%
+                  </div>
+                </div>
+                <div className="bg-white rounded p-4">
+                  <div className="text-sm text-gray-600">Fully Funded</div>
+                  <div className="text-xl font-bold text-gray-900">
+                    ${Math.round(calculationResults.pmFund.fullyFundedBalance || 0).toLocaleString()}
+                  </div>
+                </div>
+                <div className="bg-white rounded p-4">
+                  <div className="text-sm text-gray-600">Recommended</div>
+                  <div className="text-xl font-bold text-gray-900">
+                    ${Math.round(calculationResults.pmFund.recommendedContribution || 0).toLocaleString()}
+                  </div>
+                </div>
+                <div className="bg-white rounded p-4">
+                  <div className="text-sm text-gray-600">Components</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {calculationResults.pmFund.componentCount}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-4">
+              <Link
+                href={`/sites/${siteId}/results`}
+                className="flex-1 px-6 py-3 bg-green-600 text-white text-center rounded-lg hover:bg-green-700 font-medium"
+              >
+                View Full Results →
+              </Link>
+              <button
+                onClick={() => setCalculationResults(null)}
+                className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+              >
+                Run Again
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!calculationResults && !calculating && (
+          <>
+            <div className="bg-white rounded-lg shadow p-6 mb-6">
+              <h2 className="text-xl font-bold mb-4 text-gray-900">Dual Fund Calculation Summary</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                {/* Reserve Fund */}
+                <div className="border-2 border-blue-300 rounded-lg p-4">
+                  <h3 className="font-bold text-blue-900 mb-3">💰 Reserve Fund</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Components:</span>
+                      <span className="font-semibold text-gray-900">{reserveComponentCount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Beginning Balance:</span>
+                      <span className="font-semibold text-gray-900">${site?.beginningReserveBalance?.toLocaleString() || '0'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Annual Contribution:</span>
+                      <span className="font-semibold text-gray-900">${site?.currentAnnualContribution?.toLocaleString() || '0'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* PM Fund */}
+                <div className="border-2 border-purple-300 rounded-lg p-4">
+                  <h3 className="font-bold text-purple-900 mb-3">🟣 PM Fund</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Components:</span>
+                      <span className="font-semibold text-gray-900">{pmComponentCount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Beginning Balance:</span>
+                      <span className="font-semibold text-gray-900">${site?.pmBeginningBalance?.toLocaleString() || '0'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Annual Contribution:</span>
+                      <span className="font-semibold text-gray-900">${site?.pmAnnualContribution?.toLocaleString() || '0'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {!hasRequiredData && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <p className="text-orange-800">
+                    <strong>⚠️ Missing Required Data:</strong> Please add project information and components.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-4">
+              <Link
+                href={`/sites/${siteId}`}
+                className="flex-1 px-6 py-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium text-center"
+              >
+                Cancel
+              </Link>
+              <button
+                onClick={handleCalculate}
+                disabled={!hasRequiredData}
+                className="flex-1 px-6 py-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 font-medium text-lg"
+              >
+                🚀 Run Dual Fund Calculations
+              </button>
+            </div>
+          </>
+        )}
+
+        {calculating && !calculationResults && (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <div className="mb-4">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Calculating...</h3>
+            <p className="text-gray-600">{progress}</p>
+          </div>
+        )}
+
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="font-semibold text-blue-900 mb-2">🔵 NJ Dual Fund System</h3>
+          <p className="text-blue-800 text-sm">
+            This calculates Reserve Fund and PM Fund separately as required by New Jersey regulations.
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+}
