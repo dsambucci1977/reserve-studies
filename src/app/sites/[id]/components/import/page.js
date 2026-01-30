@@ -181,10 +181,10 @@ Building Exterior,Seal Coat - Parking Lot,5000,SF,1.25,4,2,Good,Yes,PM item - pr
       component.totalCost = component.quantity * component.unitCost;
       
       // Handle PM field - be very explicit about parsing
-      let pmRaw = component.pm || '';
+      let pmRaw = component.pm || component.isPreventiveMaintenance || '';
       // Remove any quotes, whitespace, or hidden characters
       let pmValue = String(pmRaw).toLowerCase().replace(/['"]/g, '').trim();
-      component.pm = (pmValue === 'yes' || pmValue === 'true' || pmValue === '1' || pmValue === 'y');
+      component.isPreventiveMaintenance = (pmValue === 'yes' || pmValue === 'true' || pmValue === '1' || pmValue === 'y');
       
       // Debug logging
       console.log(`Component: ${component.description}, PM raw: "${pmRaw}", PM parsed: ${component.pm}`);
@@ -374,7 +374,7 @@ Building Exterior,Seal Coat - Parking Lot,5000,SF,1.25,4,2,Good,Yes,PM item - pr
                       <td className="px-3 py-2 text-sm text-gray-900 font-medium">${comp.totalCost?.toLocaleString()}</td>
                       <td className="px-3 py-2 text-sm text-gray-900">{comp.usefulLife}y / {comp.remainingUsefulLife}y rem</td>
                       <td className="px-3 py-2 text-sm">
-                        {comp.pm ? (
+                        {comp.isPreventiveMaintenance ? (
                           <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">Yes</span>
                         ) : (
                           <span className="text-gray-400">No</span>
