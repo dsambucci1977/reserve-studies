@@ -19,8 +19,7 @@ const STATUSES = {
 // Study type labels
 const STUDY_TYPES = {
   'level1': 'Level 1 Full',
-  'level2': 'Level 2 Update',
-  'level3': 'Level 3 Update'
+  'level2': 'Level 2 Update'
 };
 
 export default function SitesPage() {
