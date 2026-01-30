@@ -1,5 +1,5 @@
 // src/app/sites/[id]/page.js
-// Site Detail with Status Management
+// Site Detail with Status Management and Study Type Display
 'use client';
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
@@ -147,7 +147,7 @@ export default function SiteDetailPage() {
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <span className="text-gray-500">Location:</span>
               <p className="font-medium text-gray-900">{site?.city && site?.state ? `${site.city}, ${site.state}` : site?.location || 'Not specified'}</p>
@@ -155,6 +155,10 @@ export default function SiteDetailPage() {
             <div>
               <span className="text-gray-500">Units:</span>
               <p className="font-medium text-gray-900">{site?.totalUnits || site?.numberOfUnits || 0}</p>
+            </div>
+            <div>
+              <span className="text-gray-500">Study Type:</span>
+              <p className="font-medium text-gray-900">{site?.studyType || 'Not specified'}</p>
             </div>
             <div>
               <span className="text-gray-500">Components:</span>
