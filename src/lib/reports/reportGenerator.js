@@ -332,7 +332,7 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   html += '<div style="font-weight: bold; color: #92400e; font-size: 10pt;">10% Threshold</div>';
   html += '<div style="font-size: 7pt; color: #a16207;">Reduced contributions maintaining 10% minimum</div>';
   html += '</div>';
-  html += '<div style="padding: 10px; font-size: 9pt; height: 160px;">';
+  html += '<div style="padding: 10px; font-size: 9pt; height: 180px;">';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Multiplier</span><br><strong>' + (scenarios.threshold10.multiplier || 0).toFixed(4) + '</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Annual Contribution</span><br><strong>' + formatCurrency(scenarios.threshold10.contribution) + '</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Min Balance</span><br><strong>' + formatCurrency(scenarios.threshold10.minBalance) + '</strong></div>';
@@ -347,7 +347,7 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   html += '<div style="font-weight: bold; color: #a16207; font-size: 10pt;">5% Threshold</div>';
   html += '<div style="font-size: 7pt; color: #a16207;">Reduced contributions maintaining 5% minimum</div>';
   html += '</div>';
-  html += '<div style="padding: 10px; font-size: 9pt; height: 160px;">';
+  html += '<div style="padding: 10px; font-size: 9pt; height: 180px;">';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Multiplier</span><br><strong>' + (scenarios.threshold5.multiplier || 0).toFixed(4) + '</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Annual Contribution</span><br><strong>' + formatCurrency(scenarios.threshold5.contribution) + '</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Min Balance</span><br><strong>' + formatCurrency(scenarios.threshold5.minBalance) + '</strong></div>';
@@ -362,7 +362,7 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   html += '<div style="font-weight: bold; color: #166534; font-size: 10pt;">Baseline (0%)</div>';
   html += '<div style="font-size: 7pt; color: #166534;">Minimum to avoid negatives</div>';
   html += '</div>';
-  html += '<div style="padding: 10px; font-size: 9pt; height: 160px;">';
+  html += '<div style="padding: 10px; font-size: 9pt; height: 180px;">';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Multiplier</span><br><strong>' + (scenarios.baseline.multiplier || 0).toFixed(4) + '</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Annual Contribution</span><br><strong>' + formatCurrency(scenarios.baseline.contribution) + '</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Min Balance</span><br><strong>' + formatCurrency(scenarios.baseline.minBalance) + '</strong></div>';
@@ -377,7 +377,7 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   html += '<div style="font-weight: bold; color: #1e40af; font-size: 10pt;">Full Funding</div>';
   html += '<div style="font-size: 7pt; color: #1e40af;">Recommended contribution (100%)</div>';
   html += '</div>';
-  html += '<div style="padding: 10px; font-size: 9pt; height: 160px;">';
+  html += '<div style="padding: 10px; font-size: 9pt; height: 180px;">';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Multiplier</span><br><strong>1.0000</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Annual Contribution</span><br><strong>' + formatCurrency(scenarios.fullFunding.contribution) + '</strong></div>';
   var fullFundingFinalBalance = calculateFullFundingFinalBalance(reserveCashFlow, scenarios.fullFunding.contribution, startingBalance);
