@@ -16,11 +16,19 @@ const STATUSES = {
   sent: { label: 'Sent to Client', color: 'bg-purple-100 text-purple-800', icon: '📤' }
 };
 
+// Study type labels
+const STUDY_TYPES = {
+  'level1': 'Level 1 Full',
+  'level2': 'Level 2 Update',
+  'level3': 'Level 3 Update'
+};
+
 export default function SitesPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [sites, setSites] = useState([]);
   const [filteredSites, setFilteredSites] = useState([]);
+  const [groupedSites, setGroupedSites] = useState({});
   const [loading, setLoading] = useState(true);
   const [organization, setOrganization] = useState(null);
   const [users, setUsers] = useState({});
@@ -30,6 +38,9 @@ export default function SitesPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [deleting, setDeleting] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(null);
+  
+  // Expanded groups state
+  const [expandedGroups, setExpandedGroups] = useState({});
 
   useEffect(() => {
     if (!user) {
@@ -70,6 +81,14 @@ export default function SitesPage() {
       setSites(sitesList);
       setFilteredSites(sitesList);
       
+      // Expand all groups by default
+      const groups = {};
+      sitesList.forEach(site => {
+        const groupName = site.siteName || 'Ungrouped';
+        groups[groupName] = true;
+      });
+      setExpandedGroups(groups);
+      
       // Load all users to get creator names
       const usersSnapshot = await getDocs(collection(db, 'users'));
       const usersMap = {};
@@ -105,6 +124,38 @@ export default function SitesPage() {
     }
     
     setFilteredSites(filtered);
+    
+    // Group sites by siteName (Project Name)
+    const grouped = {};
+    filtered.forEach(site => {
+      const groupName = site.siteName || 'Ungrouped';
+      if (!grouped[groupName]) {
+        grouped[groupName] = [];
+      }
+      grouped[groupName].push(site);
+    });
+    
+    // Sort sites within each group by projectNumber or updatedAt
+    Object.keys(grouped).forEach(groupName => {
+      grouped[groupName].sort((a, b) => {
+        // Sort by project number if available, otherwise by updated date
+        if (a.projectNumber && b.projectNumber) {
+          return a.projectNumber.localeCompare(b.projectNumber);
+        }
+        const dateA = a.updatedAt?.seconds || 0;
+        const dateB = b.updatedAt?.seconds || 0;
+        return dateB - dateA;
+      });
+    });
+    
+    setGroupedSites(grouped);
+  };
+
+  const toggleGroup = (groupName) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupName]: !prev[groupName]
+    }));
   };
 
   const handleStatusChange = async (siteId, newStatus, e) => {
@@ -132,11 +183,12 @@ export default function SitesPage() {
     }
   };
 
-  const handleDeleteSite = async (siteId, siteName, e) => {
+  const handleDeleteSite = async (siteId, siteName, projectNumber, e) => {
     e.preventDefault();
     e.stopPropagation();
     
-    if (!confirm(`Delete site "${siteName}"? This will also delete all components and cannot be undone.`)) {
+    const displayName = projectNumber ? `${siteName} (${projectNumber})` : siteName;
+    if (!confirm(`Delete "${displayName}"? This will also delete all components and cannot be undone.`)) {
       return;
     }
     
@@ -165,13 +217,23 @@ export default function SitesPage() {
 
   const getCreatorName = (createdBy) => {
     if (!createdBy) return 'Unknown';
-    const user = users[createdBy];
-    return user?.displayName || user?.email || 'Unknown';
+    const userData = users[createdBy];
+    return userData?.displayName || userData?.email || 'Unknown';
   };
 
   const getStatusInfo = (status) => {
     const normalizedStatus = status?.toLowerCase() || 'draft';
     return STATUSES[normalizedStatus] || STATUSES.draft;
+  };
+
+  const getStudyTypeLabel = (studyType) => {
+    return STUDY_TYPES[studyType] || studyType || 'Not specified';
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
+    return date.toLocaleDateString();
   };
 
   if (loading) {
@@ -182,6 +244,12 @@ export default function SitesPage() {
     );
   }
 
+  const sortedGroupNames = Object.keys(groupedSites).sort((a, b) => {
+    if (a === 'Ungrouped') return 1;
+    if (b === 'Ungrouped') return -1;
+    return a.localeCompare(b);
+  });
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -189,7 +257,7 @@ export default function SitesPage() {
         {/* Header */}
         <div className="mb-8 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Reserve Study Sites</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Reserve Study Projects</h1>
             {organization && (
               <p className="text-gray-600 mt-1">{organization.name}</p>
             )}
@@ -198,7 +266,7 @@ export default function SitesPage() {
             href="/sites/new"
             className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
           >
-            + New Site
+            + New Study
           </Link>
         </div>
 
@@ -209,13 +277,13 @@ export default function SitesPage() {
             {/* Search */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search Sites
+                Search Projects
               </label>
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by site name or project number..."
+                placeholder="Search by project name or project number..."
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
               />
             </div>
@@ -230,7 +298,7 @@ export default function SitesPage() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
               >
-                <option value="all">All Sites</option>
+                <option value="all">All Studies</option>
                 <option value="draft">📝 Draft</option>
                 <option value="pending">⏳ Pending</option>
                 <option value="calculated">🔢 Calculated</option>
@@ -242,118 +310,159 @@ export default function SitesPage() {
 
           {/* Results Count */}
           <div className="mt-4 text-sm text-gray-600">
-            Showing {filteredSites.length} of {sites.length} sites
+            Showing {filteredSites.length} studies across {sortedGroupNames.length} projects
           </div>
         </div>
 
-        {/* Sites Grid */}
-        {filteredSites.length === 0 ? (
+        {/* Grouped Sites */}
+        {sortedGroupNames.length === 0 ? (
           <div className="bg-white shadow rounded-lg p-12 text-center">
             <div className="text-gray-400 text-6xl mb-4">📊</div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">No sites found</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No projects found</h3>
             <p className="text-gray-600 mb-6">
               {searchTerm || statusFilter !== 'all' 
                 ? 'Try adjusting your filters'
-                : 'Get started by creating your first reserve study site'}
+                : 'Get started by creating your first reserve study'}
             </p>
             {!searchTerm && statusFilter === 'all' && (
               <Link
                 href="/sites/new"
                 className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
               >
-                Create Your First Site
+                Create Your First Study
               </Link>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredSites.map(site => {
-              const statusInfo = getStatusInfo(site.status);
+          <div className="space-y-4">
+            {sortedGroupNames.map(groupName => {
+              const groupSites = groupedSites[groupName];
+              const isExpanded = expandedGroups[groupName] !== false;
+              const completedCount = groupSites.filter(s => s.status === 'completed' || s.status === 'sent').length;
+              
               return (
-                <div key={site.id} className="bg-white shadow rounded-lg hover:shadow-lg transition-shadow overflow-hidden">
-                  <Link href={`/sites/${site.id}`} className="block p-6">
-                    {/* Status Badge */}
-                    <div className="flex justify-between items-start mb-3">
-                      <span className={`px-3 py-1 text-xs font-medium rounded-full flex items-center gap-1 ${statusInfo.color}`}>
-                        <span>{statusInfo.icon}</span>
-                        {statusInfo.label}
+                <div key={groupName} className="bg-white shadow rounded-lg overflow-hidden">
+                  {/* Group Header */}
+                  <button
+                    onClick={() => toggleGroup(groupName)}
+                    className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-blue-50 to-white hover:from-blue-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">
+                        {isExpanded ? '▼' : '▶'}
                       </span>
+                      <div className="text-left">
+                        <h2 className="text-lg font-bold text-gray-900">{groupName}</h2>
+                        <p className="text-sm text-gray-600">
+                          {groupSites.length} {groupSites.length === 1 ? 'study' : 'studies'}
+                          {completedCount > 0 && (
+                            <span className="ml-2 text-green-600">• {completedCount} completed</span>
+                          )}
+                        </p>
+                      </div>
                     </div>
-                    
-                    {/* Site Name */}
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">{site.siteName || 'Untitled Site'}</h3>
-                    
-                    {/* Project Number */}
-                    {site.projectNumber && (
-                      <p className="text-sm text-gray-600 mb-3">{site.projectNumber}</p>
-                    )}
-                    
-                    {/* Location */}
-                    {site.city && site.state && (
-                      <div className="flex items-center text-sm text-gray-600 mb-2">
-                        <span className="mr-2">📍</span>
-                        <span>{site.city}, {site.state}</span>
-                      </div>
-                    )}
-                    
-                    {/* Units */}
-                    {site.totalUnits && (
-                      <div className="flex items-center text-sm text-gray-600 mb-2">
-                        <span className="mr-2">🏠</span>
-                        <span>{site.totalUnits} Units</span>
-                      </div>
-                    )}
-                    
-                    {/* Creator */}
-                    <div className="flex items-center text-sm text-gray-500 mb-2">
-                      <span className="mr-2">👤</span>
-                      <span>Created by {getCreatorName(site.createdBy)}</span>
+                    <div className="flex items-center gap-2">
+                      {/* Show location if all sites have the same location */}
+                      {groupSites[0]?.city && groupSites[0]?.state && (
+                        <span className="text-sm text-gray-500 hidden sm:inline">
+                          📍 {groupSites[0].city}, {groupSites[0].state}
+                        </span>
+                      )}
                     </div>
-                    
-                    {/* Last Updated */}
-                    {site.updatedAt && (
-                      <div className="flex items-center text-sm text-gray-500 pt-3 border-t border-gray-100">
-                        <span className="mr-2">🕐</span>
-                        <span>Updated {new Date(site.updatedAt.seconds * 1000).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                  </Link>
+                  </button>
                   
-                  {/* Action Buttons */}
-                  <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
-                    <div className="flex items-center justify-between gap-2">
-                      {/* Status Dropdown */}
-                      <select
-                        value={site.status || 'draft'}
-                        onChange={(e) => handleStatusChange(site.id, e.target.value, e)}
-                        onClick={(e) => e.stopPropagation()}
-                        disabled={updatingStatus === site.id}
-                        className="text-xs px-2 py-1.5 border border-gray-300 rounded-md bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                      >
-                        <option value="draft">📝 Draft</option>
-                        <option value="pending">⏳ Pending</option>
-                        <option value="calculated">🔢 Calculated</option>
-                        <option value="completed">✅ Completed</option>
-                        <option value="sent">📤 Sent to Client</option>
-                      </select>
-                      
-                      {/* Delete Button */}
-                      <button
-                        onClick={(e) => handleDeleteSite(site.id, site.siteName, e)}
-                        disabled={deleting === site.id}
-                        className="text-xs px-3 py-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors flex items-center gap-1"
-                      >
-                        {deleting === site.id ? (
-                          <span>Deleting...</span>
-                        ) : (
-                          <>
-                            <span>🗑️</span>
-                            <span>Delete</span>
-                          </>
-                        )}
-                      </button>
+                  {/* Group Content - Study List */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-200">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Project Number
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Study Type
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Last Updated
+                            </th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {groupSites.map(site => {
+                            const statusInfo = getStatusInfo(site.status);
+                            return (
+                              <tr 
+                                key={site.id} 
+                                className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                onClick={() => router.push(`/sites/${site.id}`)}
+                              >
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center">
+                                    <span className="font-medium text-blue-600 hover:text-blue-800">
+                                      {site.projectNumber || 'No Project #'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-700">
+                                  {getStudyTypeLabel(site.studyType)}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <select
+                                    value={site.status || 'draft'}
+                                    onChange={(e) => handleStatusChange(site.id, e.target.value, e)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    disabled={updatingStatus === site.id}
+                                    className={`text-xs px-2 py-1 border-0 rounded-full font-medium cursor-pointer ${statusInfo.color}`}
+                                  >
+                                    <option value="draft">📝 Draft</option>
+                                    <option value="pending">⏳ Pending</option>
+                                    <option value="calculated">🔢 Calculated</option>
+                                    <option value="completed">✅ Completed</option>
+                                    <option value="sent">📤 Sent to Client</option>
+                                  </select>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-500">
+                                  {formatDate(site.updatedAt)}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Link
+                                      href={`/sites/${site.id}/calculate`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-xs px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-md transition-colors"
+                                    >
+                                      Calculate
+                                    </Link>
+                                    <Link
+                                      href={`/sites/${site.id}/reports`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-xs px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 rounded-md transition-colors"
+                                    >
+                                      Reports
+                                    </Link>
+                                    <button
+                                      onClick={(e) => handleDeleteSite(site.id, site.siteName, site.projectNumber, e)}
+                                      disabled={deleting === site.id}
+                                      className="text-xs px-2 py-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+                                    >
+                                      {deleting === site.id ? '...' : '🗑️'}
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}
