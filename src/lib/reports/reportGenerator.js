@@ -1,5 +1,5 @@
-// Report Generation Engine - Professional Version v4
-// FIXED: Load results from projections subcollection, not site.results
+// Report Generation Engine - Professional Version v5
+// UPDATED: Full threshold projection table with all 4 scenarios (10%, 5%, 0%, Full Funding)
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -267,54 +267,217 @@ function generateCashFlowTable(cashFlow, fundInfo, fundType) {
   return html;
 }
 
-// Threshold Table - Uses projection10 from thresholds
-function generateThresholdTable(thresholds, reserveCashFlow, reserveFund) {
-  var projection = thresholds.projection10 || [];
-  
-  if (projection.length === 0 && reserveCashFlow && reserveCashFlow.length > 0) {
-    // If no projection10, build from reserveCashFlow with threshold multiplier
-    var multiplier = thresholds.multiplier10 || 1;
-    var beginningBalance = reserveFund.currentBalance || 0;
-    projection = reserveCashFlow.map(function(row, idx) {
-      var contribution = Math.round((reserveFund.recommendedContribution || 0) * multiplier);
-      return {
-        year: row.year,
-        contribution: contribution,
-        expenditures: row.expenditures || 0,
-        endingBalance: row.endingBalance || 0,
-        percentOfBeginning: beginningBalance > 0 ? ((row.endingBalance || 0) / beginningBalance * 100) : 0
-      };
-    });
-  }
-  
-  if (projection.length === 0) {
+// NEW: Full Threshold Projection Table with all 4 scenarios
+function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginningBalance) {
+  // Check if we have threshold data
+  if (!thresholds || Object.keys(thresholds).length === 0) {
     return '<p><em>No threshold data available. Please run calculations first.</em></p>';
   }
-  
-  var html = '<table class="cashflow-table">';
-  html += '<thead><tr style="background:#1e3a5f; color:white;">';
-  html += '<th>Fiscal<br>Year</th>';
-  html += '<th>Annual<br>Contribution</th>';
-  html += '<th>Annual<br>Expenditures</th>';
-  html += '<th>Ending<br>Balance</th>';
-  html += '<th>% of Beginning<br>Balance</th>';
-  html += '</tr></thead><tbody>';
 
-  projection.forEach(function(row, index) {
+  var startingBalance = beginningBalance || reserveFund.currentBalance || 0;
+  
+  // Extract the 4 scenarios from thresholds
+  var scenarios = {
+    threshold10: {
+      name: '10% Threshold',
+      color: '#fef3c7',
+      headerColor: '#f59e0b',
+      multiplier: thresholds.multiplier10 || 0,
+      contribution: thresholds.contribution10 || 0,
+      minBalance: thresholds.minBalance10 || 0,
+      percentOfBeginning: thresholds.percentOfBeginning10 || 0,
+      projection: thresholds.projection10 || []
+    },
+    threshold5: {
+      name: '5% Threshold',
+      color: '#fef9c3',
+      headerColor: '#eab308',
+      multiplier: thresholds.multiplier5 || 0,
+      contribution: thresholds.contribution5 || 0,
+      minBalance: thresholds.minBalance5 || 0,
+      percentOfBeginning: thresholds.percentOfBeginning5 || 0,
+      projection: thresholds.projection5 || []
+    },
+    baseline: {
+      name: 'Baseline (0%)',
+      color: '#dcfce7',
+      headerColor: '#22c55e',
+      multiplier: thresholds.multiplierBaseline || 0,
+      contribution: thresholds.contributionBaseline || 0,
+      minBalance: thresholds.minBalanceBaseline || 0,
+      percentOfBeginning: thresholds.percentOfBeginningBaseline || 0,
+      projection: thresholds.projectionBaseline || []
+    },
+    fullFunding: {
+      name: 'Full Funding',
+      color: '#dbeafe',
+      headerColor: '#3b82f6',
+      multiplier: 1,
+      contribution: reserveFund.recommendedContribution || 0,
+      minBalance: 0,
+      percentOfBeginning: 0,
+      projection: []
+    }
+  };
+
+  // Build summary cards section
+  var html = '<div style="margin-bottom: 20px;">';
+  html += '<p style="font-size: 9pt; color: #666; margin-bottom: 15px;">Shows 30-year projections under four funding scenarios: 10% Threshold, 5% Threshold, Baseline (0%), and Full Funding.</p>';
+  
+  // NJ Compliance Notice
+  html += '<div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 6px; padding: 10px; margin-bottom: 15px;">';
+  html += '<div style="font-weight: bold; color: #92400e;">⚠ NJ Threshold Requirement</div>';
+  html += '<p style="font-size: 9pt; margin: 5px 0 0 0; color: #78350f;">New Jersey law requires reserve studies to demonstrate funding adequacy at different threshold levels. This analysis shows projected balances under reduced contribution scenarios to ensure the association maintains minimum safe funding levels.</p>';
+  html += '</div>';
+
+  // Summary cards grid
+  html += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px;">';
+  
+  // 10% Threshold Card
+  html += '<div style="border: 2px solid #f59e0b; border-radius: 6px; overflow: hidden;">';
+  html += '<div style="background: #fef3c7; padding: 8px; border-bottom: 2px solid #f59e0b;">';
+  html += '<div style="font-weight: bold; color: #92400e;">10% Threshold</div>';
+  html += '<div style="font-size: 8pt; color: #a16207;">Reduced contributions maintaining 10% minimum</div>';
+  html += '</div>';
+  html += '<div style="padding: 10px; font-size: 9pt;">';
+  html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Multiplier</span><br><strong>' + (scenarios.threshold10.multiplier || 0).toFixed(4) + '</strong></div>';
+  html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Annual Contribution</span><br><strong>' + formatCurrency(scenarios.threshold10.contribution) + '</strong></div>';
+  html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Min Balance</span><br><strong>' + formatCurrency(scenarios.threshold10.minBalance) + '</strong></div>';
+  html += '<div><span style="color: #666;">% of Beginning</span><br><strong style="color: #16a34a;">' + formatPercent(scenarios.threshold10.percentOfBeginning) + '</strong></div>';
+  html += '</div>';
+  html += '<div style="background: #22c55e; color: white; text-align: center; padding: 6px; font-weight: bold; font-size: 9pt;">✓ COMPLIANT</div>';
+  html += '</div>';
+
+  // 5% Threshold Card
+  html += '<div style="border: 2px solid #eab308; border-radius: 6px; overflow: hidden;">';
+  html += '<div style="background: #fef9c3; padding: 8px; border-bottom: 2px solid #eab308;">';
+  html += '<div style="font-weight: bold; color: #a16207;">5% Threshold</div>';
+  html += '<div style="font-size: 8pt; color: #a16207;">Reduced contributions maintaining 5% minimum</div>';
+  html += '</div>';
+  html += '<div style="padding: 10px; font-size: 9pt;">';
+  html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Multiplier</span><br><strong>' + (scenarios.threshold5.multiplier || 0).toFixed(4) + '</strong></div>';
+  html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Annual Contribution</span><br><strong>' + formatCurrency(scenarios.threshold5.contribution) + '</strong></div>';
+  html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Min Balance</span><br><strong>' + formatCurrency(scenarios.threshold5.minBalance) + '</strong></div>';
+  html += '<div><span style="color: #666;">% of Beginning</span><br><strong style="color: #16a34a;">' + formatPercent(scenarios.threshold5.percentOfBeginning) + '</strong></div>';
+  html += '</div>';
+  html += '<div style="background: #22c55e; color: white; text-align: center; padding: 6px; font-weight: bold; font-size: 9pt;">✓ COMPLIANT</div>';
+  html += '</div>';
+
+  // Baseline (0%) Card
+  html += '<div style="border: 2px solid #22c55e; border-radius: 6px; overflow: hidden;">';
+  html += '<div style="background: #dcfce7; padding: 8px; border-bottom: 2px solid #22c55e;">';
+  html += '<div style="font-weight: bold; color: #166534;">Baseline (0%)</div>';
+  html += '<div style="font-size: 8pt; color: #166534;">Minimum to avoid negatives</div>';
+  html += '</div>';
+  html += '<div style="padding: 10px; font-size: 9pt;">';
+  html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Multiplier</span><br><strong>' + (scenarios.baseline.multiplier || 0).toFixed(4) + '</strong></div>';
+  html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Annual Contribution</span><br><strong>' + formatCurrency(scenarios.baseline.contribution) + '</strong></div>';
+  html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Min Balance</span><br><strong>' + formatCurrency(scenarios.baseline.minBalance) + '</strong></div>';
+  html += '<div><span style="color: #666;">% of Beginning</span><br><strong style="color: #16a34a;">' + formatPercent(scenarios.baseline.percentOfBeginning) + '</strong></div>';
+  html += '</div>';
+  html += '<div style="background: #f59e0b; color: white; text-align: center; padding: 6px; font-weight: bold; font-size: 9pt;">⚠ MINIMUM</div>';
+  html += '</div>';
+
+  // Full Funding Card
+  html += '<div style="border: 2px solid #3b82f6; border-radius: 6px; overflow: hidden;">';
+  html += '<div style="background: #dbeafe; padding: 8px; border-bottom: 2px solid #3b82f6;">';
+  html += '<div style="font-weight: bold; color: #1e40af;">Full Funding</div>';
+  html += '<div style="font-size: 8pt; color: #1e40af;">Recommended contribution (100%)</div>';
+  html += '</div>';
+  html += '<div style="padding: 10px; font-size: 9pt;">';
+  html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Multiplier</span><br><strong>1.0000</strong></div>';
+  html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Annual Contribution</span><br><strong>' + formatCurrency(scenarios.fullFunding.contribution) + '</strong></div>';
+  var fullFundingFinalBalance = calculateFullFundingFinalBalance(reserveCashFlow, scenarios.fullFunding.contribution, startingBalance);
+  html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Final Balance (Year 30)</span><br><strong>' + formatCurrency(fullFundingFinalBalance) + '</strong></div>';
+  var percentFunded = reserveFund.percentFunded || 0;
+  html += '<div><span style="color: #666;">Percent Funded</span><br><strong style="color: #16a34a;">' + formatPercent(percentFunded) + '</strong></div>';
+  html += '</div>';
+  html += '<div style="background: #3b82f6; color: white; text-align: center; padding: 6px; font-weight: bold; font-size: 9pt;">★ RECOMMENDED</div>';
+  html += '</div>';
+
+  html += '</div>'; // End summary cards grid
+  html += '</div>'; // End summary section
+
+  // 30-Year Projection Comparison Table
+  html += '<div style="font-weight: bold; font-size: 11pt; margin: 15px 0 10px 0; padding: 8px; background: #1e3a5f; color: white; border-radius: 4px; text-align: center;">30-Year Threshold Projection Comparison</div>';
+  
+  html += '<table class="cashflow-table" style="font-size: 7pt;">';
+  html += '<thead>';
+  html += '<tr>';
+  html += '<th rowspan="2" style="background: #1e3a5f; width: 50px;">Fiscal<br>Year</th>';
+  html += '<th colspan="2" style="background: #f59e0b; text-align: center;">10% Threshold</th>';
+  html += '<th colspan="2" style="background: #eab308; text-align: center;">5% Threshold</th>';
+  html += '<th colspan="2" style="background: #22c55e; text-align: center;">Baseline (0%)</th>';
+  html += '<th colspan="2" style="background: #3b82f6; text-align: center;">Full Funding</th>';
+  html += '</tr>';
+  html += '<tr>';
+  html += '<th style="background: #fef3c7; color: #92400e;">Annual<br>Expenditures</th>';
+  html += '<th style="background: #fef3c7; color: #92400e;">Ending<br>Balance</th>';
+  html += '<th style="background: #fef9c3; color: #a16207;">Annual<br>Expenditures</th>';
+  html += '<th style="background: #fef9c3; color: #a16207;">Ending<br>Balance</th>';
+  html += '<th style="background: #dcfce7; color: #166534;">Annual<br>Expenditures</th>';
+  html += '<th style="background: #dcfce7; color: #166534;">Ending<br>Balance</th>';
+  html += '<th style="background: #dbeafe; color: #1e40af;">Annual<br>Expenditures</th>';
+  html += '<th style="background: #dbeafe; color: #1e40af;">Ending<br>Balance</th>';
+  html += '</tr>';
+  html += '</thead><tbody>';
+
+  // Generate rows - use projection10 as base for years
+  var baseProjection = scenarios.threshold10.projection || reserveCashFlow || [];
+  var fullFundingBalance = startingBalance;
+  
+  baseProjection.forEach(function(row, index) {
     var bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
-    var balanceClass = (row.endingBalance || 0) < 0 ? ' style="color:red;font-weight:bold;"' : '';
+    
+    // Get data for each scenario
+    var row10 = scenarios.threshold10.projection[index] || {};
+    var row5 = scenarios.threshold5.projection[index] || {};
+    var rowBaseline = scenarios.baseline.projection[index] || {};
+    
+    // Calculate full funding balance for this year
+    var expenditures = row.expenditures || 0;
+    fullFundingBalance = fullFundingBalance + scenarios.fullFunding.contribution - expenditures;
+    
+    var balance10Class = (row10.endingBalance || 0) < 0 ? 'color: red; font-weight: bold;' : '';
+    var balance5Class = (row5.endingBalance || 0) < 0 ? 'color: red; font-weight: bold;' : '';
+    var balanceBaselineClass = (rowBaseline.endingBalance || 0) < 0 ? 'color: red; font-weight: bold;' : '';
     
     html += '<tr style="background:' + bgColor + ';">';
-    html += '<td class="text-center text-bold">' + row.year + '</td>';
-    html += '<td class="text-right">' + formatCurrency(row.contribution) + '</td>';
-    html += '<td class="text-right">' + formatCurrency(row.expenditures) + '</td>';
-    html += '<td class="text-right"' + balanceClass + '>' + formatCurrency(row.endingBalance) + '</td>';
-    html += '<td class="text-right">' + formatPercent(row.percentOfBeginning || 0) + '</td>';
+    html += '<td class="text-center text-bold">' + (row.year || row10.year || (2026 + index)) + '</td>';
+    
+    // 10% Threshold
+    html += '<td class="text-right">' + formatCurrency(row10.expenditures || expenditures) + '</td>';
+    html += '<td class="text-right" style="' + balance10Class + '">' + formatCurrency(row10.endingBalance) + '</td>';
+    
+    // 5% Threshold
+    html += '<td class="text-right">' + formatCurrency(row5.expenditures || expenditures) + '</td>';
+    html += '<td class="text-right" style="' + balance5Class + '">' + formatCurrency(row5.endingBalance) + '</td>';
+    
+    // Baseline
+    html += '<td class="text-right">' + formatCurrency(rowBaseline.expenditures || expenditures) + '</td>';
+    html += '<td class="text-right" style="' + balanceBaselineClass + '">' + formatCurrency(rowBaseline.endingBalance) + '</td>';
+    
+    // Full Funding
+    html += '<td class="text-right">' + formatCurrency(expenditures) + '</td>';
+    html += '<td class="text-right">' + formatCurrency(fullFundingBalance) + '</td>';
+    
     html += '</tr>';
   });
 
   html += '</tbody></table>';
+  
   return html;
+}
+
+// Helper function to calculate full funding final balance
+function calculateFullFundingFinalBalance(cashFlow, contribution, startingBalance) {
+  if (!cashFlow || cashFlow.length === 0) return startingBalance;
+  
+  var balance = startingBalance;
+  cashFlow.forEach(function(row) {
+    balance = balance + contribution - (row.expenditures || 0);
+  });
+  return balance;
 }
 
 // Horizontal Expenditure Table (Year | Components | Total - fits on page)
@@ -452,6 +615,7 @@ export function generateReport(template, data) {
 
   console.log('Reserve Fund:', reserveFund);
   console.log('PM Fund:', pmFund);
+  console.log('Thresholds:', thresholds);
 
   var startYear = parseInt(site.beginningYear) || new Date().getFullYear();
   var location = ((site.city || '') + ', ' + (site.state || '')).replace(/^,\s*|,\s*$/g, '') || 'Location';
@@ -461,6 +625,7 @@ export function generateReport(template, data) {
   var recommendedContribution = reserveFund.recommendedContribution || 0;
   var pmPercentFunded = pmFund.percentFunded || 0;
   var pmRecommendedContribution = pmFund.recommendedContribution || 0;
+  var beginningBalance = parseFloat(site.beginningReserveBalance) || reserveFund.currentBalance || 0;
 
   var placeholders = {
     // Project Info
@@ -516,7 +681,7 @@ export function generateReport(template, data) {
     categorySections: generateCategorySections(components, notes),
     componentNotesTable: generateComponentNotesTable(components, notes),
     reserveCashFlowTable: generateCashFlowTable(reserveCashFlow, reserveFund, 'reserve'),
-    thresholdProjectionTable: generateThresholdTable(thresholds, reserveCashFlow, reserveFund),
+    thresholdProjectionTable: generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginningBalance),
     expenditureScheduleTable: generateExpenditureTable(components, startYear, 30, false),
     pmComponentSummaryTable: generatePMSummaryTable(components, notes),
     pmCashFlowTable: generateCashFlowTable(pmCashFlow, pmFund, 'pm'),
