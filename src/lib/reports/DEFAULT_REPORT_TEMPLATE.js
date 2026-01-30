@@ -1,5 +1,5 @@
-// Professional Report Template - Beahm Consulting Format v3
-// Fixed page numbers - uses CSS @page for print, footer for screen
+// Professional Report Template - Beahm Consulting Format v4
+// Added dynamic Study Type support for cover page and Level of Service
 
 export const DEFAULT_REPORT_TEMPLATE = `
 <!DOCTYPE html>
@@ -61,6 +61,16 @@ export const DEFAULT_REPORT_TEMPLATE = `
       font-size: 20pt;
       font-weight: bold;
       letter-spacing: 2px;
+    }
+    
+    .cover-title-highlight {
+      font-size: 20pt;
+      font-weight: bold;
+      letter-spacing: 2px;
+      background: #e07020;
+      padding: 0.05in 0.2in;
+      display: inline-block;
+      margin: 0.05in 0;
     }
     
     .cover-and {
@@ -332,7 +342,8 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="cover-page">
   <div class="cover-project-name">{projectName}</div>
   <div class="cover-title-box">
-    <div class="cover-title">RESERVE STUDY UPDATE</div>
+    <div class="cover-title">RESERVE STUDY</div>
+    {coverSubtitle}
     <div class="cover-and">&</div>
     <div class="cover-title">PREVENTIVE MAINTENANCE</div>
     <div class="cover-title">SCHEDULE</div>
@@ -394,14 +405,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
   
   <div class="sub-header">Level of Service Provided</div>
   <div class="editable-section">
-    <p>This report includes <strong>Reserve Update</strong>, With Site Visit/On-Site Review. A reserve study update consists of the following five key tasks:</p>
-    <ul>
-      <li><strong>Component Inventory</strong></li>
-      <li><strong>Condition Assessment</strong> (based on on-site visual inspections)</li>
-      <li><strong>Life and Valuation Estimates</strong></li>
-      <li><strong>Fund Status Evaluation</strong></li>
-      <li><strong>Development of a Funding Plan</strong></li>
-    </ul>
+    {levelOfServiceText}
   </div>
 </div>
 
