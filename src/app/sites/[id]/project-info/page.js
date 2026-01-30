@@ -294,8 +294,7 @@ export default function ProjectInfoPage() {
                 >
                   <option value="Level 1 Full">Level 1 Full</option>
                   <option value="Level 2 Update">Level 2 Update</option>
-                  <option value="Level 3 Update">Level 3 Update</option>
-                </select>
+                  </select>
               </div>
               
               <div>
