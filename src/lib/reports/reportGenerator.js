@@ -1,10 +1,10 @@
-// Report Generation Engine - Professional Version v6
-// FIXED: Card heights now equal so badges align properly
+// Report Generation Engine - Professional Version v7
+// Added dynamic Study Type support for cover page and Level of Service section
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export function formatCurrency(value) {
-  const num = parseFloat(value) || 0;
+  var num = parseFloat(value) || 0;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -14,7 +14,7 @@ export function formatCurrency(value) {
 }
 
 export function formatPercent(value) {
-  const num = parseFloat(value) || 0;
+  var num = parseFloat(value) || 0;
   return num.toFixed(2) + '%';
 }
 
@@ -33,19 +33,19 @@ export function formatDate(date) {
 export async function loadReportData(siteId, organizationId) {
   try {
     // Load site document
-    const siteDoc = await getDoc(doc(db, 'sites', siteId));
+    var siteDoc = await getDoc(doc(db, 'sites', siteId));
     if (!siteDoc.exists()) throw new Error('Site not found');
-    const site = { id: siteDoc.id, ...siteDoc.data() };
+    var site = { id: siteDoc.id, ...siteDoc.data() };
 
     // Load components
-    const componentsSnapshot = await getDocs(collection(db, 'sites/' + siteId + '/components'));
-    const components = componentsSnapshot.docs.map(function(d) { return { id: d.id, ...d.data() }; });
+    var componentsSnapshot = await getDocs(collection(db, 'sites/' + siteId + '/components'));
+    var components = componentsSnapshot.docs.map(function(d) { return { id: d.id, ...d.data() }; });
 
     // Load notes from organization
-    let notes = [];
+    var notes = [];
     if (organizationId) {
       try {
-        const notesSnapshot = await getDocs(collection(db, 'organizations/' + organizationId + '/notes'));
+        var notesSnapshot = await getDocs(collection(db, 'organizations/' + organizationId + '/notes'));
         notes = notesSnapshot.docs.map(function(d) { return { id: d.id, ...d.data() }; });
       } catch (e) {
         console.log('No notes collection found');
@@ -53,9 +53,9 @@ export async function loadReportData(siteId, organizationId) {
     }
 
     // FIXED: Load results from projections subcollection
-    let results = {};
+    var results = {};
     try {
-      const projectionsDoc = await getDoc(doc(db, 'sites', siteId, 'projections', 'latest'));
+      var projectionsDoc = await getDoc(doc(db, 'sites', siteId, 'projections', 'latest'));
       if (projectionsDoc.exists()) {
         results = projectionsDoc.data();
         console.log('Loaded projections:', Object.keys(results));
@@ -70,6 +70,39 @@ export async function loadReportData(siteId, organizationId) {
   } catch (error) {
     console.error('Error loading report data:', error);
     throw error;
+  }
+}
+
+// Generate Study Type content for cover page and Level of Service
+function getStudyTypeContent(studyType) {
+  // Default to Level 1 Full if not specified
+  var type = (studyType || 'Level 1 Full').toLowerCase();
+  
+  if (type.includes('level 2') || type.includes('update')) {
+    return {
+      coverSubtitle: '<div class="cover-title-highlight">UPDATE</div>',
+      levelOfServiceText: '<p>This report includes a <strong>Level 2: Reserve Update</strong>, With Site Visit/On-Site Review. A reserve study update consists of the following five key tasks:</p>' +
+        '<ul>' +
+        '<li><strong>Component Inventory</strong></li>' +
+        '<li><strong>Condition Assessment</strong> (based on on-site visual inspections)</li>' +
+        '<li><strong>Life and Valuation Estimates</strong></li>' +
+        '<li><strong>Fund Status Evaluation</strong></li>' +
+        '<li><strong>Development of a Funding Plan</strong></li>' +
+        '</ul>'
+    };
+  } else {
+    // Level 1 Full (default)
+    return {
+      coverSubtitle: '', // No subtitle for full study - just "RESERVE STUDY"
+      levelOfServiceText: '<p>This report includes a <strong>Level 1: Full Reserve Study</strong>, With Site Visit/On-Site Review. A full reserve study consists of the following five key tasks:</p>' +
+        '<ul>' +
+        '<li><strong>Component Inventory</strong></li>' +
+        '<li><strong>Condition Assessment</strong> (based on on-site visual inspections)</li>' +
+        '<li><strong>Life and Valuation Estimates</strong></li>' +
+        '<li><strong>Fund Status Evaluation</strong></li>' +
+        '<li><strong>Development of a Funding Plan</strong></li>' +
+        '</ul>'
+    };
   }
 }
 
@@ -267,7 +300,7 @@ function generateCashFlowTable(cashFlow, fundInfo, fundType) {
   return html;
 }
 
-// NEW: Full Threshold Projection Table with all 4 scenarios - FIXED CARD HEIGHTS
+// Full Threshold Projection Table with all 4 scenarios - FIXED CARD HEIGHTS
 function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginningBalance) {
   // Check if we have threshold data
   if (!thresholds || Object.keys(thresholds).length === 0) {
@@ -620,7 +653,14 @@ export function generateReport(template, data) {
   var pmRecommendedContribution = pmFund.recommendedContribution || 0;
   var beginningBalance = parseFloat(site.beginningReserveBalance) || reserveFund.currentBalance || 0;
 
+  // Get Study Type content for cover page and Level of Service
+  var studyTypeContent = getStudyTypeContent(site.studyType);
+
   var placeholders = {
+    // Study Type placeholders
+    coverSubtitle: studyTypeContent.coverSubtitle,
+    levelOfServiceText: studyTypeContent.levelOfServiceText,
+    
     // Project Info
     projectName: site.siteName || site.projectName || 'Project Name',
     projectNumber: site.projectNumber || 'N/A',
