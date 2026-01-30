@@ -375,7 +375,7 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Min Balance</span><br><strong>' + formatCurrency(scenarios.baseline.minBalance) + '</strong></div>';
   html += '<div><span style="color: #666;">% of Beginning</span><br><strong style="color: #16a34a;">' + formatPercent(scenarios.baseline.percentOfBeginning) + '</strong></div>';
   html += '</div>';
-  html += '<div style="background: #f59e0b; color: white; text-align: center; padding: 6px; font-weight: bold; font-size: 9pt;">⚠ MINIMUM</div>';
+  html += '<div style="background: #f59e0b; color: white; text-align: center; padding: 6px; font-weight: bold; font-size: 9pt; white-space: nowrap;">⚠ MINIMUM</div>';
   html += '</div>';
 
   // Full Funding Card
