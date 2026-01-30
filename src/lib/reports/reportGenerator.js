@@ -1,5 +1,5 @@
-// Report Generation Engine - Professional Version v5
-// UPDATED: Full threshold projection table with all 4 scenarios (10%, 5%, 0%, Full Funding)
+// Report Generation Engine - Professional Version v6
+// FIXED: Card heights now equal so badges align properly
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -267,7 +267,7 @@ function generateCashFlowTable(cashFlow, fundInfo, fundType) {
   return html;
 }
 
-// NEW: Full Threshold Projection Table with all 4 scenarios
+// NEW: Full Threshold Projection Table with all 4 scenarios - FIXED CARD HEIGHTS
 function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginningBalance) {
   // Check if we have threshold data
   if (!thresholds || Object.keys(thresholds).length === 0) {
@@ -280,8 +280,6 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   var scenarios = {
     threshold10: {
       name: '10% Threshold',
-      color: '#fef3c7',
-      headerColor: '#f59e0b',
       multiplier: thresholds.multiplier10 || 0,
       contribution: thresholds.contribution10 || 0,
       minBalance: thresholds.minBalance10 || 0,
@@ -290,8 +288,6 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
     },
     threshold5: {
       name: '5% Threshold',
-      color: '#fef9c3',
-      headerColor: '#eab308',
       multiplier: thresholds.multiplier5 || 0,
       contribution: thresholds.contribution5 || 0,
       minBalance: thresholds.minBalance5 || 0,
@@ -300,8 +296,6 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
     },
     baseline: {
       name: 'Baseline (0%)',
-      color: '#dcfce7',
-      headerColor: '#22c55e',
       multiplier: thresholds.multiplierBaseline || 0,
       contribution: thresholds.contributionBaseline || 0,
       minBalance: thresholds.minBalanceBaseline || 0,
@@ -310,8 +304,6 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
     },
     fullFunding: {
       name: 'Full Funding',
-      color: '#dbeafe',
-      headerColor: '#3b82f6',
       multiplier: 1,
       contribution: reserveFund.recommendedContribution || 0,
       minBalance: 0,
@@ -330,61 +322,62 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   html += '<p style="font-size: 9pt; margin: 5px 0 0 0; color: #78350f;">New Jersey law requires reserve studies to demonstrate funding adequacy at different threshold levels. This analysis shows projected balances under reduced contribution scenarios to ensure the association maintains minimum safe funding levels.</p>';
   html += '</div>';
 
-  // Summary cards grid
-  html += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px;">';
+  // Summary cards grid - FIXED with equal height cards using table layout
+  html += '<table style="width: 100%; border-collapse: separate; border-spacing: 10px; margin-bottom: 20px;">';
+  html += '<tr>';
   
   // 10% Threshold Card
-  html += '<div style="border: 2px solid #f59e0b; border-radius: 6px; overflow: hidden;">';
-  html += '<div style="background: #fef3c7; padding: 8px; border-bottom: 2px solid #f59e0b;">';
-  html += '<div style="font-weight: bold; color: #92400e;">10% Threshold</div>';
-  html += '<div style="font-size: 8pt; color: #a16207;">Reduced contributions maintaining 10% minimum</div>';
+  html += '<td style="width: 25%; vertical-align: top; border: 2px solid #f59e0b; border-radius: 6px; padding: 0; background: white;">';
+  html += '<div style="background: #fef3c7; padding: 8px; border-bottom: 2px solid #f59e0b; border-radius: 4px 4px 0 0;">';
+  html += '<div style="font-weight: bold; color: #92400e; font-size: 10pt;">10% Threshold</div>';
+  html += '<div style="font-size: 7pt; color: #a16207;">Reduced contributions maintaining 10% minimum</div>';
   html += '</div>';
-  html += '<div style="padding: 10px; font-size: 9pt;">';
+  html += '<div style="padding: 10px; font-size: 9pt; height: 140px;">';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Multiplier</span><br><strong>' + (scenarios.threshold10.multiplier || 0).toFixed(4) + '</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Annual Contribution</span><br><strong>' + formatCurrency(scenarios.threshold10.contribution) + '</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Min Balance</span><br><strong>' + formatCurrency(scenarios.threshold10.minBalance) + '</strong></div>';
   html += '<div><span style="color: #666;">% of Beginning</span><br><strong style="color: #16a34a;">' + formatPercent(scenarios.threshold10.percentOfBeginning) + '</strong></div>';
   html += '</div>';
-  html += '<div style="background: #22c55e; color: white; text-align: center; padding: 6px; font-weight: bold; font-size: 9pt;">✓ COMPLIANT</div>';
-  html += '</div>';
+  html += '<div style="background: #22c55e; color: white; text-align: center; padding: 8px; font-weight: bold; font-size: 9pt; border-radius: 0 0 4px 4px;">✓ COMPLIANT</div>';
+  html += '</td>';
 
   // 5% Threshold Card
-  html += '<div style="border: 2px solid #eab308; border-radius: 6px; overflow: hidden;">';
-  html += '<div style="background: #fef9c3; padding: 8px; border-bottom: 2px solid #eab308;">';
-  html += '<div style="font-weight: bold; color: #a16207;">5% Threshold</div>';
-  html += '<div style="font-size: 8pt; color: #a16207;">Reduced contributions maintaining 5% minimum</div>';
+  html += '<td style="width: 25%; vertical-align: top; border: 2px solid #eab308; border-radius: 6px; padding: 0; background: white;">';
+  html += '<div style="background: #fef9c3; padding: 8px; border-bottom: 2px solid #eab308; border-radius: 4px 4px 0 0;">';
+  html += '<div style="font-weight: bold; color: #a16207; font-size: 10pt;">5% Threshold</div>';
+  html += '<div style="font-size: 7pt; color: #a16207;">Reduced contributions maintaining 5% minimum</div>';
   html += '</div>';
-  html += '<div style="padding: 10px; font-size: 9pt;">';
+  html += '<div style="padding: 10px; font-size: 9pt; height: 140px;">';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Multiplier</span><br><strong>' + (scenarios.threshold5.multiplier || 0).toFixed(4) + '</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Annual Contribution</span><br><strong>' + formatCurrency(scenarios.threshold5.contribution) + '</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Min Balance</span><br><strong>' + formatCurrency(scenarios.threshold5.minBalance) + '</strong></div>';
   html += '<div><span style="color: #666;">% of Beginning</span><br><strong style="color: #16a34a;">' + formatPercent(scenarios.threshold5.percentOfBeginning) + '</strong></div>';
   html += '</div>';
-  html += '<div style="background: #22c55e; color: white; text-align: center; padding: 6px; font-weight: bold; font-size: 9pt;">✓ COMPLIANT</div>';
-  html += '</div>';
+  html += '<div style="background: #22c55e; color: white; text-align: center; padding: 8px; font-weight: bold; font-size: 9pt; border-radius: 0 0 4px 4px;">✓ COMPLIANT</div>';
+  html += '</td>';
 
   // Baseline (0%) Card
-  html += '<div style="border: 2px solid #22c55e; border-radius: 6px; overflow: hidden;">';
-  html += '<div style="background: #dcfce7; padding: 8px; border-bottom: 2px solid #22c55e;">';
-  html += '<div style="font-weight: bold; color: #166534;">Baseline (0%)</div>';
-  html += '<div style="font-size: 8pt; color: #166534;">Minimum to avoid negatives</div>';
+  html += '<td style="width: 25%; vertical-align: top; border: 2px solid #22c55e; border-radius: 6px; padding: 0; background: white;">';
+  html += '<div style="background: #dcfce7; padding: 8px; border-bottom: 2px solid #22c55e; border-radius: 4px 4px 0 0;">';
+  html += '<div style="font-weight: bold; color: #166534; font-size: 10pt;">Baseline (0%)</div>';
+  html += '<div style="font-size: 7pt; color: #166534;">Minimum to avoid negatives</div>';
   html += '</div>';
-  html += '<div style="padding: 10px; font-size: 9pt;">';
+  html += '<div style="padding: 10px; font-size: 9pt; height: 140px;">';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Multiplier</span><br><strong>' + (scenarios.baseline.multiplier || 0).toFixed(4) + '</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Annual Contribution</span><br><strong>' + formatCurrency(scenarios.baseline.contribution) + '</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Min Balance</span><br><strong>' + formatCurrency(scenarios.baseline.minBalance) + '</strong></div>';
   html += '<div><span style="color: #666;">% of Beginning</span><br><strong style="color: #16a34a;">' + formatPercent(scenarios.baseline.percentOfBeginning) + '</strong></div>';
   html += '</div>';
-  html += '<div style="background: #f59e0b; color: white; text-align: center; padding: 6px; font-weight: bold; font-size: 9pt; white-space: nowrap;">⚠ MINIMUM</div>';
-  html += '</div>';
+  html += '<div style="background: #f59e0b; color: white; text-align: center; padding: 8px; font-weight: bold; font-size: 9pt; border-radius: 0 0 4px 4px;">⚠ MINIMUM</div>';
+  html += '</td>';
 
   // Full Funding Card
-  html += '<div style="border: 2px solid #3b82f6; border-radius: 6px; overflow: hidden;">';
-  html += '<div style="background: #dbeafe; padding: 8px; border-bottom: 2px solid #3b82f6;">';
-  html += '<div style="font-weight: bold; color: #1e40af;">Full Funding</div>';
-  html += '<div style="font-size: 8pt; color: #1e40af;">Recommended contribution (100%)</div>';
+  html += '<td style="width: 25%; vertical-align: top; border: 2px solid #3b82f6; border-radius: 6px; padding: 0; background: white;">';
+  html += '<div style="background: #dbeafe; padding: 8px; border-bottom: 2px solid #3b82f6; border-radius: 4px 4px 0 0;">';
+  html += '<div style="font-weight: bold; color: #1e40af; font-size: 10pt;">Full Funding</div>';
+  html += '<div style="font-size: 7pt; color: #1e40af;">Recommended contribution (100%)</div>';
   html += '</div>';
-  html += '<div style="padding: 10px; font-size: 9pt;">';
+  html += '<div style="padding: 10px; font-size: 9pt; height: 140px;">';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Multiplier</span><br><strong>1.0000</strong></div>';
   html += '<div style="margin-bottom: 8px;"><span style="color: #666;">Annual Contribution</span><br><strong>' + formatCurrency(scenarios.fullFunding.contribution) + '</strong></div>';
   var fullFundingFinalBalance = calculateFullFundingFinalBalance(reserveCashFlow, scenarios.fullFunding.contribution, startingBalance);
@@ -392,10 +385,10 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   var percentFunded = reserveFund.percentFunded || 0;
   html += '<div><span style="color: #666;">Percent Funded</span><br><strong style="color: #16a34a;">' + formatPercent(percentFunded) + '</strong></div>';
   html += '</div>';
-  html += '<div style="background: #3b82f6; color: white; text-align: center; padding: 6px; font-weight: bold; font-size: 9pt;">★ RECOMMENDED</div>';
-  html += '</div>';
+  html += '<div style="background: #3b82f6; color: white; text-align: center; padding: 8px; font-weight: bold; font-size: 9pt; border-radius: 0 0 4px 4px;">★ RECOMMENDED</div>';
+  html += '</td>';
 
-  html += '</div>'; // End summary cards grid
+  html += '</tr></table>';
   html += '</div>'; // End summary section
 
   // 30-Year Projection Comparison Table
