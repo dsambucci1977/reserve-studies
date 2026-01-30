@@ -69,8 +69,13 @@ export default function ReportsListPage() {
 
       const htmlContent = generateReport(template, reportData);
 
+      // Include study type in report title
+      const studyType = site?.studyType || 'Reserve Study';
+      const reportTitle = `${studyType} Report - ${new Date().toLocaleDateString()}`;
+
       const reportRef = await addDoc(collection(db, `sites/${siteId}/reports`), {
-        title: 'Reserve Study Report - ' + new Date().toLocaleDateString(),
+        title: reportTitle,
+        studyType: site?.studyType || null,
         status: 'draft',
         htmlContent,
         createdBy: user.uid,
@@ -125,6 +130,11 @@ export default function ReportsListPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Reports</h1>
             <p className="text-gray-600 mt-1">{site?.siteName}</p>
+            {site?.studyType && (
+              <span className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+                {site.studyType}
+              </span>
+            )}
           </div>
           <button
             onClick={handleGenerateReport}
@@ -139,7 +149,9 @@ export default function ReportsListPage() {
           <div className="bg-white shadow rounded-lg p-12 text-center">
             <div className="text-gray-400 text-6xl mb-4">📄</div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">No reports yet</h3>
-            <p className="text-gray-600 mb-6">Generate your first Reserve Study Report</p>
+            <p className="text-gray-600 mb-6">
+              Generate your first {site?.studyType || 'Reserve Study'} Report
+            </p>
             <button onClick={handleGenerateReport} disabled={generating}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50">
               Generate Report
