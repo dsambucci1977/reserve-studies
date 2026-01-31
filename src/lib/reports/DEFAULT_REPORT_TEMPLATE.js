@@ -442,7 +442,9 @@ export const DEFAULT_REPORT_TEMPLATE = `
   </div>
 </div>
 
-<!-- ==================== RESERVE STUDY CHART ==================== -->
+<div class="page-break"></div>
+
+<!-- ==================== RESERVE STUDY CHART (own page) ==================== -->
 <div id="reserve-chart" class="section-header">RESERVE STUDY CHART</div>
 
 <div class="content-section">
@@ -492,7 +494,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
   </div>
 </div>
 
-<!-- ==================== RESERVE FUND INFO (same page as chart) ==================== -->
+<!-- ==================== RESERVE FUND INFO ==================== -->
 <div class="section-header">RESERVE FUND INFORMATION</div>
 
 <div class="content-section">
@@ -517,8 +519,6 @@ export const DEFAULT_REPORT_TEMPLATE = `
     <tr><td><strong>Averaging Length in Years:</strong></td><td class="text-right text-bold" style="font-size:10pt;">30</td></tr>
   </table>
 </div>
-
-<div class="page-break"></div>
 
 <!-- ==================== TERMS ==================== -->
 <div id="terms" class="section-header">TERMS AND DEFINITIONS</div>
