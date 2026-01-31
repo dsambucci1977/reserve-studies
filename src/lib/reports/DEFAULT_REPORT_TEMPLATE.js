@@ -17,7 +17,53 @@ export const DEFAULT_REPORT_TEMPLATE = `
     @media print {
       .no-print { display: none !important; }
       .page-break { page-break-before: always; }
+      .page-break-indicator { display: none !important; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+    
+    /* ============ EDITOR VIEW - PAGE MARGIN INDICATORS ============ */
+    @media screen {
+      body {
+        background: #e0e0e0;
+        padding: 20px;
+      }
+      
+      .page-container {
+        background: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        margin: 0 auto 30px auto;
+        padding: 0.6in;
+        min-height: 10in;
+        max-width: 8.5in;
+        position: relative;
+      }
+      
+      .page-break-indicator {
+        border-top: 2px dashed #f97316;
+        margin: 20px -0.6in;
+        padding: 0;
+        position: relative;
+      }
+      
+      .page-break-indicator::before {
+        content: '— PAGE BREAK —';
+        position: absolute;
+        top: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #f97316;
+        color: white;
+        font-size: 9px;
+        font-weight: bold;
+        padding: 2px 10px;
+        border-radius: 3px;
+      }
+      
+      .page-break {
+        height: 0;
+        margin: 0;
+        padding: 0;
+      }
     }
     
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -410,6 +456,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
 
 <!-- ==================== INTRODUCTION (no TOC page - saves space) ==================== -->
 <div id="introduction" class="section-header">INTRODUCTION</div>
@@ -443,6 +490,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
 
 <!-- ==================== RESERVE STUDY CHART (own page) ==================== -->
 <div id="reserve-chart" class="section-header">RESERVE STUDY CHART</div>
@@ -560,6 +608,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
 
 <!-- ==================== COMPONENT SCHEDULE SUMMARY ==================== -->
 <div id="component-summary" class="section-header">COMPONENT SCHEDULE SUMMARY</div>
@@ -570,6 +619,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
 
 <!-- ==================== CAPITAL ITEMS ==================== -->
 <div id="capital-items" class="section-header">CAPITAL ITEMS / COMPONENTS</div>
@@ -588,6 +638,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
 
 <!-- ==================== FINANCIAL RESULTS ==================== -->
 <div id="financial-results" class="section-header">FINANCIAL RESULTS</div>
@@ -620,6 +671,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
 
 <!-- ==================== CASH FLOW ==================== -->
 <div id="cash-flow" class="section-header">RESERVE FUND THIRTY YEAR CASH FLOW</div>
@@ -629,6 +681,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
 
 <!-- ==================== THRESHOLD ==================== -->
 <div id="threshold" class="section-header">RESERVE FUND THIRTY YEAR THRESHOLD FUNDING</div>
@@ -638,6 +691,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
 
 <!-- ==================== EXPENDITURES ==================== -->
 <div id="expenditures" class="section-header">RESERVE FUND EXPENDITURES</div>
@@ -647,6 +701,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
 
 <!-- ==================== PM SECTION ==================== -->
 <div id="pm-section" class="section-header section-header-green">PREVENTIVE MAINTENANCE</div>
@@ -664,6 +719,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
 
 <!-- ==================== PM EXPENDITURES ==================== -->
 <div id="pm-expenditures" class="section-header section-header-green">PM EXPENDITURES</div>
@@ -673,6 +729,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
 
 <!-- ==================== RECOMMENDATIONS ==================== -->
 <div id="recommendations" class="section-header section-header-orange">RECOMMENDATIONS</div>
