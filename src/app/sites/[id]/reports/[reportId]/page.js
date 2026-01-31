@@ -1,803 +1,363 @@
-// Professional Report Template - Beahm Consulting Format v7
-// Uses same placeholders as v5, but with spacing/layout fixes
-// Fixes: Removed cover box, compact footer, consolidated sections, fewer blank pages
+'use client';
 
-export const DEFAULT_REPORT_TEMPLATE = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>{projectName} - Reserve Study Report</title>
-  <style>
-    @page {
-      size: letter;
-      margin: 0.6in 0.6in 0.75in 0.6in;
-    }
-    
-    @media print {
-      .no-print { display: none !important; }
-      .page-break { page-break-before: always; }
-      .page-break-indicator { display: none !important; }
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    }
-    
-    /* ============ EDITOR VIEW - PAGE MARGIN INDICATORS ============ */
-    @media screen {
-      body {
-        background: #e0e0e0;
-        padding: 20px;
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
+export default function ReportEditorPage() {
+  const { user } = useAuth();
+  const params = useParams();
+  const router = useRouter();
+  const siteId = params.id;
+  const reportId = params.reportId;
+
+  const [site, setSite] = useState(null);
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [htmlContent, setHtmlContent] = useState('');
+  const [hasChanges, setHasChanges] = useState(false);
+  const editorRef = useRef(null);
+
+  useEffect(() => {
+    if (user) loadData();
+  }, [user, siteId, reportId]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const siteDoc = await getDoc(doc(db, 'sites', siteId));
+      if (siteDoc.exists()) setSite({ id: siteDoc.id, ...siteDoc.data() });
+
+      const reportDoc = await getDoc(doc(db, 'sites/' + siteId + '/reports', reportId));
+      if (reportDoc.exists()) {
+        const reportData = { id: reportDoc.id, ...reportDoc.data() };
+        setReport(reportData);
+        setHtmlContent(reportData.htmlContent || '');
+      } else {
+        alert('Report not found');
+        router.push('/sites/' + siteId + '/reports');
       }
+    } catch (error) {
+      console.error('Error loading report:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async (status) => {
+    status = status || 'draft';
+    try {
+      setSaving(true);
+      var content = editorRef.current ? editorRef.current.innerHTML : htmlContent;
+
+      await updateDoc(doc(db, 'sites/' + siteId + '/reports', reportId), {
+        htmlContent: content,
+        status: status,
+        updatedAt: new Date(),
+        updatedBy: user.uid
+      });
+
+      setHtmlContent(content);
+      setHasChanges(false);
+      setReport(prev => ({ ...prev, status: status }));
+      alert(status === 'final' ? 'Report finalized!' : 'Report saved as draft');
+    } catch (error) {
+      console.error('Error saving report:', error);
+      alert('Error saving report');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Formatting commands
+  const execCommand = (command, value) => {
+    document.execCommand(command, false, value || null);
+    editorRef.current?.focus();
+    setHasChanges(true);
+  };
+
+  // Insert page break at cursor
+  const insertPageBreak = () => {
+    const pageBreakHTML = '<div class="page-break"></div><div class="page-break-indicator no-print"></div>';
+    execCommand('insertHTML', pageBreakHTML);
+  };
+
+  // Remove nearest page break
+  const removePageBreak = () => {
+    const editor = editorRef.current;
+    if (editor) {
+      const pageBreaks = editor.querySelectorAll('.page-break');
+      const indicators = editor.querySelectorAll('.page-break-indicator');
       
-      .page-container {
-        background: white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        margin: 0 auto 30px auto;
-        padding: 0.6in;
-        min-height: 10in;
-        max-width: 8.5in;
-        position: relative;
-      }
-      
-      .page-break-indicator {
-        border-top: 2px dashed #f97316;
-        margin: 20px -0.6in;
-        padding: 0;
-        position: relative;
-      }
-      
-      .page-break-indicator::before {
-        content: '— PAGE BREAK —';
-        position: absolute;
-        top: -10px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #f97316;
-        color: white;
-        font-size: 9px;
-        font-weight: bold;
-        padding: 2px 10px;
-        border-radius: 3px;
-      }
-      
-      .page-break {
-        height: 0;
-        margin: 0;
-        padding: 0;
+      // Remove the last one (or could prompt user)
+      if (pageBreaks.length > 0) {
+        const lastBreak = pageBreaks[pageBreaks.length - 1];
+        const lastIndicator = indicators[indicators.length - 1];
+        lastBreak?.remove();
+        lastIndicator?.remove();
+        setHasChanges(true);
+      } else {
+        alert('No page breaks to remove');
       }
     }
-    
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    
-    body {
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 10pt;
-      line-height: 1.4;
-      color: #1a1a1a;
-      background: white;
-      max-width: 8.5in;
-      margin: 0 auto;
-    }
-    
-    /* ============ COMPACT PAGE FOOTER ============ */
-    .page-footer {
-      text-align: center;
-      padding: 6px 0;
-      margin-top: 20px;
-      border-top: 1px solid #ccc;
-      font-size: 7pt;
-      color: #666;
-    }
-    
-    .page-footer .company-name {
-      font-weight: bold;
-      color: #1e3a5f;
-    }
-    
-    /* ============ COVER PAGE ============ */
-    .cover-page {
-      min-height: 9.5in;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      align-items: center;
-      text-align: center;
-      padding: 0.5in 1in 0.5in 1in;
-      background: white;
-      color: #1a1a1a;
-    }
-    
-    .cover-logo {
-      margin-bottom: 0.4in;
-      max-width: 4in;
-      max-height: 1.2in;
-    }
-    
-    .cover-logo img {
-      max-width: 100%;
-      max-height: 1.2in;
-      object-fit: contain;
-    }
-    
-    .cover-project-name {
-      font-size: 26pt;
-      font-weight: bold;
-      margin: 0.4in 0;
-      color: #1e3a5f;
-    }
-    
-    .cover-title-box {
-      padding: 0.3in 0;
-      margin: 0.2in 0;
-    }
-    
-    .cover-title {
-      font-size: 18pt;
-      font-weight: bold;
-      letter-spacing: 2px;
-      color: #1a1a1a;
-      margin: 0.05in 0;
-    }
-    
-    .cover-title-highlight {
-      font-size: 18pt;
-      font-weight: bold;
-      letter-spacing: 2px;
-      background: #e07020;
-      color: white;
-      padding: 3px 12px;
-      display: inline-block;
-      margin: 0.03in 0;
-    }
-    
-    .cover-and {
-      font-size: 14pt;
-      margin: 0.1in 0;
-      color: #666;
-    }
-    
-    .cover-prepared {
-      margin-top: 0.5in;
-      font-size: 11pt;
-    }
-    
-    .cover-prepared p { margin: 0.08in 0; }
-    
-    .cover-compliance {
-      margin-top: 0.4in;
-      font-size: 9pt;
-      font-style: italic;
-      color: #666;
-      border-top: 1px solid #ddd;
-      padding-top: 0.2in;
-    }
-    
-    .cover-footer {
-      margin-top: auto;
-      padding-top: 0.3in;
-      text-align: center;
-      font-size: 9pt;
-      color: #666;
-      border-top: 2px solid #1e3a5f;
-      width: 100%;
-    }
-    
-    .cover-footer .company-name {
-      font-weight: bold;
-      font-size: 10pt;
-      color: #1e3a5f;
-    }
-    
-    /* ============ TABLE OF CONTENTS ============ */
-    .toc-page { padding: 0.2in; }
-    
-    .toc-title {
-      font-size: 16pt;
-      font-weight: bold;
-      color: #1e3a5f;
-      text-align: center;
-      margin-bottom: 0.2in;
-      padding-bottom: 0.1in;
-      border-bottom: 2px solid #1e3a5f;
-    }
-    
-    .toc-section {
-      display: flex;
-      justify-content: space-between;
-      padding: 3px 8px;
-      border-bottom: 1px dotted #ccc;
-      font-size: 9pt;
-      text-decoration: none;
-      color: inherit;
-    }
-    
-    .toc-section:hover { background: #e8f4f8; color: #1e3a5f; }
-    
-    /* ============ SECTION HEADERS ============ */
-    .section-header {
-      background: linear-gradient(90deg, #1e3a5f 0%, #2d5a87 100%);
-      color: white;
-      padding: 8px 12px;
-      font-size: 12pt;
-      font-weight: bold;
-      margin: 0.15in 0 0.1in 0;
-      border-radius: 3px;
-    }
-    
-    .section-header-green {
-      background: linear-gradient(90deg, #166534 0%, #22c55e 100%);
-    }
-    
-    .section-header-teal {
-      background: linear-gradient(90deg, #0f766e 0%, #14b8a6 100%);
-    }
-    
-    .section-header-orange {
-      background: linear-gradient(90deg, #c55a11 0%, #e07020 100%);
-    }
-    
-    .sub-header {
-      font-size: 11pt;
-      font-weight: bold;
-      color: #1e3a5f;
-      margin: 0.1in 0 0.06in 0;
-      padding-bottom: 2px;
-      border-bottom: 2px solid #1e3a5f;
-    }
-    
-    /* ============ CONTENT SECTIONS ============ */
-    .content-section {
-      padding: 0 0.05in;
-      margin-bottom: 0.08in;
-    }
-    
-    .content-section p {
-      margin: 0.06in 0;
-      text-align: justify;
-      font-size: 9pt;
-    }
-    
-    /* ============ SUMMARY CARDS ============ */
-    .summary-cards {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.12in;
-      margin: 0.1in 0;
-    }
-    
-    .summary-card {
-      border: 2px solid #e0e0e0;
-      border-radius: 5px;
-      overflow: hidden;
-    }
-    
-    .summary-card-header {
-      padding: 5px 8px;
-      font-weight: bold;
-      font-size: 9pt;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    
-    .summary-card-header.reserve {
-      background: linear-gradient(90deg, #dbeafe 0%, #bfdbfe 100%);
-      color: #1e40af;
-      border-bottom: 2px solid #3b82f6;
-    }
-    
-    .summary-card-header.pm {
-      background: linear-gradient(90deg, #dcfce7 0%, #bbf7d0 100%);
-      color: #166534;
-      border-bottom: 2px solid #22c55e;
-    }
-    
-    .summary-card-body {
-      padding: 8px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-    }
-    
-    .summary-item {
-      background: #f8f9fa;
-      padding: 5px;
-      border-radius: 3px;
-    }
-    
-    .summary-label {
-      font-size: 6pt;
-      color: #666;
-      margin-bottom: 1px;
-    }
-    
-    .summary-value {
-      font-size: 11pt;
-      font-weight: bold;
-      color: #1a1a1a;
-    }
-    
-    .summary-value.highlight { color: #c55a11; }
-    
-    /* ============ DATA TABLES ============ */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 0.08in 0;
-      font-size: 8pt;
-    }
-    
-    th {
-      background: #1e3a5f;
-      color: white;
-      padding: 4px 3px;
-      text-align: center;
-      font-weight: bold;
-      border: 1px solid #1e3a5f;
-      font-size: 7pt;
-    }
-    
-    td {
-      padding: 3px;
-      border: 1px solid #ddd;
-      vertical-align: top;
-    }
-    
-    tr:nth-child(even) { background: #f8f9fa; }
-    
-    .text-right { text-align: right; }
-    .text-center { text-align: center; }
-    .text-bold { font-weight: bold; }
-    
-    .total-row {
-      background: #d9d9d9 !important;
-      font-weight: bold;
-    }
-    
-    .negative { color: #dc2626; font-weight: bold; }
-    
-    /* ============ COMPONENT TABLE ============ */
-    .component-table { font-size: 7pt; }
-    .component-table th { padding: 3px 2px; font-size: 6pt; }
-    .component-table td { padding: 2px; }
-    
-    /* ============ CASH FLOW TABLE ============ */
-    .cashflow-table { font-size: 7pt; }
-    .cashflow-table th { padding: 3px 2px; font-size: 6pt; }
-    .cashflow-table td { padding: 2px 3px; text-align: right; }
-    .cashflow-table td:first-child { text-align: center; font-weight: bold; background: #f1f5f9; }
-    
-    /* ============ EXPENDITURE TABLE ============ */
-    .expenditure-horizontal { font-size: 8pt; }
-    .expenditure-horizontal th { padding: 4px; }
-    .expenditure-horizontal td { padding: 3px; }
-    
-    /* ============ NOTES TABLE ============ */
-    .notes-table td:first-child { width: 50px; text-align: center; font-weight: bold; background: #f1f5f9; }
-    .notes-table td:nth-child(2) { width: 150px; font-weight: bold; }
-    
-    /* ============ RECOMMENDATION BOXES ============ */
-    .recommendation-box {
-      border: 2px solid #c55a11;
-      border-radius: 5px;
-      margin: 0.08in 0;
-      overflow: hidden;
-    }
-    
-    .recommendation-header {
-      background: linear-gradient(90deg, #fef3e8 0%, #fde8d8 100%);
-      padding: 5px 8px;
-      font-weight: bold;
-      color: #c55a11;
-      border-bottom: 1px solid #c55a11;
-      font-size: 9pt;
-    }
-    
-    .recommendation-body {
-      padding: 8px;
-      background: #fffbf5;
-      font-size: 9pt;
-    }
-    
-    .recommendation-box.green { border-color: #22c55e; }
-    .recommendation-box.green .recommendation-header {
-      background: linear-gradient(90deg, #dcfce7 0%, #bbf7d0 100%);
-      color: #166534;
-      border-color: #22c55e;
-    }
-    .recommendation-box.green .recommendation-body { background: #f0fdf4; }
-    
-    .recommendation-box.blue { border-color: #3b82f6; }
-    .recommendation-box.blue .recommendation-header {
-      background: linear-gradient(90deg, #dbeafe 0%, #bfdbfe 100%);
-      color: #1e40af;
-      border-color: #3b82f6;
-    }
-    .recommendation-box.blue .recommendation-body { background: #eff6ff; }
-    
-    /* ============ LISTS ============ */
-    ul, ol { margin: 0.04in 0 0.04in 0.2in; font-size: 9pt; }
-    li { margin: 0.02in 0; }
-    
-    /* ============ EDITABLE SECTIONS ============ */
-    .editable-section { min-height: 8px; }
-    .editable-section:focus { outline: 2px dashed #3b82f6; background: #eff6ff; }
-    
-    /* ============ PAGE BREAKS ============ */
-    .page-break { page-break-before: always; height: 0; margin: 0; padding: 0; }
-  </style>
-</head>
-<body>
+  };
 
-<!-- ==================== COVER PAGE ==================== -->
-<div class="cover-page">
-  <div class="cover-logo">
-    {organizationLogo}
-  </div>
-  
-  <div class="cover-project-name">{projectName}</div>
-  
-  <div class="cover-title-box">
-    <div class="cover-title">RESERVE STUDY</div>
-    {coverSubtitle}
-    <div class="cover-and">&amp;</div>
-    <div class="cover-title">PREVENTIVE MAINTENANCE</div>
-    <div class="cover-title">SCHEDULE</div>
-  </div>
-  
-  <div class="cover-prepared">
-    <p><strong>PREPARED BY:</strong> {companyName}</p>
-    <p><strong>SUBMITTED:</strong> {currentDate}</p>
-  </div>
-  
-  <div class="cover-compliance">
-    Complies with New Jersey Residential Housing Bill S2760/A4384
-  </div>
-  
-  <div class="cover-footer">
-    <div class="company-name">{companyName}</div>
-    <div>{companyAddress} {companyPhone}</div>
-  </div>
-</div>
+  // Insert horizontal line
+  const insertHorizontalLine = () => {
+    execCommand('insertHTML', '<hr style="border: none; border-top: 1px solid #ccc; margin: 10px 0;">');
+  };
 
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
+  // Change font size
+  const changeFontSize = (size) => {
+    execCommand('fontSize', size);
+  };
 
-<!-- ==================== INTRODUCTION (no TOC page - saves space) ==================== -->
-<div id="introduction" class="section-header">INTRODUCTION</div>
+  const handlePrint = () => {
+    var content = editorRef.current ? editorRef.current.innerHTML : htmlContent;
+    var printWindow = window.open('', '_blank');
+    printWindow.document.write(content);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(function() { printWindow.print(); }, 500);
+  };
 
-<div class="content-section">
-  <div class="sub-header">Financial Planning</div>
-  <div class="editable-section">
-    <p>One of the key responsibilities of the Board of Trustees or Directors is to ensure that the property is properly protected and maintained. Effective financial planning and budgeting are essential to maintaining the property and ensuring that sufficient funds are available to meet ongoing and future needs.</p>
-    <p>The main objective of capital reserve planning is to ensure adequate funding for the future replacement of capital components within the community. Thoughtful planning helps distribute the cost of these projects evenly over time among owners, ensuring funds are available when needed.</p>
-  </div>
-  
-  <div class="sub-header">Capital Reserve Study</div>
-  <div class="editable-section">
-    <p>A Capital Reserve Study serves as a financial planning tool that estimates the amount of money the Community Association should set aside for the future replacement of common area components. This report has been developed in accordance with the Community Associations Institute (CAI) National Reserve Study Standards.</p>
-  </div>
-  
-  <div class="sub-header">Level of Service Provided</div>
-  <div class="editable-section">
-    {levelOfServiceText}
-  </div>
-</div>
+  const handleDownloadHTML = () => {
+    var content = editorRef.current ? editorRef.current.innerHTML : htmlContent;
+    var blob = new Blob([content], { type: 'text/html' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = (site?.siteName || 'report') + '_Reserve_Study.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
-<!-- ==================== DESCRIPTION ==================== -->
-<div id="description" class="section-header">DESCRIPTION OF DEVELOPMENT</div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
-<div class="content-section">
-  <div class="editable-section">
-    <p>{projectName} consists of a {buildingType} comprising {totalUnits} residential units. The community is located in {projectLocation}.</p>
-    <p>Residents access the building through both front and rear entrance stoops. Additional common areas within the community include the front sidewalk, front paver walkway, fencing, exterior building and landscape lighting, the building's exterior, interior hallways and lobbies, as well as the common area HVAC system and domestic hot water infrastructure.</p>
-  </div>
-</div>
+  return (
+    <div className="min-h-screen bg-gray-300">
+      {/* Top Header Bar */}
+      <div className="sticky top-0 z-50 bg-white shadow-md border-b border-gray-300">
+        {/* Row 1: Title and Actions */}
+        <div className="px-4 py-3 flex justify-between items-center border-b border-gray-200">
+          {/* Left - Back and Title */}
+          <div className="flex items-center gap-4">
+            <Link href={'/sites/' + siteId + '/reports'} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+              ← Back to Reports
+            </Link>
+            <div className="border-l border-gray-300 pl-4">
+              <h1 className="text-xl font-bold text-gray-900">{report?.title}</h1>
+              <p className="text-sm text-gray-500">
+                {site?.siteName} •
+                <span className={'ml-2 px-2 py-0.5 text-xs rounded font-medium ' + (report?.status === 'final' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>
+                  {report?.status === 'final' ? 'Final' : 'Draft'}
+                </span>
+              </p>
+            </div>
+          </div>
 
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
+          {/* Right - Main Actions */}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setEditMode(!editMode)}
+              className={'px-4 py-2 rounded-lg text-sm font-medium transition-colors ' + (editMode ? 'bg-orange-100 text-orange-700 border-2 border-orange-400' : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200')}
+            >
+              {editMode ? '✏️ Editing' : '👁️ View Only'}
+            </button>
 
-<!-- ==================== RESERVE STUDY CHART (own page) ==================== -->
-<div id="reserve-chart" class="section-header">RESERVE STUDY CHART</div>
+            {editMode && (
+              <>
+                <button onClick={() => handleSave('draft')} disabled={saving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                  {saving ? '⏳' : '💾'} Save
+                </button>
+                <button onClick={() => handleSave('final')} disabled={saving}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors">
+                  ✅ Finalize
+                </button>
+              </>
+            )}
 
-<div class="content-section">
-  <div class="summary-cards">
-    <div class="summary-card">
-      <div class="summary-card-header reserve">💰 Reserve Fund</div>
-      <div class="summary-card-body">
-        <div class="summary-item">
-          <div class="summary-label">Percent Funded</div>
-          <div class="summary-value">{percentFunded}</div>
+            <div className="border-l border-gray-300 pl-3 flex gap-2">
+              <button onClick={handlePrint}
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
+                🖨️ Print
+              </button>
+              <button onClick={handleDownloadHTML}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors">
+                📥 HTML
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="summary-item">
-          <div class="summary-label">Current Balance</div>
-          <div class="summary-value">{beginningReserveBalance}</div>
-        </div>
-        <div class="summary-item">
-          <div class="summary-label">Current Contribution</div>
-          <div class="summary-value">{currentAnnualContribution}</div>
-        </div>
-        <div class="summary-item">
-          <div class="summary-label">Recommended</div>
-          <div class="summary-value highlight">{recommendedAnnualFunding}</div>
+
+        {/* Row 2: Formatting Toolbar - Only show in edit mode */}
+        {editMode && (
+          <div className="px-4 py-3 bg-gray-50 flex flex-wrap gap-4 items-center">
+            
+            {/* Text Style Group */}
+            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
+              <span className="text-xs text-gray-500 px-2">Style</span>
+              <button onClick={() => execCommand('bold')} title="Bold (Ctrl+B)"
+                className="w-8 h-8 hover:bg-gray-100 rounded font-bold text-sm flex items-center justify-center">B</button>
+              <button onClick={() => execCommand('italic')} title="Italic (Ctrl+I)"
+                className="w-8 h-8 hover:bg-gray-100 rounded italic text-sm flex items-center justify-center">I</button>
+              <button onClick={() => execCommand('underline')} title="Underline (Ctrl+U)"
+                className="w-8 h-8 hover:bg-gray-100 rounded underline text-sm flex items-center justify-center">U</button>
+              <button onClick={() => execCommand('strikeThrough')} title="Strikethrough"
+                className="w-8 h-8 hover:bg-gray-100 rounded line-through text-sm flex items-center justify-center">S</button>
+            </div>
+
+            {/* Font Size Group */}
+            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
+              <span className="text-xs text-gray-500 px-2">Size</span>
+              <select 
+                onChange={(e) => changeFontSize(e.target.value)} 
+                className="h-8 px-2 text-sm border-0 bg-transparent focus:ring-0"
+                defaultValue="3"
+              >
+                <option value="1">8pt</option>
+                <option value="2">10pt</option>
+                <option value="3">12pt</option>
+                <option value="4">14pt</option>
+                <option value="5">18pt</option>
+                <option value="6">24pt</option>
+                <option value="7">36pt</option>
+              </select>
+            </div>
+
+            {/* Text Color Group */}
+            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
+              <span className="text-xs text-gray-500 px-2">Color</span>
+              <button onClick={() => execCommand('foreColor', '#000000')} title="Black"
+                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#000000'}}></button>
+              <button onClick={() => execCommand('foreColor', '#FF0000')} title="Red"
+                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#FF0000'}}></button>
+              <button onClick={() => execCommand('foreColor', '#0000FF')} title="Blue"
+                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#0000FF'}}></button>
+              <button onClick={() => execCommand('foreColor', '#008000')} title="Green"
+                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#008000'}}></button>
+            </div>
+
+            {/* Highlight Group */}
+            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
+              <span className="text-xs text-gray-500 px-2">Highlight</span>
+              <button onClick={() => execCommand('backColor', '#FFFF00')} title="Yellow"
+                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#FFFF00'}}></button>
+              <button onClick={() => execCommand('backColor', '#90EE90')} title="Green"
+                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#90EE90'}}></button>
+              <button onClick={() => execCommand('backColor', '#87CEEB')} title="Blue"
+                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#87CEEB'}}></button>
+              <button onClick={() => execCommand('backColor', 'transparent')} title="Remove Highlight"
+                className="w-7 h-7 rounded border border-gray-300 bg-white text-xs">✕</button>
+            </div>
+
+            {/* Alignment Group */}
+            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
+              <span className="text-xs text-gray-500 px-2">Align</span>
+              <button onClick={() => execCommand('justifyLeft')} title="Align Left"
+                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">⫷</button>
+              <button onClick={() => execCommand('justifyCenter')} title="Align Center"
+                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">☰</button>
+              <button onClick={() => execCommand('justifyRight')} title="Align Right"
+                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">⫸</button>
+              <button onClick={() => execCommand('justifyFull')} title="Justify"
+                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">≡</button>
+            </div>
+
+            {/* Lists & Indent Group */}
+            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
+              <span className="text-xs text-gray-500 px-2">Lists</span>
+              <button onClick={() => execCommand('insertUnorderedList')} title="Bullet List"
+                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">•≡</button>
+              <button onClick={() => execCommand('insertOrderedList')} title="Numbered List"
+                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">1.</button>
+              <button onClick={() => execCommand('outdent')} title="Decrease Indent"
+                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">⇤</button>
+              <button onClick={() => execCommand('indent')} title="Increase Indent"
+                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">⇥</button>
+            </div>
+
+            {/* Insert Group */}
+            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
+              <span className="text-xs text-gray-500 px-2">Insert</span>
+              <button onClick={insertPageBreak} title="Insert Page Break"
+                className="px-3 h-8 hover:bg-orange-100 rounded text-sm flex items-center justify-center text-orange-600 font-medium">
+                📄 Page Break
+              </button>
+              <button onClick={insertHorizontalLine} title="Insert Horizontal Line"
+                className="px-3 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">
+                ― Line
+              </button>
+            </div>
+
+            {/* Edit Group */}
+            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
+              <button onClick={() => execCommand('undo')} title="Undo (Ctrl+Z)"
+                className="px-3 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">↩ Undo</button>
+              <button onClick={() => execCommand('redo')} title="Redo (Ctrl+Y)"
+                className="px-3 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">↪ Redo</button>
+              <button onClick={() => execCommand('removeFormat')} title="Clear Formatting"
+                className="px-3 h-8 hover:bg-red-100 rounded text-sm flex items-center justify-center text-red-600">✕ Clear</button>
+            </div>
+
+            {/* Unsaved indicator */}
+            {hasChanges && (
+              <span className="text-orange-600 text-sm font-medium bg-orange-50 px-3 py-1 rounded-full">
+                ⚠️ Unsaved changes
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Report Content - Full Width */}
+      <div className="p-6">
+        <div 
+          className={'bg-white shadow-xl mx-auto ' + (editMode ? 'ring-4 ring-blue-400 ring-opacity-50' : '')}
+          style={{ 
+            maxWidth: '8.5in', 
+            minHeight: '11in',
+            width: '100%'
+          }}
+        >
+          {editMode ? (
+            <div 
+              ref={editorRef} 
+              contentEditable 
+              onInput={() => setHasChanges(true)}
+              dangerouslySetInnerHTML={{ __html: htmlContent }}
+              className="outline-none"
+              style={{ 
+                padding: '0.75in',
+                minHeight: '11in',
+                fontSize: '11pt',
+                lineHeight: '1.5'
+              }}
+            />
+          ) : (
+            <div 
+              dangerouslySetInnerHTML={{ __html: htmlContent }}
+              style={{
+                padding: '0.75in'
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
-    <div class="summary-card">
-      <div class="summary-card-header pm">🟢 PM Fund</div>
-      <div class="summary-card-body">
-        <div class="summary-item">
-          <div class="summary-label">Percent Funded</div>
-          <div class="summary-value">{pmPercentFunded}</div>
-        </div>
-        <div class="summary-item">
-          <div class="summary-label">Current Balance</div>
-          <div class="summary-value">{pmBeginningBalance}</div>
-        </div>
-        <div class="summary-item">
-          <div class="summary-label">Current Contribution</div>
-          <div class="summary-value">{pmCurrentContribution}</div>
-        </div>
-        <div class="summary-item">
-          <div class="summary-label">Recommended</div>
-          <div class="summary-value highlight">{pmRecommendedFunding}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ==================== RESERVE FUND INFO ==================== -->
-<div class="section-header">RESERVE FUND INFORMATION</div>
-
-<div class="content-section">
-  <table>
-    <tr><td style="width:60%;"><strong>Beginning Reserve Balance:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{beginningReserveBalance}</td></tr>
-    <tr><td><strong>Current Annual Contribution:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{currentAnnualContribution}</td></tr>
-    <tr><td><strong>Current Percent Funded:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{percentFunded}</td></tr>
-    <tr><td><strong>Recommended Annual Funding:</strong></td><td class="text-right text-bold" style="font-size:10pt; color:#22c55e;">{recommendedAnnualFunding}</td></tr>
-    <tr><td><strong>Averaging Length in Years:</strong></td><td class="text-right text-bold" style="font-size:10pt;">30</td></tr>
-  </table>
-</div>
-
-<!-- ==================== PM FUND INFO ==================== -->
-<div id="pm-fund-info" class="section-header section-header-green">PREVENTIVE MAINTENANCE FUND INFORMATION</div>
-
-<div class="content-section">
-  <table>
-    <tr><td style="width:60%;"><strong>Beginning Preventive Maintenance Balance:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{pmBeginningBalance}</td></tr>
-    <tr><td><strong>Current Annual Contribution:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{pmCurrentContribution}</td></tr>
-    <tr><td><strong>Current Percent Funded:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{pmPercentFunded}</td></tr>
-    <tr><td><strong>Recommended Annual Funding:</strong></td><td class="text-right text-bold" style="font-size:10pt; color:#22c55e;">{pmRecommendedFunding}</td></tr>
-    <tr><td><strong>Averaging Length in Years:</strong></td><td class="text-right text-bold" style="font-size:10pt;">30</td></tr>
-  </table>
-</div>
-
-<!-- ==================== TERMS ==================== -->
-<div id="terms" class="section-header">TERMS AND DEFINITIONS</div>
-
-<div class="content-section">
-  <div class="editable-section">
-    <p><strong>Capital Improvements</strong> - Additions to the association's common elements that were not previously part of the community.</p>
-    <p><strong>Cash Flow Method</strong> - A method of creating a reserve funding plan in which contributions are structured to align with projected, fluctuating annual reserve expenditures.</p>
-    <p><strong>Component</strong> - Individual items listed in the reserve study as identified through the physical analysis.</p>
-    <p><strong>Fully Funded Balance (FFB)</strong> - An ideal benchmark reserve balance. Formula: FFB = Current Cost × (Effective Age ÷ Useful Life)</p>
-    <p><strong>Percent Funded</strong> - The ratio of the actual reserve balance to the fully funded balance.</p>
-    <p><strong>Remaining Useful Life (RUL)</strong> - The estimated number of years a component will continue to function before replacement.</p>
-    <p><strong>Useful Life (UL)</strong> - The total expected lifespan of a component from installation to replacement.</p>
-    <p><strong>Replacement Cost</strong> - The total cost to repair, restore, or replace a component.</p>
-    <p><strong>Funding Goals:</strong></p>
-    <ul>
-      <li><strong>Full Funding:</strong> Keep reserves at or near 100% funded.</li>
-      <li><strong>Threshold Funding:</strong> Maintain reserves above a specific amount.</li>
-      <li><strong>Baseline Funding:</strong> Ensure fund never drops below zero.</li>
-    </ul>
-  </div>
-</div>
-
-<!-- ==================== RESPONSIBLE CHARGE, SPECIAL ASSESSMENT, PHYSICAL ANALYSIS (combined) ==================== -->
-<div id="responsible-charge" class="section-header">RESPONSIBLE CHARGE</div>
-<div class="content-section">
-  <p>A <strong>Reserve Specialist (RS)</strong> who is in responsible charge of a reserve study must provide consistent and effective oversight of all individuals performing tasks that directly impact the quality and accuracy of the study.</p>
-</div>
-
-<div id="special-assessment" class="section-header">SPECIAL ASSESSMENT</div>
-<div class="content-section">
-  <p>A <strong>Special Assessment</strong> is a temporary fee imposed on association members in addition to regular dues or assessments.</p>
-</div>
-
-<div id="physical-analysis" class="section-header">PHYSICAL ANALYSIS</div>
-<div class="content-section">
-  <p>The quantities used in the replacement cost estimates of the common elements were generated from field measurements taken during our site visit on {inspectionDate}. Current replacement costs were estimated using published construction cost data referenced in the Bibliography section of this report.</p>
-  <p>It is recommended that this reserve study be updated every three (3) to five (5) years.</p>
-</div>
-
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
-
-<!-- ==================== COMPONENT SCHEDULE SUMMARY ==================== -->
-<div id="component-summary" class="section-header">COMPONENT SCHEDULE SUMMARY</div>
-
-<div class="content-section">
-  <p style="font-size:7pt; color:#666; margin-bottom:6px;"><em>Useful Life = Total expected lifespan | Remaining Life = Years until replacement | PM = Preventive Maintenance | Note = Component Note Reference</em></p>
-  {componentSummaryTable}
-</div>
-
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
-
-<!-- ==================== CAPITAL ITEMS ==================== -->
-<div id="capital-items" class="section-header">CAPITAL ITEMS / COMPONENTS</div>
-
-<div class="content-section">
-  <p>The following provides information on the location, condition, and replacement cost of the components. Review of the common elements was conducted by {companyName} on {inspectionDate}.</p>
-  {categorySections}
-</div>
-
-<!-- ==================== COMPONENT NOTES ==================== -->
-<div id="component-notes" class="section-header">COMPONENTS NOTES</div>
-
-<div class="content-section">
-  <p style="font-size:7pt; margin-bottom:6px;"><em>*EA = Each, *LF = Linear Foot, *LS = Lump Sum, *SF = Square Feet, *SY = Square Yard, *SQ = Square</em></p>
-  {componentNotesTable}
-</div>
-
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
-
-<!-- ==================== FINANCIAL RESULTS ==================== -->
-<div id="financial-results" class="section-header">FINANCIAL RESULTS</div>
-
-<div class="content-section">
-  <p>The primary goal of capital reserve planning is to provide adequate funding for the replacement of the capital components within the community.</p>
-  <p><strong>Current Funding</strong> reflects the beginning balance with the current annual contribution added and projected expenses subtracted each year.</p>
-  <p><strong>Full Funding</strong> represents the annual contribution and fund balances for each year as if each component were fully funded.</p>
-  
-  <div class="recommendation-box blue">
-    <div class="recommendation-header">📊 Reserve Study Funding Summary</div>
-    <div class="recommendation-body">
-      <ul>
-        <li>Current Annual Contribution: <strong>{currentAnnualContribution}</strong></li>
-        <li>Full Funding Annual Contribution for {beginningYear}: <strong>{fullFundingContribution}</strong></li>
-        <li>Full Funding Average Annual Contribution: <strong>{averageAnnualContribution}</strong></li>
-      </ul>
-    </div>
-  </div>
-  
-  <div class="recommendation-box green">
-    <div class="recommendation-header">🟢 Preventive Maintenance Funding</div>
-    <div class="recommendation-body">
-      <ul>
-        <li>Current Annual Contribution: <strong>{pmCurrentContribution}</strong></li>
-        <li>Annual Full Funding Contribution: <strong>{pmRecommendedFunding}</strong></li>
-      </ul>
-    </div>
-  </div>
-</div>
-
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
-
-<!-- ==================== CASH FLOW (own page) ==================== -->
-<div id="cash-flow" class="section-header">RESERVE FUND THIRTY YEAR CASH FLOW</div>
-
-<div class="content-section">
-  {reserveCashFlowTable}
-</div>
-
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
-
-<!-- ==================== THRESHOLD (own page) ==================== -->
-<div id="threshold" class="section-header">RESERVE FUND THIRTY YEAR THRESHOLD FUNDING</div>
-
-<div class="content-section">
-  {thresholdProjectionTable}
-</div>
-
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
-
-<!-- ==================== EXPENDITURES (own page) ==================== -->
-<div id="expenditures" class="section-header">RESERVE FUND EXPENDITURES</div>
-
-<div class="content-section">
-  {expenditureScheduleTable}
-</div>
-
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
-
-<!-- ==================== PM SECTION (own page) ==================== -->
-<div id="pm-section" class="section-header section-header-teal">PREVENTIVE MAINTENANCE</div>
-
-<div class="content-section">
-  <div class="sub-header">Component Schedule Summary</div>
-  {pmComponentSummaryTable}
-</div>
-
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
-
-<!-- ==================== PM EXPENDITURES (before cash flow) ==================== -->
-<div id="pm-expenditures" class="section-header section-header-teal">PM EXPENDITURES</div>
-
-<div class="content-section">
-  {pmExpenditureTable}
-</div>
-
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
-
-<!-- ==================== PM CASH FLOW ==================== -->
-<div id="pm-cash-flow" class="section-header section-header-teal">PM THIRTY YEAR CASH FLOW</div>
-
-<div class="content-section">
-  {pmCashFlowTable}
-</div>
-
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
-
-<!-- ==================== RECOMMENDATIONS ==================== -->
-<div id="recommendations" class="section-header section-header-orange">RECOMMENDATIONS</div>
-
-<div class="content-section">
-  <p>The following recommendations are based on our review of the community and information provided by the Association. {companyName} recommends the following:</p>
-  
-  <div class="recommendation-box">
-    <div class="recommendation-header">💰 Financial Recommendation - RESERVE FUNDING</div>
-    <div class="recommendation-body">
-      <p>The current annual contribution of {currentAnnualContribution} is {fundingAssessment}.</p>
-      <p>{companyName} recommends {fundingRecommendation} as shown on the Reserve Study Funding Plan.</p>
-    </div>
-  </div>
-  
-  <div class="recommendation-box green">
-    <div class="recommendation-header">🟢 Preventive Maintenance Funding</div>
-    <div class="recommendation-body">
-      <p>Current Annual Contribution: <strong>{pmCurrentContribution}</strong><br>
-      Recommended: <strong>{pmRecommendedFunding}</strong></p>
-    </div>
-  </div>
-  
-  <div class="recommendation-box blue">
-    <div class="recommendation-header">📅 Updating the Reserve Study</div>
-    <div class="recommendation-body">
-      <p>{companyName} recommends updating the reserve study <strong>Every Three (3) Years</strong>.</p>
-      <p>New Jersey Law requires updates at a Maximum of <strong>Every Five (5) Years</strong>.</p>
-    </div>
-  </div>
-</div>
-
-<!-- ==================== DISCLOSURES & BIBLIOGRAPHY (same page) ==================== -->
-<div id="disclosures" class="section-header">DISCLOSURES</div>
-
-<div class="content-section">
-  <p>{companyName} is not aware of any conflicts of interest that would influence this study.</p>
-  <p>Physical observations were cursory and included only accessible common elements.</p>
-  <p>This study was prepared by {preparedBy}, {companyName}.</p>
-  <p>The Reserve Study reflects information provided and was not audited.</p>
-</div>
-
-<div id="bibliography" class="section-header">BIBLIOGRAPHY</div>
-
-<div class="content-section">
-  <ol>
-    <li>Master Deed of {projectName}</li>
-    <li>Best Practices for Reserve Studies/Management - Foundation for Community Association Research, 2023</li>
-    <li>National Reserve Study Standards - Community Associations Institute, 2023</li>
-    <li>Cost Works - R.S. Means Company, 2025</li>
-    <li>New Jersey Reserve Study Law (NJ Senate Bill S2760/A4384), 2024</li>
-  </ol>
-</div>
-
-<!-- ==================== PAGE FOOTER ==================== -->
-<div class="page-footer">
-  <span class="company-name">{companyName}</span> | {companyFullAddress} | {companyPhone}
-</div>
-
-</body>
-</html>
-`;
-
-export default DEFAULT_REPORT_TEMPLATE;
+  );
+}
