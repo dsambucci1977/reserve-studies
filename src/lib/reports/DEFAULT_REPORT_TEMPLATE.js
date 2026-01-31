@@ -1,5 +1,5 @@
-// Professional Report Template - Beahm Consulting Format v4
-// Added dynamic Study Type support for cover page and Level of Service
+// Professional Report Template - Beahm Consulting Format v5
+// Added organization logo, footer branding, and dynamic Study Type support
 
 export const DEFAULT_REPORT_TEMPLATE = `
 <!DOCTYPE html>
@@ -10,13 +10,19 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <style>
     @page {
       size: letter;
-      margin: 0.75in 0.75in 0.75in 0.75in;
+      margin: 0.75in 0.75in 1in 0.75in;
     }
     
     @media print {
       .no-print { display: none !important; }
       .page-break { page-break-before: always; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .page-footer { 
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+      }
     }
     
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,28 +37,55 @@ export const DEFAULT_REPORT_TEMPLATE = `
       margin: 0 auto;
     }
     
+    /* ============ PAGE FOOTER ============ */
+    .page-footer {
+      text-align: center;
+      padding: 10px 0;
+      margin-top: 30px;
+      border-top: 1px solid #ddd;
+      font-size: 8pt;
+      color: #666;
+    }
+    
+    .page-footer .company-name {
+      font-weight: bold;
+      color: #1e3a5f;
+    }
+    
     /* ============ COVER PAGE ============ */
     .cover-page {
       min-height: 10in;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-start;
       align-items: center;
       text-align: center;
-      padding: 1in;
-      background: linear-gradient(180deg, #1e3a5f 0%, #2d5a87 100%);
-      color: white;
+      padding: 0.5in 1in 1in 1in;
+      background: white;
+      color: #1a1a1a;
+    }
+    
+    .cover-logo {
+      margin-bottom: 0.5in;
+      max-width: 4in;
+      max-height: 1.5in;
+    }
+    
+    .cover-logo img {
+      max-width: 100%;
+      max-height: 1.5in;
+      object-fit: contain;
     }
     
     .cover-project-name {
-      font-size: 32pt;
+      font-size: 28pt;
       font-weight: bold;
-      margin-bottom: 0.5in;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+      margin: 0.5in 0;
+      color: #1e3a5f;
     }
     
     .cover-title-box {
-      border: 3px solid white;
+      border: 3px solid #1e3a5f;
       padding: 0.4in 0.8in;
       margin: 0.3in 0;
     }
@@ -61,6 +94,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
       font-size: 20pt;
       font-weight: bold;
       letter-spacing: 2px;
+      color: #1a1a1a;
     }
     
     .cover-title-highlight {
@@ -68,6 +102,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
       font-weight: bold;
       letter-spacing: 2px;
       background: #e07020;
+      color: white;
       padding: 0.05in 0.2in;
       display: inline-block;
       margin: 0.05in 0;
@@ -76,22 +111,39 @@ export const DEFAULT_REPORT_TEMPLATE = `
     .cover-and {
       font-size: 16pt;
       margin: 0.15in 0;
+      color: #666;
     }
     
     .cover-prepared {
-      margin-top: 1in;
+      margin-top: 0.8in;
       font-size: 12pt;
     }
     
     .cover-prepared p { margin: 0.1in 0; }
     
     .cover-compliance {
-      margin-top: 0.8in;
+      margin-top: 0.6in;
       font-size: 10pt;
       font-style: italic;
-      opacity: 0.9;
-      border-top: 1px solid rgba(255,255,255,0.5);
+      color: #666;
+      border-top: 1px solid #ddd;
       padding-top: 0.3in;
+    }
+    
+    .cover-footer {
+      margin-top: auto;
+      padding-top: 0.5in;
+      text-align: center;
+      font-size: 9pt;
+      color: #666;
+      border-top: 2px solid #1e3a5f;
+      width: 100%;
+    }
+    
+    .cover-footer .company-name {
+      font-weight: bold;
+      font-size: 11pt;
+      color: #1e3a5f;
     }
     
     /* ============ TABLE OF CONTENTS ============ */
@@ -340,7 +392,12 @@ export const DEFAULT_REPORT_TEMPLATE = `
 
 <!-- ==================== COVER PAGE ==================== -->
 <div class="cover-page">
+  <div class="cover-logo">
+    {organizationLogo}
+  </div>
+  
   <div class="cover-project-name">{projectName}</div>
+  
   <div class="cover-title-box">
     <div class="cover-title">RESERVE STUDY</div>
     {coverSubtitle}
@@ -348,12 +405,19 @@ export const DEFAULT_REPORT_TEMPLATE = `
     <div class="cover-title">PREVENTIVE MAINTENANCE</div>
     <div class="cover-title">SCHEDULE</div>
   </div>
+  
   <div class="cover-prepared">
     <p><strong>PREPARED BY:</strong> {companyName}</p>
     <p><strong>SUBMITTED:</strong> {currentDate}</p>
   </div>
+  
   <div class="cover-compliance">
     Complies with New Jersey Residential Housing Bill S2760/A4384
+  </div>
+  
+  <div class="cover-footer">
+    <div class="company-name">{companyName}</div>
+    <div>{companyAddress} {companyPhone}</div>
   </div>
 </div>
 
@@ -721,6 +785,12 @@ export const DEFAULT_REPORT_TEMPLATE = `
       <li>New Jersey Reserve Study Law (NJ Senate Bill S2760/A4384), 2024</li>
     </ol>
   </div>
+</div>
+
+<!-- ==================== PAGE FOOTER (appears on every page when printed) ==================== -->
+<div class="page-footer">
+  <span class="company-name">{companyName}</span><br>
+  {companyFullAddress} • {companyPhone}
 </div>
 
 </body>
