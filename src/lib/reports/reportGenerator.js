@@ -249,9 +249,10 @@ function generateCashFlowTable(cashFlow, fundInfo, fundType) {
     return '<p><em>No cash flow data available. Please run calculations first.</em></p>';
   }
 
-  var headerBg = fundType === 'pm' ? '#22c55e' : '#1e3a5f';
-  var currentBg = fundType === 'pm' ? '#86efac' : '#3b82f6';
-  var fullBg = '#22c55e';
+  // Use consistent navy blue for all tables
+  var headerBg = '#1e3a5f';
+  var currentBg = '#3b82f6';
+  var fullBg = '#1e3a5f';
   var recommendedContribution = fundInfo.recommendedContribution || 0;
   var currentBalance = fundInfo.currentBalance || 0;
 
@@ -534,7 +535,8 @@ function generateExpenditureTable(components, startYear, years, isPM) {
     return '<p><em>No ' + (isPM ? 'PM' : 'reserve') + ' components found</em></p>';
   }
 
-  var headerColor = isPM ? '#22c55e' : '#1e3a5f';
+  // Use consistent navy blue for all tables
+  var headerColor = '#1e3a5f';
 
   // Build year data - only years with expenditures
   var yearData = [];
