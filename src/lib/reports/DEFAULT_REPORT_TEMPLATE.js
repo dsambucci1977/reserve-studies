@@ -1,5 +1,6 @@
-// Professional Report Template - Beahm Consulting Format v5
-// Added organization logo, footer branding, and dynamic Study Type support
+// Professional Report Template - Beahm Consulting Format v7
+// Uses same placeholders as v5, but with spacing/layout fixes
+// Fixes: Removed cover box, compact footer, consolidated sections, fewer blank pages
 
 export const DEFAULT_REPORT_TEMPLATE = `
 <!DOCTYPE html>
@@ -10,40 +11,34 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <style>
     @page {
       size: letter;
-      margin: 0.75in 0.75in 1in 0.75in;
+      margin: 0.6in 0.6in 0.75in 0.6in;
     }
     
     @media print {
       .no-print { display: none !important; }
       .page-break { page-break-before: always; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .page-footer { 
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-      }
     }
     
     * { box-sizing: border-box; margin: 0; padding: 0; }
     
     body {
-      font-family: 'Segoe UI', 'Arial', sans-serif;
-      font-size: 11pt;
-      line-height: 1.5;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10pt;
+      line-height: 1.4;
       color: #1a1a1a;
       background: white;
       max-width: 8.5in;
       margin: 0 auto;
     }
     
-    /* ============ PAGE FOOTER ============ */
+    /* ============ COMPACT PAGE FOOTER ============ */
     .page-footer {
       text-align: center;
-      padding: 10px 0;
-      margin-top: 30px;
-      border-top: 1px solid #ddd;
-      font-size: 8pt;
+      padding: 6px 0;
+      margin-top: 20px;
+      border-top: 1px solid #ccc;
+      font-size: 7pt;
       color: #666;
     }
     
@@ -54,85 +49,85 @@ export const DEFAULT_REPORT_TEMPLATE = `
     
     /* ============ COVER PAGE ============ */
     .cover-page {
-      min-height: 10in;
+      min-height: 9.5in;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
       align-items: center;
       text-align: center;
-      padding: 0.5in 1in 1in 1in;
+      padding: 0.5in 1in 0.5in 1in;
       background: white;
       color: #1a1a1a;
     }
     
     .cover-logo {
-      margin-bottom: 0.5in;
+      margin-bottom: 0.4in;
       max-width: 4in;
-      max-height: 1.5in;
+      max-height: 1.2in;
     }
     
     .cover-logo img {
       max-width: 100%;
-      max-height: 1.5in;
+      max-height: 1.2in;
       object-fit: contain;
     }
     
     .cover-project-name {
-      font-size: 28pt;
+      font-size: 26pt;
       font-weight: bold;
-      margin: 0.5in 0;
+      margin: 0.4in 0;
       color: #1e3a5f;
     }
     
     .cover-title-box {
-      border: 3px solid #1e3a5f;
-      padding: 0.4in 0.8in;
-      margin: 0.3in 0;
+      padding: 0.3in 0;
+      margin: 0.2in 0;
     }
     
     .cover-title {
-      font-size: 20pt;
+      font-size: 18pt;
       font-weight: bold;
       letter-spacing: 2px;
       color: #1a1a1a;
+      margin: 0.05in 0;
     }
     
     .cover-title-highlight {
-      font-size: 20pt;
+      font-size: 18pt;
       font-weight: bold;
       letter-spacing: 2px;
       background: #e07020;
       color: white;
-      padding: 0.05in 0.2in;
+      padding: 3px 12px;
       display: inline-block;
-      margin: 0.05in 0;
+      margin: 0.03in 0;
     }
     
     .cover-and {
-      font-size: 16pt;
-      margin: 0.15in 0;
+      font-size: 14pt;
+      margin: 0.1in 0;
       color: #666;
     }
     
     .cover-prepared {
-      margin-top: 0.8in;
-      font-size: 12pt;
+      margin-top: 0.5in;
+      font-size: 11pt;
     }
     
-    .cover-prepared p { margin: 0.1in 0; }
+    .cover-prepared p { margin: 0.08in 0; }
     
     .cover-compliance {
-      margin-top: 0.6in;
-      font-size: 10pt;
+      margin-top: 0.4in;
+      font-size: 9pt;
       font-style: italic;
       color: #666;
       border-top: 1px solid #ddd;
-      padding-top: 0.3in;
+      padding-top: 0.2in;
     }
     
     .cover-footer {
       margin-top: auto;
-      padding-top: 0.5in;
+      padding-top: 0.3in;
       text-align: center;
       font-size: 9pt;
       color: #666;
@@ -142,51 +137,44 @@ export const DEFAULT_REPORT_TEMPLATE = `
     
     .cover-footer .company-name {
       font-weight: bold;
-      font-size: 11pt;
+      font-size: 10pt;
       color: #1e3a5f;
     }
     
     /* ============ TABLE OF CONTENTS ============ */
-    .toc-page { padding: 0.3in; }
+    .toc-page { padding: 0.2in; }
     
     .toc-title {
-      font-size: 18pt;
+      font-size: 16pt;
       font-weight: bold;
       color: #1e3a5f;
       text-align: center;
-      margin-bottom: 0.3in;
+      margin-bottom: 0.2in;
       padding-bottom: 0.1in;
-      border-bottom: 3px solid #1e3a5f;
+      border-bottom: 2px solid #1e3a5f;
     }
     
     .toc-section {
       display: flex;
       justify-content: space-between;
-      padding: 4px 10px;
+      padding: 3px 8px;
       border-bottom: 1px dotted #ccc;
-      font-size: 10pt;
+      font-size: 9pt;
       text-decoration: none;
       color: inherit;
     }
     
     .toc-section:hover { background: #e8f4f8; color: #1e3a5f; }
     
-    .toc-section span:last-child {
-      color: #666;
-      font-weight: bold;
-      min-width: 30px;
-      text-align: right;
-    }
-    
     /* ============ SECTION HEADERS ============ */
     .section-header {
       background: linear-gradient(90deg, #1e3a5f 0%, #2d5a87 100%);
       color: white;
-      padding: 10px 15px;
-      font-size: 13pt;
+      padding: 8px 12px;
+      font-size: 12pt;
       font-weight: bold;
-      margin: 0.25in 0 0.15in 0;
-      border-radius: 4px;
+      margin: 0.15in 0 0.1in 0;
+      border-radius: 3px;
     }
     
     .section-header-green {
@@ -198,47 +186,47 @@ export const DEFAULT_REPORT_TEMPLATE = `
     }
     
     .sub-header {
-      font-size: 12pt;
+      font-size: 11pt;
       font-weight: bold;
       color: #1e3a5f;
-      margin: 0.15in 0 0.1in 0;
-      padding-bottom: 3px;
+      margin: 0.1in 0 0.06in 0;
+      padding-bottom: 2px;
       border-bottom: 2px solid #1e3a5f;
     }
     
     /* ============ CONTENT SECTIONS ============ */
     .content-section {
-      padding: 0 0.1in;
-      margin-bottom: 0.1in;
+      padding: 0 0.05in;
+      margin-bottom: 0.08in;
     }
     
     .content-section p {
-      margin: 0.08in 0;
+      margin: 0.06in 0;
       text-align: justify;
-      font-size: 10pt;
+      font-size: 9pt;
     }
     
     /* ============ SUMMARY CARDS ============ */
     .summary-cards {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 0.15in;
-      margin: 0.15in 0;
+      gap: 0.12in;
+      margin: 0.1in 0;
     }
     
     .summary-card {
       border: 2px solid #e0e0e0;
-      border-radius: 6px;
+      border-radius: 5px;
       overflow: hidden;
     }
     
     .summary-card-header {
-      padding: 6px 10px;
+      padding: 5px 8px;
       font-weight: bold;
-      font-size: 10pt;
+      font-size: 9pt;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
     }
     
     .summary-card-header.reserve {
@@ -254,26 +242,26 @@ export const DEFAULT_REPORT_TEMPLATE = `
     }
     
     .summary-card-body {
-      padding: 10px;
+      padding: 8px;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      gap: 6px;
     }
     
     .summary-item {
       background: #f8f9fa;
-      padding: 6px;
-      border-radius: 4px;
+      padding: 5px;
+      border-radius: 3px;
     }
     
     .summary-label {
-      font-size: 7pt;
+      font-size: 6pt;
       color: #666;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
     
     .summary-value {
-      font-size: 12pt;
+      font-size: 11pt;
       font-weight: bold;
       color: #1a1a1a;
     }
@@ -284,7 +272,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 0.1in 0;
+      margin: 0.08in 0;
       font-size: 8pt;
     }
     
@@ -319,19 +307,19 @@ export const DEFAULT_REPORT_TEMPLATE = `
     
     /* ============ COMPONENT TABLE ============ */
     .component-table { font-size: 7pt; }
-    .component-table th { padding: 4px 2px; font-size: 6pt; }
+    .component-table th { padding: 3px 2px; font-size: 6pt; }
     .component-table td { padding: 2px; }
     
     /* ============ CASH FLOW TABLE ============ */
     .cashflow-table { font-size: 7pt; }
-    .cashflow-table th { padding: 4px 2px; font-size: 6pt; }
+    .cashflow-table th { padding: 3px 2px; font-size: 6pt; }
     .cashflow-table td { padding: 2px 3px; text-align: right; }
     .cashflow-table td:first-child { text-align: center; font-weight: bold; background: #f1f5f9; }
     
     /* ============ EXPENDITURE TABLE ============ */
     .expenditure-horizontal { font-size: 8pt; }
-    .expenditure-horizontal th { padding: 5px; }
-    .expenditure-horizontal td { padding: 4px; }
+    .expenditure-horizontal th { padding: 4px; }
+    .expenditure-horizontal td { padding: 3px; }
     
     /* ============ NOTES TABLE ============ */
     .notes-table td:first-child { width: 50px; text-align: center; font-weight: bold; background: #f1f5f9; }
@@ -340,14 +328,14 @@ export const DEFAULT_REPORT_TEMPLATE = `
     /* ============ RECOMMENDATION BOXES ============ */
     .recommendation-box {
       border: 2px solid #c55a11;
-      border-radius: 6px;
-      margin: 0.1in 0;
+      border-radius: 5px;
+      margin: 0.08in 0;
       overflow: hidden;
     }
     
     .recommendation-header {
       background: linear-gradient(90deg, #fef3e8 0%, #fde8d8 100%);
-      padding: 6px 10px;
+      padding: 5px 8px;
       font-weight: bold;
       color: #c55a11;
       border-bottom: 1px solid #c55a11;
@@ -355,7 +343,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
     }
     
     .recommendation-body {
-      padding: 10px;
+      padding: 8px;
       background: #fffbf5;
       font-size: 9pt;
     }
@@ -377,11 +365,11 @@ export const DEFAULT_REPORT_TEMPLATE = `
     .recommendation-box.blue .recommendation-body { background: #eff6ff; }
     
     /* ============ LISTS ============ */
-    ul, ol { margin: 0.05in 0 0.05in 0.2in; font-size: 10pt; }
+    ul, ol { margin: 0.04in 0 0.04in 0.2in; font-size: 9pt; }
     li { margin: 0.02in 0; }
     
     /* ============ EDITABLE SECTIONS ============ */
-    .editable-section { min-height: 10px; }
+    .editable-section { min-height: 8px; }
     .editable-section:focus { outline: 2px dashed #3b82f6; background: #eff6ff; }
     
     /* ============ PAGE BREAKS ============ */
@@ -401,7 +389,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <div class="cover-title-box">
     <div class="cover-title">RESERVE STUDY</div>
     {coverSubtitle}
-    <div class="cover-and">&</div>
+    <div class="cover-and">&amp;</div>
     <div class="cover-title">PREVENTIVE MAINTENANCE</div>
     <div class="cover-title">SCHEDULE</div>
   </div>
@@ -423,48 +411,19 @@ export const DEFAULT_REPORT_TEMPLATE = `
 
 <div class="page-break"></div>
 
-<!-- ==================== TABLE OF CONTENTS ==================== -->
-<div class="toc-page">
-  <div class="toc-title">TABLE OF CONTENTS</div>
-  
-  <a href="#introduction" class="toc-section"><span>INTRODUCTION</span><span></span></a>
-  <a href="#description" class="toc-section"><span>Description of Development</span><span></span></a>
-  <a href="#reserve-chart" class="toc-section"><span>RESERVE STUDY CHART</span><span></span></a>
-  <a href="#pm-fund-info" class="toc-section"><span>Preventive Maintenance Fund Information</span><span></span></a>
-  <a href="#terms" class="toc-section"><span>TERMS AND DEFINITIONS</span><span></span></a>
-  <a href="#responsible-charge" class="toc-section"><span>RESPONSIBLE CHARGE</span><span></span></a>
-  <a href="#special-assessment" class="toc-section"><span>SPECIAL ASSESSMENT</span><span></span></a>
-  <a href="#physical-analysis" class="toc-section"><span>PHYSICAL ANALYSIS</span><span></span></a>
-  <a href="#component-summary" class="toc-section"><span>COMPONENT SCHEDULE SUMMARY</span><span></span></a>
-  <a href="#capital-items" class="toc-section"><span>CAPITAL ITEMS / COMPONENTS</span><span></span></a>
-  <a href="#component-notes" class="toc-section"><span>COMPONENTS NOTES</span><span></span></a>
-  <a href="#financial-results" class="toc-section"><span>FINANCIAL RESULTS</span><span></span></a>
-  <a href="#cash-flow" class="toc-section"><span>RESERVE FUND THIRTY YEAR CASH FLOW</span><span></span></a>
-  <a href="#threshold" class="toc-section"><span>RESERVE FUND THIRTY YEAR THRESHOLD FUNDING</span><span></span></a>
-  <a href="#expenditures" class="toc-section"><span>RESERVE FUND EXPENDITURES</span><span></span></a>
-  <a href="#pm-section" class="toc-section"><span>PREVENTIVE MAINTENANCE</span><span></span></a>
-  <a href="#pm-cash-flow" class="toc-section"><span>PM THIRTY YEAR CASH FLOW</span><span></span></a>
-  <a href="#pm-expenditures" class="toc-section"><span>PM EXPENDITURES</span><span></span></a>
-  <a href="#recommendations" class="toc-section"><span>RECOMMENDATIONS</span><span></span></a>
-  <a href="#disclosures" class="toc-section"><span>DISCLOSURES</span><span></span></a>
-  <a href="#bibliography" class="toc-section"><span>BIBLIOGRAPHY</span><span></span></a>
-</div>
-
-<div class="page-break"></div>
-
-<!-- ==================== INTRODUCTION ==================== -->
+<!-- ==================== INTRODUCTION (no TOC page - saves space) ==================== -->
 <div id="introduction" class="section-header">INTRODUCTION</div>
 
 <div class="content-section">
   <div class="sub-header">Financial Planning</div>
   <div class="editable-section">
     <p>One of the key responsibilities of the Board of Trustees or Directors is to ensure that the property is properly protected and maintained. Effective financial planning and budgeting are essential to maintaining the property and ensuring that sufficient funds are available to meet ongoing and future needs.</p>
-    <p>The main objective of capital reserve planning is to ensure adequate funding for the future replacement of capital components within the community. Thoughtful planning helps distribute the cost of these projects evenly over time among owners, ensuring funds are available when needed. A well-funded reserve reduces the likelihood of significant fee increases, special assessments, or the need for loans.</p>
+    <p>The main objective of capital reserve planning is to ensure adequate funding for the future replacement of capital components within the community. Thoughtful planning helps distribute the cost of these projects evenly over time among owners, ensuring funds are available when needed.</p>
   </div>
   
   <div class="sub-header">Capital Reserve Study</div>
   <div class="editable-section">
-    <p>A Capital Reserve Study serves as a financial planning tool that estimates the amount of money the Community Association should set aside for the future replacement of common area components. This report has been developed in accordance with the Community Associations Institute (CAI) National Reserve Study Standards. It provides guidance in evaluating and establishing a stable reserve funding strategy for anticipated repairs and replacements.</p>
+    <p>A Capital Reserve Study serves as a financial planning tool that estimates the amount of money the Community Association should set aside for the future replacement of common area components. This report has been developed in accordance with the Community Associations Institute (CAI) National Reserve Study Standards.</p>
   </div>
   
   <div class="sub-header">Level of Service Provided</div>
@@ -533,20 +492,33 @@ export const DEFAULT_REPORT_TEMPLATE = `
   </div>
 </div>
 
-<div class="page-break"></div>
+<!-- ==================== RESERVE FUND INFO (same page as chart) ==================== -->
+<div class="section-header">RESERVE FUND INFORMATION</div>
+
+<div class="content-section">
+  <table>
+    <tr><td style="width:60%;"><strong>Beginning Reserve Balance:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{beginningReserveBalance}</td></tr>
+    <tr><td><strong>Current Annual Contribution:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{currentAnnualContribution}</td></tr>
+    <tr><td><strong>Current Percent Funded:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{percentFunded}</td></tr>
+    <tr><td><strong>Recommended Annual Funding:</strong></td><td class="text-right text-bold" style="font-size:10pt; color:#22c55e;">{recommendedAnnualFunding}</td></tr>
+    <tr><td><strong>Averaging Length in Years:</strong></td><td class="text-right text-bold" style="font-size:10pt;">30</td></tr>
+  </table>
+</div>
 
 <!-- ==================== PM FUND INFO ==================== -->
 <div id="pm-fund-info" class="section-header section-header-green">PREVENTIVE MAINTENANCE FUND INFORMATION</div>
 
 <div class="content-section">
   <table>
-    <tr><td style="width:60%;"><strong>Beginning Preventive Maintenance Balance:</strong></td><td class="text-right text-bold" style="font-size:11pt;">{pmBeginningBalance}</td></tr>
-    <tr><td><strong>Current Annual Contribution:</strong></td><td class="text-right text-bold" style="font-size:11pt;">{pmCurrentContribution}</td></tr>
-    <tr><td><strong>Current Percent Funded:</strong></td><td class="text-right text-bold" style="font-size:11pt;">{pmPercentFunded}</td></tr>
-    <tr><td><strong>Recommended Annual Funding:</strong></td><td class="text-right text-bold" style="font-size:11pt; color:#22c55e;">{pmRecommendedFunding}</td></tr>
-    <tr><td><strong>Averaging Length in Years:</strong></td><td class="text-right text-bold" style="font-size:11pt;">30</td></tr>
+    <tr><td style="width:60%;"><strong>Beginning Preventive Maintenance Balance:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{pmBeginningBalance}</td></tr>
+    <tr><td><strong>Current Annual Contribution:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{pmCurrentContribution}</td></tr>
+    <tr><td><strong>Current Percent Funded:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{pmPercentFunded}</td></tr>
+    <tr><td><strong>Recommended Annual Funding:</strong></td><td class="text-right text-bold" style="font-size:10pt; color:#22c55e;">{pmRecommendedFunding}</td></tr>
+    <tr><td><strong>Averaging Length in Years:</strong></td><td class="text-right text-bold" style="font-size:10pt;">30</td></tr>
   </table>
 </div>
+
+<div class="page-break"></div>
 
 <!-- ==================== TERMS ==================== -->
 <div id="terms" class="section-header">TERMS AND DEFINITIONS</div>
@@ -570,34 +542,21 @@ export const DEFAULT_REPORT_TEMPLATE = `
   </div>
 </div>
 
-<div class="page-break"></div>
-
-<!-- ==================== RESPONSIBLE CHARGE ==================== -->
+<!-- ==================== RESPONSIBLE CHARGE, SPECIAL ASSESSMENT, PHYSICAL ANALYSIS (combined) ==================== -->
 <div id="responsible-charge" class="section-header">RESPONSIBLE CHARGE</div>
-
 <div class="content-section">
-  <div class="editable-section">
-    <p>A <strong>Reserve Specialist (RS)</strong> who is in responsible charge of a reserve study must provide consistent and effective oversight of all individuals performing tasks that directly impact the quality and accuracy of the study.</p>
-  </div>
+  <p>A <strong>Reserve Specialist (RS)</strong> who is in responsible charge of a reserve study must provide consistent and effective oversight of all individuals performing tasks that directly impact the quality and accuracy of the study.</p>
 </div>
 
-<!-- ==================== SPECIAL ASSESSMENT ==================== -->
 <div id="special-assessment" class="section-header">SPECIAL ASSESSMENT</div>
-
 <div class="content-section">
-  <div class="editable-section">
-    <p>A <strong>Special Assessment</strong> is a temporary fee imposed on association members in addition to regular dues or assessments.</p>
-  </div>
+  <p>A <strong>Special Assessment</strong> is a temporary fee imposed on association members in addition to regular dues or assessments.</p>
 </div>
 
-<!-- ==================== PHYSICAL ANALYSIS ==================== -->
 <div id="physical-analysis" class="section-header">PHYSICAL ANALYSIS</div>
-
 <div class="content-section">
-  <div class="editable-section">
-    <p>The quantities used in the replacement cost estimates of the common elements were generated from field measurements taken during our site visit on {inspectionDate}. Current replacement costs were estimated using published construction cost data referenced in the Bibliography section of this report.</p>
-    <p>It is recommended that this reserve study be updated every three (3) to five (5) years.</p>
-  </div>
+  <p>The quantities used in the replacement cost estimates of the common elements were generated from field measurements taken during our site visit on {inspectionDate}. Current replacement costs were estimated using published construction cost data referenced in the Bibliography section of this report.</p>
+  <p>It is recommended that this reserve study be updated every three (3) to five (5) years.</p>
 </div>
 
 <div class="page-break"></div>
@@ -606,7 +565,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div id="component-summary" class="section-header">COMPONENT SCHEDULE SUMMARY</div>
 
 <div class="content-section">
-  <p style="font-size:7pt; color:#666; margin-bottom:8px;"><em>Useful Life = Total expected lifespan | Remaining Life = Years until replacement | PM = Preventive Maintenance | Note = Component Note Reference</em></p>
+  <p style="font-size:7pt; color:#666; margin-bottom:6px;"><em>Useful Life = Total expected lifespan | Remaining Life = Years until replacement | PM = Preventive Maintenance | Note = Component Note Reference</em></p>
   {componentSummaryTable}
 </div>
 
@@ -616,19 +575,15 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div id="capital-items" class="section-header">CAPITAL ITEMS / COMPONENTS</div>
 
 <div class="content-section">
-  <div class="editable-section">
-    <p>The following provides information on the location, condition, and replacement cost of the components. Review of the common elements was conducted by {companyName} on {inspectionDate}.</p>
-  </div>
+  <p>The following provides information on the location, condition, and replacement cost of the components. Review of the common elements was conducted by {companyName} on {inspectionDate}.</p>
   {categorySections}
 </div>
-
-<div class="page-break"></div>
 
 <!-- ==================== COMPONENT NOTES ==================== -->
 <div id="component-notes" class="section-header">COMPONENTS NOTES</div>
 
 <div class="content-section">
-  <p style="font-size:8pt; margin-bottom:8px;"><em>*EA = Each, *LF = Linear Foot, *LS = Lump Sum, *SF = Square Feet, *SY = Square Yard, *SQ = Square</em></p>
+  <p style="font-size:7pt; margin-bottom:6px;"><em>*EA = Each, *LF = Linear Foot, *LS = Lump Sum, *SF = Square Feet, *SY = Square Yard, *SQ = Square</em></p>
   {componentNotesTable}
 </div>
 
@@ -638,11 +593,9 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div id="financial-results" class="section-header">FINANCIAL RESULTS</div>
 
 <div class="content-section">
-  <div class="editable-section">
-    <p>The primary goal of capital reserve planning is to provide adequate funding for the replacement of the capital components within the community.</p>
-    <p><strong>Current Funding</strong> reflects the beginning balance with the current annual contribution added and projected expenses subtracted each year.</p>
-    <p><strong>Full Funding</strong> represents the annual contribution and fund balances for each year as if each component were fully funded.</p>
-  </div>
+  <p>The primary goal of capital reserve planning is to provide adequate funding for the replacement of the capital components within the community.</p>
+  <p><strong>Current Funding</strong> reflects the beginning balance with the current annual contribution added and projected expenses subtracted each year.</p>
+  <p><strong>Full Funding</strong> represents the annual contribution and fund balances for each year as if each component were fully funded.</p>
   
   <div class="recommendation-box blue">
     <div class="recommendation-header">📊 Reserve Study Funding Summary</div>
@@ -703,8 +656,6 @@ export const DEFAULT_REPORT_TEMPLATE = `
   {pmComponentSummaryTable}
 </div>
 
-<div class="page-break"></div>
-
 <!-- ==================== PM CASH FLOW ==================== -->
 <div id="pm-cash-flow" class="section-header section-header-green">PM THIRTY YEAR CASH FLOW</div>
 
@@ -727,17 +678,13 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div id="recommendations" class="section-header section-header-orange">RECOMMENDATIONS</div>
 
 <div class="content-section">
-  <div class="editable-section">
-    <p>The following recommendations are based on our review of the community and information provided by the Association. {companyName} recommends the following:</p>
-  </div>
+  <p>The following recommendations are based on our review of the community and information provided by the Association. {companyName} recommends the following:</p>
   
   <div class="recommendation-box">
     <div class="recommendation-header">💰 Financial Recommendation - RESERVE FUNDING</div>
     <div class="recommendation-body">
-      <div class="editable-section">
-        <p>The current annual contribution of {currentAnnualContribution} is {fundingAssessment}.</p>
-        <p>{companyName} recommends {fundingRecommendation} as shown on the Reserve Study Funding Plan.</p>
-      </div>
+      <p>The current annual contribution of {currentAnnualContribution} is {fundingAssessment}.</p>
+      <p>{companyName} recommends {fundingRecommendation} as shown on the Reserve Study Funding Plan.</p>
     </div>
   </div>
   
@@ -758,39 +705,31 @@ export const DEFAULT_REPORT_TEMPLATE = `
   </div>
 </div>
 
-<div class="page-break"></div>
-
-<!-- ==================== DISCLOSURES ==================== -->
+<!-- ==================== DISCLOSURES & BIBLIOGRAPHY (same page) ==================== -->
 <div id="disclosures" class="section-header">DISCLOSURES</div>
 
 <div class="content-section">
-  <div class="editable-section">
-    <p>{companyName} is not aware of any conflicts of interest that would influence this study.</p>
-    <p>Physical observations were cursory and included only accessible common elements.</p>
-    <p>This study was prepared by {preparedBy}, {companyName}.</p>
-    <p>The Reserve Study reflects information provided and was not audited.</p>
-  </div>
+  <p>{companyName} is not aware of any conflicts of interest that would influence this study.</p>
+  <p>Physical observations were cursory and included only accessible common elements.</p>
+  <p>This study was prepared by {preparedBy}, {companyName}.</p>
+  <p>The Reserve Study reflects information provided and was not audited.</p>
 </div>
 
-<!-- ==================== BIBLIOGRAPHY ==================== -->
 <div id="bibliography" class="section-header">BIBLIOGRAPHY</div>
 
 <div class="content-section">
-  <div class="editable-section">
-    <ol>
-      <li>Master Deed of {projectName}</li>
-      <li>Best Practices for Reserve Studies/Management - Foundation for Community Association Research, 2023</li>
-      <li>National Reserve Study Standards - Community Associations Institute, 2023</li>
-      <li>Cost Works - R.S. Means Company, 2025</li>
-      <li>New Jersey Reserve Study Law (NJ Senate Bill S2760/A4384), 2024</li>
-    </ol>
-  </div>
+  <ol>
+    <li>Master Deed of {projectName}</li>
+    <li>Best Practices for Reserve Studies/Management - Foundation for Community Association Research, 2023</li>
+    <li>National Reserve Study Standards - Community Associations Institute, 2023</li>
+    <li>Cost Works - R.S. Means Company, 2025</li>
+    <li>New Jersey Reserve Study Law (NJ Senate Bill S2760/A4384), 2024</li>
+  </ol>
 </div>
 
-<!-- ==================== PAGE FOOTER (appears on every page when printed) ==================== -->
+<!-- ==================== PAGE FOOTER ==================== -->
 <div class="page-footer">
-  <span class="company-name">{companyName}</span><br>
-  {companyFullAddress} • {companyPhone}
+  <span class="company-name">{companyName}</span> | {companyFullAddress} | {companyPhone}
 </div>
 
 </body>
