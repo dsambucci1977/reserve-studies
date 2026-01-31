@@ -41,14 +41,26 @@ export async function loadReportData(siteId, organizationId) {
     var componentsSnapshot = await getDocs(collection(db, 'sites/' + siteId + '/components'));
     var components = componentsSnapshot.docs.map(function(d) { return { id: d.id, ...d.data() }; });
 
-    // Load notes from organization
+    // Load notes and organization data
     var notes = [];
+    var organization = {};
     if (organizationId) {
       try {
         var notesSnapshot = await getDocs(collection(db, 'organizations/' + organizationId + '/notes'));
         notes = notesSnapshot.docs.map(function(d) { return { id: d.id, ...d.data() }; });
       } catch (e) {
         console.log('No notes collection found');
+      }
+      
+      // Load organization branding data
+      try {
+        var orgDoc = await getDoc(doc(db, 'organizations', organizationId));
+        if (orgDoc.exists()) {
+          organization = orgDoc.data();
+          console.log('Loaded organization branding:', organization.name);
+        }
+      } catch (e) {
+        console.log('Error loading organization:', e);
       }
     }
 
@@ -66,7 +78,7 @@ export async function loadReportData(siteId, organizationId) {
       console.log('Error loading projections:', e);
     }
 
-    return { site: site, components: components, notes: notes, results: results };
+    return { site: site, components: components, notes: notes, results: results, organization: organization };
   } catch (error) {
     console.error('Error loading report data:', error);
     throw error;
@@ -618,6 +630,7 @@ export function generateReport(template, data) {
   var components = data.components;
   var notes = data.notes;
   var results = data.results;
+  var organization = data.organization || {};
   
   console.log('Generating report with results:', results ? Object.keys(results) : 'none');
   
@@ -656,10 +669,36 @@ export function generateReport(template, data) {
   // Get Study Type content for cover page and Level of Service
   var studyTypeContent = getStudyTypeContent(site.studyType);
 
+  // Build organization branding strings
+  var orgName = organization.name || site.companyName || 'Beahm Consulting, LLC';
+  var orgAddress = organization.address || '';
+  var orgCity = organization.city || '';
+  var orgState = organization.state || '';
+  var orgZip = organization.zipCode || '';
+  var orgPhone = organization.phone || '';
+  var orgLogo = organization.logoUrl || '';
+  
+  // Build full address string
+  var addressParts = [orgAddress, orgCity, orgState, orgZip].filter(Boolean);
+  var companyFullAddress = addressParts.join(', ');
+  var companyAddress = orgCity && orgState ? (orgCity + ', ' + orgState + ' ' + orgZip) : '';
+  var companyPhone = orgPhone ? ('C:' + orgPhone) : '';
+  
+  // Build logo HTML
+  var organizationLogo = orgLogo 
+    ? '<img src="' + orgLogo + '" alt="' + orgName + '" />'
+    : '';
+
   var placeholders = {
     // Study Type placeholders
     coverSubtitle: studyTypeContent.coverSubtitle,
     levelOfServiceText: studyTypeContent.levelOfServiceText,
+    
+    // Organization branding
+    organizationLogo: organizationLogo,
+    companyFullAddress: companyFullAddress,
+    companyAddress: companyAddress,
+    companyPhone: companyPhone,
     
     // Project Info
     projectName: site.siteName || site.projectName || 'Project Name',
@@ -671,9 +710,9 @@ export function generateReport(template, data) {
     
     // Contact Info
     contactName: site.contactName || 'Property Manager',
-    companyName: site.companyName || 'Beahm Consulting, LLC',
-    managementCompany: site.managementCompany || site.companyName || 'Management Company',
-    preparedBy: site.preparedBy || 'Jordan Beahm',
+    companyName: orgName,
+    managementCompany: site.managementCompany || orgName || 'Management Company',
+    preparedBy: organization.preparedBy || site.preparedBy || 'Jordan Beahm',
     
     // Dates
     currentDate: formatDate(new Date()),
