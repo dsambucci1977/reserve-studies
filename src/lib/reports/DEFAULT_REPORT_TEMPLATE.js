@@ -1,5 +1,5 @@
-// Professional Report Template - Beahm Consulting Format v5
-// Added organization logo, footer branding, and dynamic Study Type support
+// Professional Report Template - Beahm Consulting Format v6
+// Fixed: removed cover box, smaller footer, font issues, threshold table pagination
 
 export const DEFAULT_REPORT_TEMPLATE = `
 <!DOCTYPE html>
@@ -10,40 +10,34 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <style>
     @page {
       size: letter;
-      margin: 0.75in 0.75in 1in 0.75in;
+      margin: 0.75in 0.75in 0.6in 0.75in;
     }
     
     @media print {
       .no-print { display: none !important; }
       .page-break { page-break-before: always; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .page-footer { 
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-      }
     }
     
     * { box-sizing: border-box; margin: 0; padding: 0; }
     
     body {
-      font-family: 'Segoe UI', 'Arial', sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
       font-size: 11pt;
-      line-height: 1.5;
+      line-height: 1.4;
       color: #1a1a1a;
       background: white;
       max-width: 8.5in;
       margin: 0 auto;
     }
     
-    /* ============ PAGE FOOTER ============ */
+    /* ============ PAGE FOOTER - Compact ============ */
     .page-footer {
       text-align: center;
-      padding: 10px 0;
-      margin-top: 30px;
-      border-top: 1px solid #ddd;
-      font-size: 8pt;
+      padding: 6px 0;
+      margin-top: 15px;
+      border-top: 1px solid #ccc;
+      font-size: 7pt;
       color: #666;
     }
     
@@ -60,89 +54,89 @@ export const DEFAULT_REPORT_TEMPLATE = `
       justify-content: flex-start;
       align-items: center;
       text-align: center;
-      padding: 0.5in 1in 1in 1in;
+      padding: 0.5in 1in 0.5in 1in;
       background: white;
       color: #1a1a1a;
     }
     
     .cover-logo {
-      margin-bottom: 0.5in;
+      margin-bottom: 0.4in;
       max-width: 4in;
-      max-height: 1.5in;
+      max-height: 1.2in;
     }
     
     .cover-logo img {
       max-width: 100%;
-      max-height: 1.5in;
+      max-height: 1.2in;
       object-fit: contain;
     }
     
     .cover-project-name {
-      font-size: 28pt;
+      font-size: 26pt;
       font-weight: bold;
-      margin: 0.5in 0;
+      margin: 0.4in 0;
       color: #1e3a5f;
     }
     
-    .cover-title-box {
-      border: 3px solid #1e3a5f;
-      padding: 0.4in 0.8in;
+    .cover-title-section {
       margin: 0.3in 0;
+      padding: 0.3in 0;
     }
     
     .cover-title {
-      font-size: 20pt;
+      font-size: 18pt;
       font-weight: bold;
       letter-spacing: 2px;
       color: #1a1a1a;
+      margin: 0.1in 0;
     }
     
     .cover-title-highlight {
-      font-size: 20pt;
+      font-size: 18pt;
       font-weight: bold;
       letter-spacing: 2px;
       background: #e07020;
       color: white;
-      padding: 0.05in 0.2in;
+      padding: 2px 10px;
       display: inline-block;
       margin: 0.05in 0;
     }
     
     .cover-and {
-      font-size: 16pt;
-      margin: 0.15in 0;
+      font-size: 14pt;
+      margin: 0.1in 0;
       color: #666;
     }
     
     .cover-prepared {
-      margin-top: 0.8in;
-      font-size: 12pt;
+      margin-top: 0.6in;
+      font-size: 11pt;
     }
     
-    .cover-prepared p { margin: 0.1in 0; }
+    .cover-prepared p { margin: 0.08in 0; }
     
     .cover-compliance {
-      margin-top: 0.6in;
-      font-size: 10pt;
+      margin-top: 0.5in;
+      font-size: 9pt;
       font-style: italic;
       color: #666;
       border-top: 1px solid #ddd;
-      padding-top: 0.3in;
+      padding-top: 0.2in;
     }
     
     .cover-footer {
       margin-top: auto;
-      padding-top: 0.5in;
+      padding-top: 0.3in;
       text-align: center;
-      font-size: 9pt;
+      font-size: 8pt;
       color: #666;
-      border-top: 2px solid #1e3a5f;
+      border-top: 1px solid #1e3a5f;
       width: 100%;
     }
     
     .cover-footer .company-name {
       font-weight: bold;
-      font-size: 11pt;
+      font-size: 9pt;
       color: #1e3a5f;
     }
     
@@ -398,10 +392,10 @@ export const DEFAULT_REPORT_TEMPLATE = `
   
   <div class="cover-project-name">{projectName}</div>
   
-  <div class="cover-title-box">
+  <div class="cover-title-section">
     <div class="cover-title">RESERVE STUDY</div>
     {coverSubtitle}
-    <div class="cover-and">&</div>
+    <div class="cover-and">&amp;</div>
     <div class="cover-title">PREVENTIVE MAINTENANCE</div>
     <div class="cover-title">SCHEDULE</div>
   </div>
@@ -417,7 +411,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
   
   <div class="cover-footer">
     <div class="company-name">{companyName}</div>
-    <div>{companyAddress} {companyPhone}</div>
+    <div>{companyFullAddress} {companyPhone}</div>
   </div>
 </div>
 
@@ -789,8 +783,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 
 <!-- ==================== PAGE FOOTER (appears on every page when printed) ==================== -->
 <div class="page-footer">
-  <span class="company-name">{companyName}</span><br>
-  {companyFullAddress} • {companyPhone}
+  <span class="company-name">{companyName}</span> | {companyFullAddress} | {companyPhone}
 </div>
 
 </body>
