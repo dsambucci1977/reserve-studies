@@ -436,13 +436,16 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   html += '</tr></table>';
   html += '</div>'; // End summary section
 
+  // Page break before the 30-year table
+  html += '<div class="page-break"></div>';
+
   // 30-Year Projection Comparison Table
-  html += '<div style="font-weight: bold; font-size: 11pt; margin: 15px 0 10px 0; padding: 8px; background: #1e3a5f; color: white; border-radius: 4px; text-align: center;">30-Year Threshold Projection Comparison</div>';
+  html += '<div style="font-weight: bold; font-size: 11pt; margin: 0 0 10px 0; padding: 8px; background: #1e3a5f; color: white; border-radius: 4px; text-align: center;">30-Year Threshold Projection Comparison</div>';
   
-  html += '<table class="cashflow-table" style="font-size: 7pt;">';
+  html += '<table class="cashflow-table" style="font-size: 6pt;">';
   html += '<thead>';
   html += '<tr>';
-  html += '<th rowspan="2" style="background: #1e3a5f; width: 50px;">Fiscal<br>Year</th>';
+  html += '<th rowspan="2" style="background: #1e3a5f; width: 40px;">Year</th>';
   html += '<th colspan="2" style="background: #f59e0b; text-align: center;">10% Threshold</th>';
   html += '<th colspan="2" style="background: #eab308; text-align: center;">5% Threshold</th>';
   html += '<th colspan="2" style="background: #22c55e; text-align: center;">Baseline (0%)</th>';
