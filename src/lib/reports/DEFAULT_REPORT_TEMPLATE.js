@@ -344,6 +344,47 @@ export const DEFAULT_REPORT_TEMPLATE = `
     
     tr:nth-child(even) { background: #f8f9fa; }
     
+    /* ============ PM TABLES - Better color scheme ============ */
+    .pm-table th {
+      background: #0f766e;
+      border-color: #0f766e;
+    }
+    
+    .pm-table tr:nth-child(even) { background: #f0fdfa; }
+    .pm-table tr:nth-child(odd) { background: white; }
+    .pm-table td:first-child { background: #f0fdfa; font-weight: bold; }
+    
+    /* Override any green table headers in PM sections */
+    .cashflow-table th[style*="green"],
+    .cashflow-table th[style*="#22c55e"],
+    .cashflow-table th[style*="#16a34a"],
+    table th[style*="green"],
+    table th[style*="#22c55e"],
+    table th[style*="#16a34a"] {
+      background: #0f766e !important;
+      border-color: #0f766e !important;
+    }
+    
+    /* PM section tables - teal theme */
+    #pm-section table th,
+    #pm-cash-flow table th,
+    #pm-expenditures table th {
+      background: #0f766e !important;
+      border-color: #0f766e !important;
+    }
+    
+    #pm-section table tr:nth-child(even),
+    #pm-cash-flow table tr:nth-child(even),
+    #pm-expenditures table tr:nth-child(even) {
+      background: #f0fdfa !important;
+    }
+    
+    #pm-section table tr:nth-child(odd),
+    #pm-cash-flow table tr:nth-child(odd),
+    #pm-expenditures table tr:nth-child(odd) {
+      background: white !important;
+    }
+    
     .text-right { text-align: right; }
     .text-center { text-align: center; }
     .text-bold { font-weight: bold; }
