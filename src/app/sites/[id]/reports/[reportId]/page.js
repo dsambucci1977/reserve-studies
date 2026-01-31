@@ -1,114 +1,104 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, getDocs, doc, getDoc, addDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { loadReportData, generateReport } from '@/lib/reports/reportGenerator';
-import { DEFAULT_REPORT_TEMPLATE } from '@/lib/reports/DEFAULT_REPORT_TEMPLATE';
 
-export default function ReportsListPage() {
+export default function ReportEditorPage() {
   const { user } = useAuth();
   const params = useParams();
   const router = useRouter();
   const siteId = params.id;
+  const reportId = params.reportId;
 
   const [site, setSite] = useState(null);
-  const [reports, setReports] = useState([]);
+  const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [organizationId, setOrganizationId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [htmlContent, setHtmlContent] = useState('');
+  const [hasChanges, setHasChanges] = useState(false);
+  const editorRef = useRef(null);
 
   useEffect(() => {
     if (user) loadData();
-  }, [user, siteId]);
+  }, [user, siteId, reportId]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.exists()) setOrganizationId(userDoc.data().organizationId);
-
       const siteDoc = await getDoc(doc(db, 'sites', siteId));
       if (siteDoc.exists()) setSite({ id: siteDoc.id, ...siteDoc.data() });
 
-      try {
-        const reportsRef = collection(db, `sites/${siteId}/reports`);
-        const reportsQuery = query(reportsRef, orderBy('createdAt', 'desc'));
-        const reportsSnapshot = await getDocs(reportsQuery);
-        setReports(reportsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (e) {
-        console.log('No reports yet');
-        setReports([]);
+      const reportDoc = await getDoc(doc(db, 'sites/' + siteId + '/reports', reportId));
+      if (reportDoc.exists()) {
+        const reportData = { id: reportDoc.id, ...reportDoc.data() };
+        setReport(reportData);
+        setHtmlContent(reportData.htmlContent || '');
+      } else {
+        alert('Report not found');
+        router.push('/sites/' + siteId + '/reports');
       }
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Error loading report:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGenerateReport = async () => {
+  const handleSave = async (status) => {
+    status = status || 'draft';
     try {
-      setGenerating(true);
-      const reportData = await loadReportData(siteId, organizationId);
-      
-      let template = DEFAULT_REPORT_TEMPLATE;
-      if (organizationId) {
-        try {
-          const templateDoc = await getDoc(doc(db, `organizations/${organizationId}/settings/reportTemplate`));
-          if (templateDoc.exists() && templateDoc.data().template) {
-            template = templateDoc.data().template;
-          }
-        } catch (e) {
-          console.log('Using default template');
-        }
-      }
+      setSaving(true);
+      var content = editorRef.current ? editorRef.current.innerHTML : htmlContent;
 
-      const htmlContent = generateReport(template, reportData);
-
-      // Include study type in report title
-      const studyType = site?.studyType || 'Reserve Study';
-      const reportTitle = `${studyType} Report - ${new Date().toLocaleDateString()}`;
-
-      const reportRef = await addDoc(collection(db, `sites/${siteId}/reports`), {
-        title: reportTitle,
-        studyType: site?.studyType || null,
-        status: 'draft',
-        htmlContent,
-        createdBy: user.uid,
-        createdAt: new Date(),
+      await updateDoc(doc(db, 'sites/' + siteId + '/reports', reportId), {
+        htmlContent: content,
+        status: status,
         updatedAt: new Date(),
-        version: reports.length + 1
+        updatedBy: user.uid
       });
 
-      router.push('/sites/' + siteId + '/reports/' + reportRef.id);
+      setHtmlContent(content);
+      setHasChanges(false);
+      setReport(prev => ({ ...prev, status: status }));
+      alert(status === 'final' ? 'Report finalized!' : 'Report saved as draft');
     } catch (error) {
-      console.error('Error generating report:', error);
-      alert('Error generating report: ' + error.message);
+      console.error('Error saving report:', error);
+      alert('Error saving report');
     } finally {
-      setGenerating(false);
+      setSaving(false);
     }
   };
 
-  const handleDeleteReport = async (reportId, e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!confirm('Delete this report?')) return;
-    try {
-      await deleteDoc(doc(db, `sites/${siteId}/reports`, reportId));
-      setReports(prev => prev.filter(r => r.id !== reportId));
-    } catch (error) {
-      console.error('Error deleting report:', error);
-    }
+  // Formatting commands
+  const execCommand = (command, value) => {
+    document.execCommand(command, false, value || null);
+    editorRef.current?.focus();
+    setHasChanges(true);
   };
 
-  const formatDate = (date) => {
-    if (!date) return 'N/A';
-    if (date.seconds) return new Date(date.seconds * 1000).toLocaleDateString();
-    return new Date(date).toLocaleDateString();
+  const handlePrint = () => {
+    var printWindow = window.open('', '_blank');
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(function() { printWindow.print(); }, 500);
+  };
+
+  const handleDownloadHTML = () => {
+    var blob = new Blob([htmlContent], { type: 'text/html' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = (site?.siteName || 'report') + '_Reserve_Study.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -120,72 +110,179 @@ export default function ReportsListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4">
-        <Link href={'/sites/' + siteId} className="text-red-600 hover:text-red-800 mb-4 inline-block">
-          ← Back to Site
-        </Link>
+    <div className="min-h-screen bg-gray-200">
+      {/* Top Toolbar */}
+      <div className="sticky top-0 z-50 bg-white shadow border-b border-gray-300">
+        <div className="px-4 py-2">
+          <div className="flex justify-between items-center">
+            {/* Left - Back and Title */}
+            <div className="flex items-center gap-4">
+              <Link href={'/sites/' + siteId + '/reports'} className="text-gray-600 hover:text-gray-900 text-sm">
+                ← Back to Reports
+              </Link>
+              <div className="border-l border-gray-300 pl-4">
+                <h1 className="text-lg font-bold text-gray-900">{report?.title}</h1>
+                <p className="text-xs text-gray-500">
+                  {site?.siteName} • 
+                  <span className={'ml-1 px-2 py-0.5 text-xs rounded ' + (report?.status === 'final' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>
+                    {report?.status === 'final' ? 'Final' : 'Draft'}
+                  </span>
+                </p>
+              </div>
+            </div>
 
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Reports</h1>
-            <p className="text-gray-600 mt-1">{site?.siteName}</p>
-            {site?.studyType && (
-              <span className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
-                {site.studyType}
-              </span>
-            )}
+            {/* Right - Actions */}
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setEditMode(!editMode)}
+                className={'px-3 py-1.5 rounded text-sm font-medium ' + (editMode ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' : 'bg-gray-100 text-gray-700 border border-gray-300')}
+              >
+                {editMode ? '✏️ Editing' : '👁️ View Only'}
+              </button>
+
+              {editMode && (
+                <>
+                  <button onClick={() => handleSave('draft')} disabled={saving}
+                    className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50">
+                    {saving ? 'Saving...' : '💾 Save'}
+                  </button>
+                  <button onClick={() => handleSave('final')} disabled={saving}
+                    className="px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50">
+                    ✅ Finalize
+                  </button>
+                </>
+              )}
+
+              <div className="border-l border-gray-300 pl-2 ml-1 flex gap-1">
+                <button onClick={handlePrint}
+                  className="px-3 py-1.5 bg-gray-700 text-white rounded text-sm hover:bg-gray-800">
+                  🖨️ Print
+                </button>
+                <button onClick={handleDownloadHTML}
+                  className="px-3 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700">
+                  📥 HTML
+                </button>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={handleGenerateReport}
-            disabled={generating}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
-          >
-            {generating ? '⏳ Generating...' : '📄 Generate New Report'}
-          </button>
         </div>
 
-        {reports.length === 0 ? (
-          <div className="bg-white shadow rounded-lg p-12 text-center">
-            <div className="text-gray-400 text-6xl mb-4">📄</div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">No reports yet</h3>
-            <p className="text-gray-600 mb-6">
-              Generate your first {site?.studyType || 'Reserve Study'} Report
-            </p>
-            <button onClick={handleGenerateReport} disabled={generating}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50">
-              Generate Report
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {reports.map(report => (
-              <div key={report.id} className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow">
-                <div className="flex justify-between items-start">
-                  <Link href={'/sites/' + siteId + '/reports/' + report.id} className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-bold text-gray-900">{report.title}</h3>
-                      <span className={'px-2 py-1 text-xs rounded-full ' + (report.status === 'final' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>
-                        {report.status === 'final' ? 'Final' : 'Draft'}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600">Version {report.version || 1} • Created {formatDate(report.createdAt)}</p>
-                  </Link>
-                  <div className="flex gap-2">
-                    <Link href={'/sites/' + siteId + '/reports/' + report.id}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
-                      Open
-                    </Link>
-                    <button onClick={(e) => handleDeleteReport(report.id, e)}
-                      className="px-4 py-2 text-red-600 hover:bg-red-50 rounded text-sm">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+        {/* Formatting Toolbar - Only show in edit mode */}
+        {editMode && (
+          <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 flex flex-wrap gap-1 items-center">
+            {/* Text Formatting */}
+            <div className="flex gap-0.5 border-r border-gray-300 pr-2 mr-2">
+              <button onClick={() => execCommand('bold')} title="Bold (Ctrl+B)"
+                className="p-1.5 hover:bg-gray-200 rounded font-bold text-sm">B</button>
+              <button onClick={() => execCommand('italic')} title="Italic (Ctrl+I)"
+                className="p-1.5 hover:bg-gray-200 rounded italic text-sm">I</button>
+              <button onClick={() => execCommand('underline')} title="Underline (Ctrl+U)"
+                className="p-1.5 hover:bg-gray-200 rounded underline text-sm">U</button>
+              <button onClick={() => execCommand('strikeThrough')} title="Strikethrough"
+                className="p-1.5 hover:bg-gray-200 rounded line-through text-sm">S</button>
+            </div>
+
+            {/* Highlighting */}
+            <div className="flex gap-0.5 border-r border-gray-300 pr-2 mr-2">
+              <button onClick={() => execCommand('backColor', '#ffff00')} title="Highlight Yellow"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm" style={{backgroundColor: '#ffff00'}}>🖍️</button>
+              <button onClick={() => execCommand('backColor', '#90EE90')} title="Highlight Green"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm" style={{backgroundColor: '#90EE90'}}>🖍️</button>
+              <button onClick={() => execCommand('backColor', '#87CEEB')} title="Highlight Blue"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm" style={{backgroundColor: '#87CEEB'}}>🖍️</button>
+              <button onClick={() => execCommand('backColor', '#FFB6C1')} title="Highlight Pink"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm" style={{backgroundColor: '#FFB6C1'}}>🖍️</button>
+              <button onClick={() => execCommand('removeFormat')} title="Remove Formatting"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm">✖️</button>
+            </div>
+
+            {/* Text Color */}
+            <div className="flex gap-0.5 border-r border-gray-300 pr-2 mr-2">
+              <button onClick={() => execCommand('foreColor', '#000000')} title="Black Text"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm font-bold" style={{color: '#000000'}}>A</button>
+              <button onClick={() => execCommand('foreColor', '#FF0000')} title="Red Text"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm font-bold" style={{color: '#FF0000'}}>A</button>
+              <button onClick={() => execCommand('foreColor', '#0000FF')} title="Blue Text"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm font-bold" style={{color: '#0000FF'}}>A</button>
+              <button onClick={() => execCommand('foreColor', '#008000')} title="Green Text"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm font-bold" style={{color: '#008000'}}>A</button>
+            </div>
+
+            {/* Alignment */}
+            <div className="flex gap-0.5 border-r border-gray-300 pr-2 mr-2">
+              <button onClick={() => execCommand('justifyLeft')} title="Align Left"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm">⬅️</button>
+              <button onClick={() => execCommand('justifyCenter')} title="Align Center"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm">↔️</button>
+              <button onClick={() => execCommand('justifyRight')} title="Align Right"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm">➡️</button>
+            </div>
+
+            {/* Lists */}
+            <div className="flex gap-0.5 border-r border-gray-300 pr-2 mr-2">
+              <button onClick={() => execCommand('insertUnorderedList')} title="Bullet List"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm">• List</button>
+              <button onClick={() => execCommand('insertOrderedList')} title="Numbered List"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm">1. List</button>
+            </div>
+
+            {/* Indentation */}
+            <div className="flex gap-0.5 border-r border-gray-300 pr-2 mr-2">
+              <button onClick={() => execCommand('outdent')} title="Decrease Indent"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm">⬅️ Indent</button>
+              <button onClick={() => execCommand('indent')} title="Increase Indent"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm">➡️ Indent</button>
+            </div>
+
+            {/* Undo/Redo */}
+            <div className="flex gap-0.5">
+              <button onClick={() => execCommand('undo')} title="Undo (Ctrl+Z)"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm">↩️ Undo</button>
+              <button onClick={() => execCommand('redo')} title="Redo (Ctrl+Y)"
+                className="p-1.5 hover:bg-gray-200 rounded text-sm">↪️ Redo</button>
+            </div>
+
+            {/* Unsaved indicator */}
+            {hasChanges && (
+              <span className="ml-4 text-yellow-600 text-sm">⚠️ Unsaved changes</span>
+            )}
           </div>
         )}
+      </div>
+
+      {/* Report Content - Full Width */}
+      <div className="p-4">
+        <div 
+          className={'bg-white shadow-lg mx-auto ' + (editMode ? 'ring-2 ring-blue-400' : '')}
+          style={{ 
+            maxWidth: '11in', 
+            minHeight: '11in',
+            width: '100%'
+          }}
+        >
+          {editMode ? (
+            <div 
+              ref={editorRef} 
+              contentEditable 
+              onInput={() => setHasChanges(true)}
+              dangerouslySetInnerHTML={{ __html: htmlContent }}
+              className="outline-none"
+              style={{ 
+                padding: '0.75in',
+                minHeight: '11in',
+                fontSize: '11pt',
+                lineHeight: '1.5'
+              }}
+            />
+          ) : (
+            <div 
+              dangerouslySetInnerHTML={{ __html: htmlContent }}
+              style={{
+                padding: '0.75in'
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
