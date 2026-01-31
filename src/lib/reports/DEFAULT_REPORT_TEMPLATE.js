@@ -227,6 +227,10 @@ export const DEFAULT_REPORT_TEMPLATE = `
       background: linear-gradient(90deg, #166534 0%, #22c55e 100%);
     }
     
+    .section-header-teal {
+      background: linear-gradient(90deg, #0f766e 0%, #14b8a6 100%);
+    }
+    
     .section-header-orange {
       background: linear-gradient(90deg, #c55a11 0%, #e07020 100%);
     }
@@ -673,7 +677,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== CASH FLOW ==================== -->
+<!-- ==================== CASH FLOW (own page) ==================== -->
 <div id="cash-flow" class="section-header">RESERVE FUND THIRTY YEAR CASH FLOW</div>
 
 <div class="content-section">
@@ -683,7 +687,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== THRESHOLD ==================== -->
+<!-- ==================== THRESHOLD (own page) ==================== -->
 <div id="threshold" class="section-header">RESERVE FUND THIRTY YEAR THRESHOLD FUNDING</div>
 
 <div class="content-section">
@@ -693,7 +697,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== EXPENDITURES ==================== -->
+<!-- ==================== EXPENDITURES (own page) ==================== -->
 <div id="expenditures" class="section-header">RESERVE FUND EXPENDITURES</div>
 
 <div class="content-section">
@@ -703,29 +707,32 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== PM SECTION ==================== -->
-<div id="pm-section" class="section-header section-header-green">PREVENTIVE MAINTENANCE</div>
+<!-- ==================== PM SECTION (own page) ==================== -->
+<div id="pm-section" class="section-header section-header-teal">PREVENTIVE MAINTENANCE</div>
 
 <div class="content-section">
   <div class="sub-header">Component Schedule Summary</div>
   {pmComponentSummaryTable}
 </div>
 
-<!-- ==================== PM CASH FLOW ==================== -->
-<div id="pm-cash-flow" class="section-header section-header-green">PM THIRTY YEAR CASH FLOW</div>
+<div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
+
+<!-- ==================== PM EXPENDITURES (before cash flow) ==================== -->
+<div id="pm-expenditures" class="section-header section-header-teal">PM EXPENDITURES</div>
 
 <div class="content-section">
-  {pmCashFlowTable}
+  {pmExpenditureTable}
 </div>
 
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== PM EXPENDITURES ==================== -->
-<div id="pm-expenditures" class="section-header section-header-green">PM EXPENDITURES</div>
+<!-- ==================== PM CASH FLOW ==================== -->
+<div id="pm-cash-flow" class="section-header section-header-teal">PM THIRTY YEAR CASH FLOW</div>
 
 <div class="content-section">
-  {pmExpenditureTable}
+  {pmCashFlowTable}
 </div>
 
 <div class="page-break"></div>
