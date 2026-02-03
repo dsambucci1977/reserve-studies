@@ -126,9 +126,9 @@ export default function ReportEditorPage() {
     <div className="min-h-screen bg-gray-100">
       {/* ============ TOP HEADER BAR ============ */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="px-4 py-3">
+        <div className="px-4 py-3 pr-6">
           {/* Row 1: Navigation and Title */}
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-4">
               <Link 
                 href={'/sites/' + siteId + '/reports'} 
@@ -136,62 +136,66 @@ export default function ReportEditorPage() {
               >
                 ← Back to Reports
               </Link>
-              <div>
-                <h1 className="text-lg font-bold text-gray-800">
-                  {studyType} Report - {reportDate}
-                </h1>
-                <p className="text-sm text-gray-500">
-                  {site?.siteName || 'Site'} 
-                  <span className={'ml-2 px-2 py-0.5 rounded text-xs font-medium ' + 
-                    (report?.status === 'final' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700')}>
-                    •{report?.status || 'Draft'}
-                  </span>
-                </p>
-              </div>
             </div>
+          </div>
+          
+          {/* Row 2: Report Title and Status */}
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">
+                {studyType} Report - {reportDate}
+              </h1>
+              <p className="text-sm text-gray-500">
+                {site?.siteName || 'Site'} 
+                <span className={'ml-2 px-2 py-0.5 rounded text-xs font-medium ' + 
+                  (report?.status === 'final' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700')}>
+                  •{report?.status || 'Draft'}
+                </span>
+              </p>
+            </div>
+          </div>
+          
+          {/* Row 3: Action Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setEditMode(!editMode)}
+              className={'px-4 py-2 font-medium text-sm transition-all border ' + 
+                (editMode 
+                  ? 'bg-orange-500 text-white border-orange-600' 
+                  : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200')}
+            >
+              {editMode ? '✏️ Editing' : '👁️ View Mode'}
+            </button>
             
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setEditMode(!editMode)}
-                className={'px-4 py-2 font-medium text-sm transition-all border ' + 
-                  (editMode 
-                    ? 'bg-orange-500 text-white border-orange-600' 
-                    : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200')}
-              >
-                {editMode ? '✏️ Editing' : '👁️ View Mode'}
-              </button>
-              
-              <button
-                onClick={() => handleSave('draft')}
-                disabled={saving || !hasChanges}
-                className="px-4 py-2 bg-green-600 text-white font-medium text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 border border-green-700"
-              >
-                💾 Save Draft
-              </button>
-              
-              <button
-                onClick={() => handleSave('final')}
-                disabled={saving}
-                className="px-4 py-2 bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1 border border-emerald-700"
-              >
-                ✓ Finalize
-              </button>
-              
-              <button
-                onClick={handlePrint}
-                className="px-4 py-2 bg-purple-600 text-white font-medium text-sm hover:bg-purple-700 flex items-center gap-1 border border-purple-700"
-              >
-                🖨️ Print
-              </button>
-            </div>
+            <button
+              onClick={() => handleSave('draft')}
+              disabled={saving || !hasChanges}
+              className="px-4 py-2 bg-green-600 text-white font-medium text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 border border-green-700"
+            >
+              💾 Save Draft
+            </button>
+            
+            <button
+              onClick={() => handleSave('final')}
+              disabled={saving}
+              className="px-4 py-2 bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1 border border-emerald-700"
+            >
+              ✓ Finalize
+            </button>
+            
+            <button
+              onClick={handlePrint}
+              className="px-4 py-2 bg-purple-600 text-white font-medium text-sm hover:bg-purple-700 flex items-center gap-1 border border-purple-700"
+            >
+              🖨️ Print
+            </button>
           </div>
         </div>
       </div>
 
       {/* ============ FORMATTING TOOLBAR (only in edit mode) ============ */}
       {editMode && (
-        <div className="bg-gray-50 border-b border-gray-200 sticky top-[72px] z-40">
+        <div className="bg-gray-50 border-b border-gray-200 sticky top-[140px] z-40">
           {/* Row 1: Text Formatting */}
           <div className="px-4 py-2 flex items-center gap-6 border-b border-gray-100">
             {/* Text Style Group */}
