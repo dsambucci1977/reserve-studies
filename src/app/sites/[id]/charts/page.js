@@ -150,15 +150,13 @@ export default function ChartsPage() {
   
   // Debug: Log the results structure to console
   console.log('Charts Data Debug:', {
-    resultsKeys: Object.keys(results),
     reserveFund,
     pmFund,
     thresholds,
-    threshold10: results.threshold10,
-    threshold5: results.threshold5,
-    baseline: results.baseline,
+    siteCurrentContribution: site?.currentAnnualContribution,
     componentsCount: components.length,
-    sampleComponent: components[0]
+    reserveComponentsCount: components.filter(c => !c.isPreventiveMaintenance).length,
+    pmComponentsCount: components.filter(c => c.isPreventiveMaintenance).length,
   });
 
   // Cash Flow Chart Data - combine current and full funding
@@ -201,30 +199,28 @@ export default function ChartsPage() {
     .sort((a, b) => b.value - a.value);
 
   // Funding Scenarios Comparison Data
-  // Try multiple possible field name patterns
-  const threshold10 = results.threshold10 || results.thresholdResults?.ten || {};
-  const threshold5 = results.threshold5 || results.thresholdResults?.five || {};
-  const baseline = results.baseline || results.thresholdResults?.baseline || {};
+  // Thresholds store multipliers, so we calculate the actual contribution amounts
+  const currentContribution = reserveFund.currentContribution || site?.currentAnnualContribution || 0;
   
   const scenarioData = [
     {
       name: 'Full Funding',
-      contribution: reserveFund.recommendedContribution || reserveFund.fullFundingContribution || 0,
+      contribution: reserveFund.recommendedContribution || 0,
       color: COLORS.full
     },
     {
       name: '10% Threshold',
-      contribution: threshold10.annualContribution || threshold10.contribution || thresholds.contribution10 || 0,
+      contribution: thresholds.multiplier10 ? Math.round(currentContribution * thresholds.multiplier10) : 0,
       color: COLORS.threshold10
     },
     {
       name: '5% Threshold',
-      contribution: threshold5.annualContribution || threshold5.contribution || thresholds.contribution5 || 0,
+      contribution: thresholds.multiplier5 ? Math.round(currentContribution * thresholds.multiplier5) : 0,
       color: COLORS.threshold5
     },
     {
       name: 'Baseline (0%)',
-      contribution: baseline.annualContribution || baseline.contribution || thresholds.contributionBaseline || 0,
+      contribution: thresholds.multiplierBaseline ? Math.round(currentContribution * thresholds.multiplierBaseline) : 0,
       color: COLORS.baseline
     }
   ];
@@ -236,23 +232,22 @@ export default function ChartsPage() {
     { name: 'Unfunded', value: Math.max(100 - percentFunded, 0) }
   ];
 
-  // Reserve vs PM Comparison
-  // Try multiple field name patterns
+  // Reserve vs PM Comparison - using exact field names from calculate page
   const fundComparisonData = [
     {
       name: 'Current Balance',
-      reserve: reserveFund.currentBalance || reserveFund.beginningBalance || results.beginningReserveBalance || 0,
-      pm: pmFund.currentBalance || pmFund.beginningBalance || results.beginningPMBalance || 0
+      reserve: reserveFund.currentBalance || 0,
+      pm: pmFund.currentBalance || 0
     },
     {
       name: 'Annual Contribution',
-      reserve: reserveFund.currentContribution || reserveFund.annualContribution || results.currentAnnualContribution || 0,
-      pm: pmFund.currentContribution || pmFund.annualContribution || results.pmCurrentContribution || 0
+      reserve: reserveFund.currentContribution || 0,
+      pm: pmFund.currentContribution || 0
     },
     {
       name: 'Recommended',
-      reserve: reserveFund.recommendedContribution || reserveFund.fullFundingContribution || 0,
-      pm: pmFund.recommendedContribution || pmFund.fullFundingContribution || 0
+      reserve: reserveFund.recommendedContribution || 0,
+      pm: pmFund.recommendedContribution || 0
     }
   ];
 
@@ -689,15 +684,15 @@ export default function ChartsPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Components:</span>
-                    <span className="font-medium">{reserveComponents.length}</span>
+                    <span className="font-medium text-gray-900">{reserveFund.componentCount || reserveComponents.length}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Cost:</span>
-                    <span className="font-medium">{formatFullCurrency(reserveComponents.reduce((sum, c) => sum + (parseFloat(c.totalCost) || 0), 0))}</span>
+                    <span className="font-medium text-gray-900">{formatFullCurrency(reserveFund.totalReplacementCost || reserveComponents.reduce((sum, c) => sum + (parseFloat(c.totalCost) || 0), 0))}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Percent Funded:</span>
-                    <span className="font-medium">{(reserveFund.percentFunded || 0).toFixed(1)}%</span>
+                    <span className="font-medium text-gray-900">{(reserveFund.percentFunded || 0).toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
@@ -709,15 +704,15 @@ export default function ChartsPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Components:</span>
-                    <span className="font-medium">{pmComponents.length}</span>
+                    <span className="font-medium text-gray-900">{pmFund.componentCount || pmComponents.length}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Cost:</span>
-                    <span className="font-medium">{formatFullCurrency(pmComponents.reduce((sum, c) => sum + (parseFloat(c.totalCost) || 0), 0))}</span>
+                    <span className="font-medium text-gray-900">{formatFullCurrency(pmFund.totalReplacementCost || pmComponents.reduce((sum, c) => sum + (parseFloat(c.totalCost) || 0), 0))}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Percent Funded:</span>
-                    <span className="font-medium">{(pmFund.percentFunded || 0).toFixed(1)}%</span>
+                    <span className="font-medium text-gray-900">{(pmFund.percentFunded || 0).toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
