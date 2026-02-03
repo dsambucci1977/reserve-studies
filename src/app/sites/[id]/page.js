@@ -272,7 +272,7 @@ export default function SiteDetailPage() {
             </div>
           </Link>
 
-          {/* Results */}
+          {/* View Results */}
           {hasResults && (
             <Link
               href={`/sites/${siteId}/results`}
@@ -297,7 +297,32 @@ export default function SiteDetailPage() {
             </Link>
           )}
 
-          {/* Reports */}
+          {/* Charts & Visualizations */}
+          {hasResults && (
+            <Link
+              href={`/sites/${siteId}/charts`}
+              className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow border-l-4 border-teal-500"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">
+                    📈 Charts
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Visual fund analysis
+                  </p>
+                </div>
+              </div>
+              <div className="text-sm font-medium mb-4 text-green-600">
+                ✅ Charts available
+              </div>
+              <div className="w-full px-4 py-2 bg-teal-600 text-white text-center rounded-lg hover:bg-teal-700">
+                View Charts →
+              </div>
+            </Link>
+          )}
+
+          {/* Generate Reports */}
           {hasResults && (
             <Link
               href={`/sites/${siteId}/reports`}
