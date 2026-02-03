@@ -1,5 +1,10 @@
-// Report Generation Engine - Professional Version v7
-// Added dynamic Study Type support for cover page and Level of Service section
+// Report Generation Engine - Professional Version v8
+// FIXES from v7:
+// 1. PM Cash Flow tables now use GREEN headers (not blue)
+// 2. PM Expenditure tables now use GREEN headers
+// 3. PM Component Summary tables now use GREEN headers
+// 4. Added isPM parameter to table generation functions
+
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -118,11 +123,35 @@ function getStudyTypeContent(studyType) {
   }
 }
 
+// =============================================================================
+// COLOR CONSTANTS - Centralized color definitions for consistency
+// =============================================================================
+const COLORS = {
+  // Reserve Fund colors (Blue)
+  reserve: {
+    headerBg: '#1e3a5f',      // Dark navy blue
+    headerLight: '#3b82f6',    // Lighter blue for contrast columns
+    text: 'white'
+  },
+  // PM Fund colors (Green)
+  pm: {
+    headerBg: '#166534',       // Dark green
+    headerLight: '#22c55e',    // Lighter green for contrast columns
+    text: 'white'
+  }
+};
+
+// =============================================================================
 // Component Summary Table with full column names and PM/Note indicators
-function generateComponentSummaryTable(components, notes, showPMColumn) {
+// UPDATED: Added isPM parameter for green headers
+// =============================================================================
+function generateComponentSummaryTable(components, notes, showPMColumn, isPM = false) {
   if (!components || components.length === 0) {
     return '<p><em>No components found</em></p>';
   }
+
+  // Use green for PM tables, blue for reserve tables
+  var headerBg = isPM ? COLORS.pm.headerBg : COLORS.reserve.headerBg;
 
   var sorted = components.slice().sort(function(a, b) {
     if (a.category !== b.category) return (a.category || '').localeCompare(b.category || '');
@@ -131,19 +160,19 @@ function generateComponentSummaryTable(components, notes, showPMColumn) {
 
   var html = '<table class="component-table">';
   html += '<thead><tr>';
-  html += '<th>Component</th>';
-  html += '<th>Category</th>';
-  html += '<th class="text-center">Qty</th>';
-  html += '<th>Unit</th>';
-  html += '<th class="text-right">Unit Cost</th>';
-  html += '<th class="text-right">Total Cost</th>';
-  html += '<th class="text-center">Useful<br>Life</th>';
-  html += '<th class="text-center">Remaining<br>Life</th>';
-  html += '<th class="text-center">Replace<br>Year</th>';
+  html += '<th style="background:' + headerBg + ';">Component</th>';
+  html += '<th style="background:' + headerBg + ';">Category</th>';
+  html += '<th style="background:' + headerBg + ';" class="text-center">Qty</th>';
+  html += '<th style="background:' + headerBg + ';">Unit</th>';
+  html += '<th style="background:' + headerBg + ';" class="text-right">Unit Cost</th>';
+  html += '<th style="background:' + headerBg + ';" class="text-right">Total Cost</th>';
+  html += '<th style="background:' + headerBg + ';" class="text-center">Useful<br>Life</th>';
+  html += '<th style="background:' + headerBg + ';" class="text-center">Remaining<br>Life</th>';
+  html += '<th style="background:' + headerBg + ';" class="text-center">Replace<br>Year</th>';
   if (showPMColumn) {
-    html += '<th class="text-center">PM</th>';
+    html += '<th style="background:' + headerBg + ';" class="text-center">PM</th>';
   }
-  html += '<th class="text-center">Note</th>';
+  html += '<th style="background:' + headerBg + ';" class="text-center">Note</th>';
   html += '</tr></thead><tbody>';
 
   var totalCost = 0;
@@ -196,7 +225,7 @@ function generateCategoryTable(components, category, notes) {
     return c.category === category && !c.isPreventiveMaintenance; 
   });
   if (filtered.length === 0) return '';
-  return generateComponentSummaryTable(filtered, notes, false);
+  return generateComponentSummaryTable(filtered, notes, false, false); // Reserve = blue
 }
 
 // Component Notes Table - sorted numerically by note ID, no duplicates
@@ -243,33 +272,37 @@ function generateComponentNotesTable(components, notes) {
   return html;
 }
 
-// Cash Flow Table - Uses actual data structure from calculations
+// =============================================================================
+// Cash Flow Table - UPDATED with isPM parameter for green headers
+// =============================================================================
 function generateCashFlowTable(cashFlow, fundInfo, fundType) {
   if (!cashFlow || cashFlow.length === 0) {
     return '<p><em>No cash flow data available. Please run calculations first.</em></p>';
   }
 
-  // Use consistent navy blue for all tables
-  var headerBg = '#1e3a5f';
-  var currentBg = '#3b82f6';
-  var fullBg = '#1e3a5f';
+  // FIXED: Use green colors for PM tables, blue for reserve
+  var isPM = fundType === 'pm';
+  var headerBg = isPM ? COLORS.pm.headerBg : COLORS.reserve.headerBg;
+  var currentBg = isPM ? COLORS.pm.headerLight : COLORS.reserve.headerLight;
+  var fullBg = isPM ? COLORS.pm.headerBg : COLORS.reserve.headerBg;
+  
   var recommendedContribution = fundInfo.recommendedContribution || 0;
   var currentBalance = fundInfo.currentBalance || 0;
 
   var html = '<table class="cashflow-table">';
   html += '<thead>';
   html += '<tr>';
-  html += '<th rowspan="2" style="background:' + headerBg + ';">Fiscal<br>Year</th>';
-  html += '<th colspan="3" style="background:' + currentBg + '; text-align:center;">Current Funding</th>';
-  html += '<th colspan="3" style="background:' + fullBg + '; text-align:center;">Full Funding Analysis</th>';
+  html += '<th rowspan="2" style="background:' + headerBg + '; color:white;">Fiscal<br>Year</th>';
+  html += '<th colspan="3" style="background:' + currentBg + '; color:white; text-align:center;">Current Funding</th>';
+  html += '<th colspan="3" style="background:' + fullBg + '; color:white; text-align:center;">Full Funding Analysis</th>';
   html += '</tr>';
   html += '<tr>';
-  html += '<th style="background:' + currentBg + ';">Current<br>Contribution</th>';
-  html += '<th style="background:' + currentBg + ';">Annual<br>Expenditures</th>';
-  html += '<th style="background:' + currentBg + ';">Ending<br>Balance</th>';
-  html += '<th style="background:' + fullBg + ';">Annual<br>Contribution</th>';
-  html += '<th style="background:' + fullBg + ';">Average Annual<br>Contribution</th>';
-  html += '<th style="background:' + fullBg + ';">Ending<br>Balance</th>';
+  html += '<th style="background:' + currentBg + '; color:white;">Current<br>Contribution</th>';
+  html += '<th style="background:' + currentBg + '; color:white;">Annual<br>Expenditures</th>';
+  html += '<th style="background:' + currentBg + '; color:white;">Ending<br>Balance</th>';
+  html += '<th style="background:' + fullBg + '; color:white;">Annual<br>Contribution</th>';
+  html += '<th style="background:' + fullBg + '; color:white;">Average Annual<br>Contribution</th>';
+  html += '<th style="background:' + fullBg + '; color:white;">Ending<br>Balance</th>';
   html += '</tr>';
   html += '</thead><tbody>';
 
@@ -446,11 +479,11 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   html += '<table class="cashflow-table" style="font-size: 6pt;">';
   html += '<thead>';
   html += '<tr>';
-  html += '<th rowspan="2" style="background: #1e3a5f; width: 40px;">Year</th>';
-  html += '<th colspan="2" style="background: #f59e0b; text-align: center;">10% Threshold</th>';
-  html += '<th colspan="2" style="background: #eab308; text-align: center;">5% Threshold</th>';
-  html += '<th colspan="2" style="background: #22c55e; text-align: center;">Baseline (0%)</th>';
-  html += '<th colspan="2" style="background: #3b82f6; text-align: center;">Full Funding</th>';
+  html += '<th rowspan="2" style="background: #1e3a5f; color: white; width: 40px;">Year</th>';
+  html += '<th colspan="2" style="background: #f59e0b; color: white; text-align: center;">10% Threshold</th>';
+  html += '<th colspan="2" style="background: #eab308; color: white; text-align: center;">5% Threshold</th>';
+  html += '<th colspan="2" style="background: #22c55e; color: white; text-align: center;">Baseline (0%)</th>';
+  html += '<th colspan="2" style="background: #3b82f6; color: white; text-align: center;">Full Funding</th>';
   html += '</tr>';
   html += '<tr>';
   html += '<th style="background: #fef3c7; color: #92400e;">Annual<br>Expenditures</th>';
@@ -522,7 +555,9 @@ function calculateFullFundingFinalBalance(cashFlow, contribution, startingBalanc
   return balance;
 }
 
-// Horizontal Expenditure Table (Year | Components | Total - fits on page)
+// =============================================================================
+// Horizontal Expenditure Table - UPDATED with isPM parameter for green headers
+// =============================================================================
 function generateExpenditureTable(components, startYear, years, isPM) {
   startYear = parseInt(startYear) || 2026;
   years = years || 30;
@@ -535,8 +570,8 @@ function generateExpenditureTable(components, startYear, years, isPM) {
     return '<p><em>No ' + (isPM ? 'PM' : 'reserve') + ' components found</em></p>';
   }
 
-  // Use consistent navy blue for all tables
-  var headerColor = '#1e3a5f';
+  // FIXED: Use green for PM tables, blue for reserve
+  var headerColor = isPM ? COLORS.pm.headerBg : COLORS.reserve.headerBg;
 
   // Build year data - only years with expenditures
   var yearData = [];
@@ -573,9 +608,9 @@ function generateExpenditureTable(components, startYear, years, isPM) {
   // Horizontal table: Years as rows
   var html = '<table class="expenditure-horizontal">';
   html += '<thead><tr style="background:' + headerColor + '; color:white;">';
-  html += '<th style="width:80px;">Year</th>';
-  html += '<th>Components to be Replaced</th>';
-  html += '<th style="width:120px; text-align:right;">Total Cost</th>';
+  html += '<th style="width:80px; background:' + headerColor + '; color:white;">Year</th>';
+  html += '<th style="background:' + headerColor + '; color:white;">Components to be Replaced</th>';
+  html += '<th style="width:120px; text-align:right; background:' + headerColor + '; color:white;">Total Cost</th>';
   html += '</tr></thead><tbody>';
 
   yearData.forEach(function(yd, index) {
@@ -602,11 +637,14 @@ function generateExpenditureTable(components, startYear, years, isPM) {
   return html;
 }
 
-// PM Summary Table
+// =============================================================================
+// PM Summary Table - UPDATED to use green headers
+// =============================================================================
 function generatePMSummaryTable(components, notes) {
   var pmComponents = components.filter(function(c) { return c.isPreventiveMaintenance; });
   if (pmComponents.length === 0) return '<p><em>No preventive maintenance components</em></p>';
-  return generateComponentSummaryTable(pmComponents, notes, false);
+  // FIXED: Pass isPM=true for green headers
+  return generateComponentSummaryTable(pmComponents, notes, false, true);
 }
 
 // Generate category sections - skip empty categories
@@ -753,16 +791,16 @@ export function generateReport(template, data) {
                        percentFunded >= 50 ? 'marginally adequate' : 'inadequate',
     fundingRecommendation: 'increasing the annual contribution to ' + formatCurrency(recommendedContribution),
     
-    // Generated Tables - pass fund info for full funding calculations
-    componentSummaryTable: generateComponentSummaryTable(reserveComponents, notes, true),
+    // Generated Tables - FIXED: pass correct fundType for PM tables
+    componentSummaryTable: generateComponentSummaryTable(reserveComponents, notes, true, false), // Reserve = blue
     categorySections: generateCategorySections(components, notes),
     componentNotesTable: generateComponentNotesTable(components, notes),
-    reserveCashFlowTable: generateCashFlowTable(reserveCashFlow, reserveFund, 'reserve'),
+    reserveCashFlowTable: generateCashFlowTable(reserveCashFlow, reserveFund, 'reserve'), // Reserve = blue
     thresholdProjectionTable: generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginningBalance),
-    expenditureScheduleTable: generateExpenditureTable(components, startYear, 30, false),
-    pmComponentSummaryTable: generatePMSummaryTable(components, notes),
-    pmCashFlowTable: generateCashFlowTable(pmCashFlow, pmFund, 'pm'),
-    pmExpenditureTable: generateExpenditureTable(components, startYear, 30, true)
+    expenditureScheduleTable: generateExpenditureTable(components, startYear, 30, false), // Reserve = blue
+    pmComponentSummaryTable: generatePMSummaryTable(components, notes), // PM = green (handled inside function)
+    pmCashFlowTable: generateCashFlowTable(pmCashFlow, pmFund, 'pm'), // PM = green
+    pmExpenditureTable: generateExpenditureTable(components, startYear, 30, true) // PM = green
   };
 
   var html = template;
