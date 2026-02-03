@@ -503,12 +503,12 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <div class="sub-header">Financial Planning</div>
   <div class="editable-section">
     <p>One of the key responsibilities of the Board of Trustees or Directors is to ensure that the property is properly protected and maintained. Effective financial planning and budgeting are essential to maintaining the property and ensuring that sufficient funds are available to meet ongoing and future needs.</p>
-    <p>The main objective of capital reserve planning is to ensure adequate funding for the future replacement of capital components within the community. Thoughtful planning helps distribute the cost of these projects evenly over time among owners, ensuring funds are available when needed.</p>
+    <p>The main objective of capital reserve planning is to ensure adequate funding for the future replacement of capital components within the community. Thoughtful planning helps distribute the cost of these projects evenly over time among owners, ensuring funds are available when needed. A well-funded reserve reduces the likelihood of significant fee increases, special assessments, or the need for loans.</p>
   </div>
   
   <div class="sub-header">Capital Reserve Study</div>
   <div class="editable-section">
-    <p>A Capital Reserve Study serves as a financial planning tool that estimates the amount of money the Community Association should set aside for the future replacement of common area components. This report has been developed in accordance with the Community Associations Institute (CAI) National Reserve Study Standards.</p>
+    <p>A Capital Reserve Study serves as a financial planning tool that estimates the amount of money the Community Association should set aside for the future replacement of common area components. This report has been developed in accordance with the Community Associations Institute (CAI) National Reserve Study Standards. It provides guidance in evaluating and establishing a stable reserve funding strategy for anticipated repairs and replacements.</p>
   </div>
   
   <div class="sub-header">Level of Service Provided</div>
@@ -700,12 +700,20 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <p>A <strong>Special Assessment</strong> is a temporary fee imposed on association members in addition to regular dues or assessments. These assessments are typically used to cover unexpected or one-time expenses and are often subject to limitations or procedures outlined in the association's governing documents or applicable local laws.</p>
 </div>
 
+<!-- ==================== USEFUL LIFE ==================== -->
+<div class="content-section">
+  <p><strong>Useful Life (UL)</strong> - Useful Life refers to the estimated number of years a reserve component is expected to remain functional and perform its intended purpose—assuming it has been properly constructed and maintained in its current application or installation.</p>
+</div>
+
 <!-- ==================== PHYSICAL ANALYSIS ==================== -->
 <div id="physical-analysis" class="section-header">PHYSICAL ANALYSIS</div>
 <div class="content-section">
-  <p>The quantities used in the replacement cost estimates of the common elements were generated from field measurements taken during our site visit on {inspectionDate}. Current replacement costs were estimated using published construction cost data referenced in the Bibliography section of this report.</p>
-  <p>The remaining life expectancies of the common elements were determined through a visual site inspection of the Community, as well as information provided by the Property Manager and maintenance contractors familiar with the common elements of the Community. The common elements were identified through a review of the governing documents.</p>
-  <p>Please note that these estimates are based on the professional judgment and experience of this firm and were developed in accordance with generally accepted industry standards. However, actual costs and useful life expectancies may vary due to factors beyond our control, such as market fluctuations, usage patterns, maintenance practices, deterioration rates, and weather conditions.</p>
+  <p>The quantities used in the replacement cost estimates of the common elements were generated from field measurements taken during our site visit on {inspectionDate}, and/or from take-offs based on architectural and site design drawings. The remaining life expectancies of the common elements were determined through a visual site inspection of the Community, as well as information provided by the Property Manager and maintenance contractors familiar with the common elements of the Community. The common elements were identified through a review of the governing documents.</p>
+  
+  <p>Current replacement costs were estimated using published construction cost data referenced in the Bibliography section of this report, along with average costs provided by contractors who have performed similar projects bid out by {companyName}. Useful life and remaining useful life estimates were based on field observations and the assumption that an adequate maintenance schedule is in place and will be followed. Without proper maintenance, common elements may deteriorate more rapidly and require earlier replacement, resulting in a greater draw on reserve funds.</p>
+  
+  <p>Please note that these estimates are based on the professional judgment and experience of this firm and were developed in accordance with generally accepted industry standards. However, actual costs and useful life expectancies may vary due to factors beyond our control, such as market fluctuations, usage patterns, maintenance practices, deterioration rates, and weather conditions. Future updates of this report will include adjustments to reflect any significant variances in actual costs or life expectancies.</p>
+  
   <p>It is recommended that this reserve study be updated every three (3) to five (5) years.</p>
 </div>
 
@@ -727,7 +735,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div id="capital-items" class="section-header">CAPITAL ITEMS / COMPONENTS</div>
 
 <div class="content-section">
-  <p>The following provides information on the location, condition, and replacement cost of the components. Review of the common elements was conducted by {companyName} on {inspectionDate}.</p>
+  <p>The following notes provide information on the location, condition, and replacement cost of the components listed in the tables. The information is based on either visual observation or information provided to the preparer from the Association, their contractors, or maintenance personnel. Review of the common elements was conducted by {companyName} on {inspectionDate}.</p>
   {categorySections}
 </div>
 
@@ -752,11 +760,17 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="content-section">
   <p>The primary goal of capital reserve planning is to provide adequate funding for the replacement of the capital components within the community. Effective planning ensures that expenditures for these projects are spread across many years, making funds available when they are needed. An adequately funded capital reserve will prevent the need for large fee increases, special assessments, and loans.</p>
   
-  <p>Averaging the annual contributions results in consistent maintenance fees, which benefits homeowners and property values. The charts shown in this report provide a 30-year projection of the funding requirements for {projectName}. This reserve study funding analysis includes funding options: Full Funding and Current Funding.</p>
+  <p>Averaging the annual contributions results in consistent maintenance fees, which benefits homeowners and property values.</p>
   
-  <p><strong>Current Funding</strong> reflects the beginning balance with the current annual contribution added and projected expenses subtracted each year. The beginning balance and current annual contribution of {beginningReserveBalance} and {currentAnnualContribution} were provided by the Property Manager. Current funding demonstrates the balances over the projection period, assuming no change in the annual contribution.</p>
+  <p>The charts shown in this report provide a 30-year projection of the funding requirements for {projectName}. This reserve study funding analysis includes funding options: Full Funding, Current Funding, and Threshold Funding.</p>
   
-  <p><strong>Full Funding</strong> represents the annual contribution and fund balances for each year as if each component were fully funded. Full funding ensures that each component will accrue its full replacement cost during its remaining life expectancy.</p>
+  <p><strong>Current Funding:</strong> reflects the beginning balance with the current annual contribution added and projected expenses subtracted each year. The beginning balance and current annual contribution of {beginningReserveBalance} and {currentAnnualContribution} were provided by the Property Manager. Current funding demonstrates the balances over the projection period, assuming no change in the annual contribution.</p>
+  
+  <p><strong>Full Funding:</strong> is the annual contribution and fund balances for each year as if each component were Fully Funded. Full funding is the amount necessary so each component will accrue its full replacement cost during its remaining life expectancy.</p>
+  
+  <p><strong>Threshold Funding:</strong> represents the annual contribution and fund balance for each year as if the reserve balance were to be maintained at or above a specified amount, but no lower (lowest balance). Threshold funding is calculated by adjusting Full Funding to produce the lowest acceptable balance.</p>
+  
+  <p>If the Association implements Threshold Funding, it is imperative that the Reserve Study be updated regularly to minimize the chances of creating a reserve fund deficit.</p>
   
   <div class="recommendation-box blue">
     <div class="recommendation-header">📊 Reserve Study Funding Summary</div>
@@ -885,32 +899,53 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div id="disclosures" class="section-header">DISCLOSURES</div>
 
 <div class="content-section">
-  <p>{companyName} is not aware of any involvement with the {projectName} that could result in any actual or perceived conflicts of interest that would influence the preparation of this study.</p>
+  <p>{companyName} is not aware of any involvement with {projectName} that could result in any actual or perceived conflicts of interest that would influence the preparation of this study.</p>
   
   <p>The physical on-site observations performed in the preparation of this study were cursory in nature and only included the accessible common and limited common elements. The surfaces of the roofs were not walked unless specifically noted within this report, and no invasive testing was employed.</p>
   
   <p>Unless specifically noted within this report, {companyName} has not utilized any assumptions regarding interest, inflation, taxes, or any other outside economic factors.</p>
   
-  {updateDisclosure}
-  
   <p>This study was prepared by {preparedBy}, {companyName}.</p>
+  
+  {updateDisclosure}
   
   <p>{companyName} is not aware of any material issues which, if not disclosed, would cause a distortion of the Association's situation.</p>
   
-  <p>Information provided by the official representative of the Association regarding financial, physical, quantity, or historical issues will be deemed reliable by {companyName}. The Reserve Study reflects the information provided to the consultant and assembled for the Association's use, not for the purpose of performing an audit, quality/forensic analyses, or background checks of historical records.</p>
+  <p>Information provided by the official representative of the Association regarding financial, physical, quantity, or historical issues will be deemed reliable by {companyName}. The Reserve Study will reflect the information provided to the consultant and assembled for the Association's use, not for the purpose of performing an audit, quality/forensic analyses, or background checks of historical records.</p>
   
   <p>The actual or projected total presented in the Reserve Study is based upon the information provided and was not audited.</p>
+  
+  <p>Information provided to {companyName} about the reserve project will be considered reliable. Any on-site inspection should not be considered a project audit or quality inspection.</p>
+  
+  <p>The items included in the Component Inventory are based on information provided in the governing documents and by the association's managing agent. The quantities have not been field measured by a representative of {companyName} unless specifically noted.</p>
 </div>
 
 <div id="bibliography" class="section-header">BIBLIOGRAPHY</div>
 
 <div class="content-section">
   <ol>
-    <li>Master Deed of {projectName}</li>
-    <li>Best Practices for Reserve Studies/Management - Foundation for Community Association Research, 2023</li>
-    <li>National Reserve Study Standards - Community Associations Institute, 2023</li>
-    <li>Cost Works - R.S. Means Company, 2025</li>
-    <li>New Jersey Reserve Study Law (NJ Senate Bill S2760/A4384), 2024</li>
+    <li><strong>Master Deed of {projectName}</strong><br>
+    Prepared by {masterDeedPreparedBy}<br>
+    Dated {masterDeedDate}</li>
+    
+    <li><strong>Best Practices for Reserve Studies/Management</strong><br>
+    By the Foundation for Community Association Research<br>
+    Dated 2023</li>
+    
+    <li><strong>National Reserve Study Standards</strong><br>
+    By the Community Associations Institute<br>
+    Dated 2023</li>
+    
+    <li><strong>Cost Works</strong><br>
+    By R.S. Means Company<br>
+    Dated 2025</li>
+    
+    <li><strong>Common Interest Realty Association Audit and Accounting Guide</strong><br>
+    By the American Institute of Certified Public Accountants<br>
+    Dated 2021</li>
+    
+    <li><strong>New Jersey Reserve Study Law</strong> (referred to as NJ Senate Bill S2760 and NJ Assembly Bill A4384)<br>
+    Dated 2024</li>
   </ol>
 </div>
 
