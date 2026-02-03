@@ -91,26 +91,35 @@ export async function loadReportData(siteId, organizationId) {
 }
 
 // Generate Study Type content for cover page and Level of Service
+// Supports: "Level 1 Full" (default) and "Level 2 Update"
 function getStudyTypeContent(studyType) {
   // Default to Level 1 Full if not specified
   var type = (studyType || 'Level 1 Full').toLowerCase();
   
   if (type.includes('level 2') || type.includes('update')) {
+    // LEVEL 2: RESERVE STUDY UPDATE
     return {
-      coverSubtitle: '<div class="cover-title-highlight">UPDATE</div>',
-      levelOfServiceText: '<p>This report includes a <strong>Level 2: Reserve Update</strong>, With Site Visit/On-Site Review. A reserve study update consists of the following five key tasks:</p>' +
+      studyTypeName: 'Reserve Study Update',
+      coverTitle: 'RESERVE STUDY UPDATE', // Changed from "RESERVE STUDY"
+      coverSubtitle: '', // No additional subtitle needed - title says UPDATE
+      levelOfServiceText: '<p>This report includes a <strong>Level 2: Reserve Study Update</strong>, With Site Visit/On-Site Review. A reserve study update consists of the following five key tasks:</p>' +
         '<ul>' +
         '<li><strong>Component Inventory</strong></li>' +
         '<li><strong>Condition Assessment</strong> (based on on-site visual inspections)</li>' +
         '<li><strong>Life and Valuation Estimates</strong></li>' +
         '<li><strong>Fund Status Evaluation</strong></li>' +
         '<li><strong>Development of a Funding Plan</strong></li>' +
-        '</ul>'
+        '</ul>',
+      // Update-specific disclosure text
+      updateDisclosure: '<p>Update reports are reliant on the information provided in the previous report.</p>',
+      isUpdate: true
     };
   } else {
-    // Level 1 Full (default)
+    // LEVEL 1: FULL RESERVE STUDY (default)
     return {
-      coverSubtitle: '', // No subtitle for full study - just "RESERVE STUDY"
+      studyTypeName: 'Full Reserve Study',
+      coverTitle: 'RESERVE STUDY', // Standard title
+      coverSubtitle: '', // No subtitle for full study
       levelOfServiceText: '<p>This report includes a <strong>Level 1: Full Reserve Study</strong>, With Site Visit/On-Site Review. A full reserve study consists of the following five key tasks:</p>' +
         '<ul>' +
         '<li><strong>Component Inventory</strong></li>' +
@@ -118,7 +127,9 @@ function getStudyTypeContent(studyType) {
         '<li><strong>Life and Valuation Estimates</strong></li>' +
         '<li><strong>Fund Status Evaluation</strong></li>' +
         '<li><strong>Development of a Funding Plan</strong></li>' +
-        '</ul>'
+        '</ul>',
+      updateDisclosure: '', // No update disclosure for full studies
+      isUpdate: false
     };
   }
 }
@@ -734,8 +745,11 @@ export function generateReport(template, data) {
 
   var placeholders = {
     // Study Type placeholders
+    coverTitle: studyTypeContent.coverTitle,
     coverSubtitle: studyTypeContent.coverSubtitle,
     levelOfServiceText: studyTypeContent.levelOfServiceText,
+    updateDisclosure: studyTypeContent.updateDisclosure,
+    studyTypeName: studyTypeContent.studyTypeName,
     
     // Organization branding
     organizationLogo: organizationLogo,
