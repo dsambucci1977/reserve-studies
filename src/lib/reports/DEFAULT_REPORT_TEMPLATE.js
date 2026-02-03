@@ -471,7 +471,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <div class="cover-project-name">{projectName}</div>
   
   <div class="cover-title-box">
-    <div class="cover-title">RESERVE STUDY</div>
+    <div class="cover-title">{coverTitle}</div>
     {coverSubtitle}
     <div class="cover-and">&amp;</div>
     <div class="cover-title">PREVENTIVE MAINTENANCE</div>
@@ -813,6 +813,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="content-section">
   <p>{companyName} is not aware of any conflicts of interest that would influence this study.</p>
   <p>Physical observations were cursory and included only accessible common elements.</p>
+  {updateDisclosure}
   <p>This study was prepared by {preparedBy}, {companyName}.</p>
   <p>The Reserve Study reflects information provided and was not audited.</p>
 </div>
