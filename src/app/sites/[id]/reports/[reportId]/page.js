@@ -21,6 +21,7 @@ export default function ReportEditorPage() {
   const [editMode, setEditMode] = useState(false);
   const [htmlContent, setHtmlContent] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [showHtml, setShowHtml] = useState(false);
   const editorRef = useRef(null);
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function ReportEditorPage() {
       setHtmlContent(content);
       setHasChanges(false);
       setReport(prev => ({ ...prev, status: status }));
-      alert(status === 'final' ? 'Report finalized!' : 'Report saved as draft');
+      alert(status === 'final' ? 'Report finalized!' : 'Report saved!');
     } catch (error) {
       console.error('Error saving report:', error);
       alert('Error saving report');
@@ -74,159 +75,162 @@ export default function ReportEditorPage() {
     }
   };
 
-  // Formatting commands
+  const handlePrint = () => {
+    const content = editorRef.current ? editorRef.current.innerHTML : htmlContent;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(content);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   const execCommand = (command, value) => {
     document.execCommand(command, false, value || null);
     editorRef.current?.focus();
     setHasChanges(true);
   };
 
-  // Insert page break at cursor
   const insertPageBreak = () => {
-    const pageBreakHTML = '<div class="page-break"></div><div class="page-break-indicator no-print"></div>';
-    execCommand('insertHTML', pageBreakHTML);
-  };
-
-  // Remove nearest page break
-  const removePageBreak = () => {
-    const editor = editorRef.current;
-    if (editor) {
-      const pageBreaks = editor.querySelectorAll('.page-break');
-      const indicators = editor.querySelectorAll('.page-break-indicator');
-      
-      // Remove the last one (or could prompt user)
-      if (pageBreaks.length > 0) {
-        const lastBreak = pageBreaks[pageBreaks.length - 1];
-        const lastIndicator = indicators[indicators.length - 1];
-        lastBreak?.remove();
-        lastIndicator?.remove();
-        setHasChanges(true);
-      } else {
-        alert('No page breaks to remove');
-      }
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const pageBreakHtml = '<div class="page-break" style="page-break-before: always; height: 0; margin: 20px 0; border-top: 2px dashed #f97316; position: relative;"><span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #f97316; color: white; font-size: 9px; padding: 2px 8px; border-radius: 3px;">PAGE BREAK</span></div>';
+      const div = document.createElement('div');
+      div.innerHTML = pageBreakHtml;
+      range.deleteContents();
+      range.insertNode(div.firstChild);
+      setHasChanges(true);
     }
   };
 
-  // Insert horizontal line
   const insertHorizontalLine = () => {
-    execCommand('insertHTML', '<hr style="border: none; border-top: 1px solid #ccc; margin: 10px 0;">');
+    execCommand('insertHTML', '<hr style="border: none; border-top: 2px solid #ccc; margin: 16px 0;">');
   };
 
-  // Change font size
-  const changeFontSize = (size) => {
-    execCommand('fontSize', size);
-  };
-
-  const handlePrint = () => {
-    var content = editorRef.current ? editorRef.current.innerHTML : htmlContent;
-    var printWindow = window.open('', '_blank');
-    printWindow.document.write(content);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(function() { printWindow.print(); }, 500);
-  };
-
-  const handleDownloadHTML = () => {
-    var content = editorRef.current ? editorRef.current.innerHTML : htmlContent;
-    var blob = new Blob([content], { type: 'text/html' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = (site?.siteName || 'report') + '_Reserve_Study.html';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const clearFormatting = () => {
+    execCommand('removeFormat');
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
+  const studyType = site?.studyType || 'Level 1 Full';
+  const reportDate = report?.createdAt?.seconds 
+    ? new Date(report.createdAt.seconds * 1000).toLocaleDateString() 
+    : 'N/A';
+
   return (
-    <div className="min-h-screen bg-gray-300">
-      {/* Top Header Bar */}
-      <div className="sticky top-0 z-50 bg-white shadow-md border-b border-gray-300">
-        {/* Row 1: Title and Actions */}
-        <div className="px-4 py-3 flex justify-between items-center border-b border-gray-200">
-          {/* Left - Back and Title */}
-          <div className="flex items-center gap-4">
-            <Link href={'/sites/' + siteId + '/reports'} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-              ← Back to Reports
-            </Link>
-            <div className="border-l border-gray-300 pl-4">
-              <h1 className="text-xl font-bold text-gray-900">{report?.title}</h1>
-              <p className="text-sm text-gray-500">
-                {site?.siteName} •
-                <span className={'ml-2 px-2 py-0.5 text-xs rounded font-medium ' + (report?.status === 'final' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>
-                  {report?.status === 'final' ? 'Final' : 'Draft'}
-                </span>
-              </p>
+    <div className="min-h-screen bg-gray-100">
+      {/* ============ TOP HEADER BAR ============ */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div className="px-4 py-3">
+          {/* Row 1: Navigation and Title */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-4">
+              <Link 
+                href={'/sites/' + siteId + '/reports'} 
+                className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
+              >
+                ← Back to Reports
+              </Link>
+              <div>
+                <h1 className="text-lg font-bold text-gray-800">
+                  {studyType} Report - {reportDate}
+                </h1>
+                <p className="text-sm text-gray-500">
+                  {site?.siteName || 'Site'} 
+                  <span className={'ml-2 px-2 py-0.5 rounded text-xs font-medium ' + 
+                    (report?.status === 'final' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700')}>
+                    •{report?.status || 'Draft'}
+                  </span>
+                </p>
+              </div>
             </div>
-          </div>
-
-          {/* Right - Main Actions */}
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setEditMode(!editMode)}
-              className={'px-4 py-2 rounded-lg text-sm font-medium transition-colors ' + (editMode ? 'bg-orange-100 text-orange-700 border-2 border-orange-400' : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200')}
-            >
-              {editMode ? '✏️ Editing' : '👁️ View Only'}
-            </button>
-
-            {editMode && (
-              <>
-                <button onClick={() => handleSave('draft')} disabled={saving}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                  {saving ? '⏳' : '💾'} Save
-                </button>
-                <button onClick={() => handleSave('final')} disabled={saving}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors">
-                  ✅ Finalize
-                </button>
-              </>
-            )}
-
-            <div className="border-l border-gray-300 pl-3 flex gap-2">
-              <button onClick={handlePrint}
-                className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
+            
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setEditMode(!editMode)}
+                className={'px-4 py-2 rounded-lg font-medium text-sm transition-all ' + 
+                  (editMode 
+                    ? 'bg-orange-500 text-white shadow-md' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200')}
+              >
+                {editMode ? '✏️ Editing' : '👁️ View'}
+              </button>
+              
+              <button
+                onClick={() => handleSave('draft')}
+                disabled={saving || !hasChanges}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                💾 Save
+              </button>
+              
+              <button
+                onClick={() => handleSave('final')}
+                disabled={saving}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+              >
+                ✓ Finalize
+              </button>
+              
+              <button
+                onClick={handlePrint}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium text-sm hover:bg-purple-700 flex items-center gap-1"
+              >
                 🖨️ Print
               </button>
-              <button onClick={handleDownloadHTML}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors">
-                📥 HTML
+              
+              <button
+                onClick={() => setShowHtml(!showHtml)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg font-medium text-sm hover:bg-gray-700 flex items-center gap-1"
+              >
+                {'</>'}  HTML
               </button>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Row 2: Formatting Toolbar - Only show in edit mode */}
-        {editMode && (
-          <div className="px-4 py-3 bg-gray-50 flex flex-wrap gap-4 items-center">
-            
+      {/* ============ FORMATTING TOOLBAR (only in edit mode) ============ */}
+      {editMode && (
+        <div className="bg-gray-50 border-b border-gray-200 sticky top-[72px] z-40">
+          {/* Row 1: Text Formatting */}
+          <div className="px-4 py-2 flex items-center gap-6 border-b border-gray-100">
             {/* Text Style Group */}
-            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
-              <span className="text-xs text-gray-500 px-2">Style</span>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-400 mr-2 w-10">Style</span>
               <button onClick={() => execCommand('bold')} title="Bold (Ctrl+B)"
-                className="w-8 h-8 hover:bg-gray-100 rounded font-bold text-sm flex items-center justify-center">B</button>
+                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 font-bold">
+                B
+              </button>
               <button onClick={() => execCommand('italic')} title="Italic (Ctrl+I)"
-                className="w-8 h-8 hover:bg-gray-100 rounded italic text-sm flex items-center justify-center">I</button>
+                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 italic">
+                I
+              </button>
               <button onClick={() => execCommand('underline')} title="Underline (Ctrl+U)"
-                className="w-8 h-8 hover:bg-gray-100 rounded underline text-sm flex items-center justify-center">U</button>
+                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 underline">
+                U
+              </button>
               <button onClick={() => execCommand('strikeThrough')} title="Strikethrough"
-                className="w-8 h-8 hover:bg-gray-100 rounded line-through text-sm flex items-center justify-center">S</button>
+                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 line-through">
+                S
+              </button>
             </div>
 
+            <div className="h-6 w-px bg-gray-300"></div>
+
             {/* Font Size Group */}
-            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
-              <span className="text-xs text-gray-500 px-2">Size</span>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-400 mr-2">Size</span>
               <select 
-                onChange={(e) => changeFontSize(e.target.value)} 
-                className="h-8 px-2 text-sm border-0 bg-transparent focus:ring-0"
+                onChange={(e) => execCommand('fontSize', e.target.value)}
+                className="h-8 px-2 border border-gray-300 rounded bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 defaultValue="3"
               >
                 <option value="1">8pt</option>
@@ -239,124 +243,177 @@ export default function ReportEditorPage() {
               </select>
             </div>
 
+            <div className="h-6 w-px bg-gray-300"></div>
+
             {/* Text Color Group */}
-            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
-              <span className="text-xs text-gray-500 px-2">Color</span>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-400 mr-2">Color</span>
               <button onClick={() => execCommand('foreColor', '#000000')} title="Black"
-                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#000000'}}></button>
-              <button onClick={() => execCommand('foreColor', '#FF0000')} title="Red"
-                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#FF0000'}}></button>
-              <button onClick={() => execCommand('foreColor', '#0000FF')} title="Blue"
-                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#0000FF'}}></button>
-              <button onClick={() => execCommand('foreColor', '#008000')} title="Green"
-                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#008000'}}></button>
+                className="w-6 h-6 rounded border border-gray-300 bg-black hover:scale-110 transition-transform"></button>
+              <button onClick={() => execCommand('foreColor', '#dc2626')} title="Red"
+                className="w-6 h-6 rounded border border-gray-300 bg-red-600 hover:scale-110 transition-transform"></button>
+              <button onClick={() => execCommand('foreColor', '#2563eb')} title="Blue"
+                className="w-6 h-6 rounded border border-gray-300 bg-blue-600 hover:scale-110 transition-transform"></button>
+              <button onClick={() => execCommand('foreColor', '#16a34a')} title="Green"
+                className="w-6 h-6 rounded border border-gray-300 bg-green-600 hover:scale-110 transition-transform"></button>
             </div>
+
+            <div className="h-6 w-px bg-gray-300"></div>
 
             {/* Highlight Group */}
-            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
-              <span className="text-xs text-gray-500 px-2">Highlight</span>
-              <button onClick={() => execCommand('backColor', '#FFFF00')} title="Yellow"
-                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#FFFF00'}}></button>
-              <button onClick={() => execCommand('backColor', '#90EE90')} title="Green"
-                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#90EE90'}}></button>
-              <button onClick={() => execCommand('backColor', '#87CEEB')} title="Blue"
-                className="w-7 h-7 rounded border border-gray-300" style={{backgroundColor: '#87CEEB'}}></button>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-400 mr-2">Highlight</span>
+              <button onClick={() => execCommand('backColor', '#fef08a')} title="Yellow Highlight"
+                className="w-6 h-6 rounded border border-gray-300 bg-yellow-200 hover:scale-110 transition-transform"></button>
+              <button onClick={() => execCommand('backColor', '#bbf7d0')} title="Green Highlight"
+                className="w-6 h-6 rounded border border-gray-300 bg-green-200 hover:scale-110 transition-transform"></button>
+              <button onClick={() => execCommand('backColor', '#bfdbfe')} title="Blue Highlight"
+                className="w-6 h-6 rounded border border-gray-300 bg-blue-200 hover:scale-110 transition-transform"></button>
+              <button onClick={() => execCommand('backColor', '#fecaca')} title="Red Highlight"
+                className="w-6 h-6 rounded border border-gray-300 bg-red-200 hover:scale-110 transition-transform"></button>
               <button onClick={() => execCommand('backColor', 'transparent')} title="Remove Highlight"
-                className="w-7 h-7 rounded border border-gray-300 bg-white text-xs">✕</button>
+                className="w-6 h-6 rounded border border-gray-300 bg-white hover:scale-110 transition-transform flex items-center justify-center text-gray-400 text-xs">
+                ✕
+              </button>
             </div>
+          </div>
 
+          {/* Row 2: Paragraph & Insert */}
+          <div className="px-4 py-2 flex items-center gap-6">
             {/* Alignment Group */}
-            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
-              <span className="text-xs text-gray-500 px-2">Align</span>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-400 mr-2">Align</span>
               <button onClick={() => execCommand('justifyLeft')} title="Align Left"
-                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">⫷</button>
+                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm">
+                ⫷
+              </button>
               <button onClick={() => execCommand('justifyCenter')} title="Align Center"
-                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">☰</button>
+                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm">
+                ≡
+              </button>
               <button onClick={() => execCommand('justifyRight')} title="Align Right"
-                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">⫸</button>
+                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm">
+                ⫸
+              </button>
               <button onClick={() => execCommand('justifyFull')} title="Justify"
-                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">≡</button>
+                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm">
+                ☰
+              </button>
             </div>
 
-            {/* Lists & Indent Group */}
-            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
-              <span className="text-xs text-gray-500 px-2">Lists</span>
+            <div className="h-6 w-px bg-gray-300"></div>
+
+            {/* Lists Group */}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-400 mr-2">Lists</span>
               <button onClick={() => execCommand('insertUnorderedList')} title="Bullet List"
-                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">•≡</button>
+                className="h-8 px-2 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1">
+                •≡
+              </button>
               <button onClick={() => execCommand('insertOrderedList')} title="Numbered List"
-                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">1.</button>
+                className="h-8 px-2 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1">
+                1.
+              </button>
               <button onClick={() => execCommand('outdent')} title="Decrease Indent"
-                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">⇤</button>
+                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm">
+                ⇤
+              </button>
               <button onClick={() => execCommand('indent')} title="Increase Indent"
-                className="w-8 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">⇥</button>
+                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm">
+                ⇥
+              </button>
             </div>
+
+            <div className="h-6 w-px bg-gray-300"></div>
 
             {/* Insert Group */}
-            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
-              <span className="text-xs text-gray-500 px-2">Insert</span>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-400 mr-2">Insert</span>
               <button onClick={insertPageBreak} title="Insert Page Break"
-                className="px-3 h-8 hover:bg-orange-100 rounded text-sm flex items-center justify-center text-orange-600 font-medium">
+                className="h-8 px-3 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1 text-orange-600">
                 📄 Page Break
               </button>
               <button onClick={insertHorizontalLine} title="Insert Horizontal Line"
-                className="px-3 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">
-                ― Line
+                className="h-8 px-3 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1">
+                — Line
               </button>
             </div>
 
+            <div className="h-6 w-px bg-gray-300"></div>
+
             {/* Edit Group */}
-            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 p-1">
+            <div className="flex items-center gap-1">
               <button onClick={() => execCommand('undo')} title="Undo (Ctrl+Z)"
-                className="px-3 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">↩ Undo</button>
+                className="h-8 px-2 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1">
+                ↩ Undo
+              </button>
               <button onClick={() => execCommand('redo')} title="Redo (Ctrl+Y)"
-                className="px-3 h-8 hover:bg-gray-100 rounded text-sm flex items-center justify-center">↪ Redo</button>
-              <button onClick={() => execCommand('removeFormat')} title="Clear Formatting"
-                className="px-3 h-8 hover:bg-red-100 rounded text-sm flex items-center justify-center text-red-600">✕ Clear</button>
+                className="h-8 px-2 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1">
+                ↪ Redo
+              </button>
+              <button onClick={clearFormatting} title="Clear Formatting"
+                className="h-8 px-2 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1 text-red-500">
+                ✕ Clear
+              </button>
             </div>
 
-            {/* Unsaved indicator */}
+            {/* Unsaved Changes Indicator */}
             {hasChanges && (
-              <span className="text-orange-600 text-sm font-medium bg-orange-50 px-3 py-1 rounded-full">
-                ⚠️ Unsaved changes
-              </span>
+              <div className="ml-auto flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-sm">
+                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                Unsaved changes
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============ DOCUMENT AREA ============ */}
+      <div className="p-6">
+        {showHtml ? (
+          /* HTML View Mode */
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-gray-800 rounded-lg p-4 overflow-auto">
+              <pre className="text-green-400 text-sm whitespace-pre-wrap font-mono">
+                {editorRef.current ? editorRef.current.innerHTML : htmlContent}
+              </pre>
+            </div>
+          </div>
+        ) : (
+          /* Document View */
+          <div 
+            className={'bg-white shadow-lg mx-auto transition-all ' + 
+              (editMode ? 'ring-4 ring-blue-400 ring-opacity-50' : '')}
+            style={{ 
+              maxWidth: '8.5in', 
+              minHeight: '11in',
+              width: '100%'
+            }}
+          >
+            {editMode ? (
+              <div 
+                ref={editorRef} 
+                contentEditable 
+                onInput={() => setHasChanges(true)}
+                dangerouslySetInnerHTML={{ __html: htmlContent }}
+                className="outline-none"
+                style={{ 
+                  padding: '0.6in',
+                  minHeight: '11in',
+                  fontSize: '10pt',
+                  lineHeight: '1.4'
+                }}
+              />
+            ) : (
+              <div 
+                dangerouslySetInnerHTML={{ __html: htmlContent }}
+                style={{
+                  padding: '0.6in'
+                }}
+              />
             )}
           </div>
         )}
-      </div>
-
-      {/* Report Content - Full Width */}
-      <div className="p-6">
-        <div 
-          className={'bg-white shadow-xl mx-auto ' + (editMode ? 'ring-4 ring-blue-400 ring-opacity-50' : '')}
-          style={{ 
-            maxWidth: '8.5in', 
-            minHeight: '11in',
-            width: '100%'
-          }}
-        >
-          {editMode ? (
-            <div 
-              ref={editorRef} 
-              contentEditable 
-              onInput={() => setHasChanges(true)}
-              dangerouslySetInnerHTML={{ __html: htmlContent }}
-              className="outline-none"
-              style={{ 
-                padding: '0.75in',
-                minHeight: '11in',
-                fontSize: '11pt',
-                lineHeight: '1.5'
-              }}
-            />
-          ) : (
-            <div 
-              dangerouslySetInnerHTML={{ __html: htmlContent }}
-              style={{
-                padding: '0.75in'
-              }}
-            />
-          )}
-        </div>
       </div>
     </div>
   );
