@@ -147,6 +147,19 @@ export default function ChartsPage() {
   const reserveFund = results.reserveFund || {};
   const pmFund = results.pmFund || {};
   const thresholds = results.thresholds || {};
+  
+  // Debug: Log the results structure to console
+  console.log('Charts Data Debug:', {
+    resultsKeys: Object.keys(results),
+    reserveFund,
+    pmFund,
+    thresholds,
+    threshold10: results.threshold10,
+    threshold5: results.threshold5,
+    baseline: results.baseline,
+    componentsCount: components.length,
+    sampleComponent: components[0]
+  });
 
   // Cash Flow Chart Data - combine current and full funding
   const cashFlowData = reserveCashFlow.map((row, index) => {
@@ -171,8 +184,10 @@ export default function ChartsPage() {
     }));
 
   // Component Cost Breakdown Data
-  const reserveComponents = components.filter(c => !c.isPreventiveMaintenance);
-  const pmComponents = components.filter(c => c.isPreventiveMaintenance);
+  // Check multiple possible field names for PM classification
+  const isPMComponent = (c) => c.isPreventiveMaintenance || c.isPM || c.type === 'pm' || c.fundType === 'pm';
+  const reserveComponents = components.filter(c => !isPMComponent(c));
+  const pmComponents = components.filter(c => isPMComponent(c));
   
   // Group by category for pie chart
   const categoryTotals = {};
@@ -186,25 +201,30 @@ export default function ChartsPage() {
     .sort((a, b) => b.value - a.value);
 
   // Funding Scenarios Comparison Data
+  // Try multiple possible field name patterns
+  const threshold10 = results.threshold10 || results.thresholdResults?.ten || {};
+  const threshold5 = results.threshold5 || results.thresholdResults?.five || {};
+  const baseline = results.baseline || results.thresholdResults?.baseline || {};
+  
   const scenarioData = [
     {
       name: 'Full Funding',
-      contribution: reserveFund.recommendedContribution || 0,
+      contribution: reserveFund.recommendedContribution || reserveFund.fullFundingContribution || 0,
       color: COLORS.full
     },
     {
       name: '10% Threshold',
-      contribution: thresholds.contribution10 || 0,
+      contribution: threshold10.annualContribution || threshold10.contribution || thresholds.contribution10 || 0,
       color: COLORS.threshold10
     },
     {
       name: '5% Threshold',
-      contribution: thresholds.contribution5 || 0,
+      contribution: threshold5.annualContribution || threshold5.contribution || thresholds.contribution5 || 0,
       color: COLORS.threshold5
     },
     {
       name: 'Baseline (0%)',
-      contribution: thresholds.contributionBaseline || 0,
+      contribution: baseline.annualContribution || baseline.contribution || thresholds.contributionBaseline || 0,
       color: COLORS.baseline
     }
   ];
@@ -217,21 +237,22 @@ export default function ChartsPage() {
   ];
 
   // Reserve vs PM Comparison
+  // Try multiple field name patterns
   const fundComparisonData = [
     {
       name: 'Current Balance',
-      reserve: reserveFund.currentBalance || 0,
-      pm: pmFund.currentBalance || 0
+      reserve: reserveFund.currentBalance || reserveFund.beginningBalance || results.beginningReserveBalance || 0,
+      pm: pmFund.currentBalance || pmFund.beginningBalance || results.beginningPMBalance || 0
     },
     {
       name: 'Annual Contribution',
-      reserve: reserveFund.currentContribution || 0,
-      pm: pmFund.currentContribution || 0
+      reserve: reserveFund.currentContribution || reserveFund.annualContribution || results.currentAnnualContribution || 0,
+      pm: pmFund.currentContribution || pmFund.annualContribution || results.pmCurrentContribution || 0
     },
     {
       name: 'Recommended',
-      reserve: reserveFund.recommendedContribution || 0,
-      pm: pmFund.recommendedContribution || 0
+      reserve: reserveFund.recommendedContribution || reserveFund.fullFundingContribution || 0,
+      pm: pmFund.recommendedContribution || pmFund.fullFundingContribution || 0
     }
   ];
 
