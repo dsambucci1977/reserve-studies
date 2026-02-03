@@ -611,37 +611,101 @@ export const DEFAULT_REPORT_TEMPLATE = `
 
 <div class="content-section">
   <div class="editable-section">
-    <p><strong>Capital Improvements</strong> - Additions to the association's common elements that were not previously part of the community.</p>
-    <p><strong>Cash Flow Method</strong> - A method of creating a reserve funding plan in which contributions are structured to align with projected, fluctuating annual reserve expenditures.</p>
-    <p><strong>Component</strong> - Individual items listed in the reserve study as identified through the physical analysis.</p>
-    <p><strong>Fully Funded Balance (FFB)</strong> - An ideal benchmark reserve balance. Formula: FFB = Current Cost × (Effective Age ÷ Useful Life)</p>
-    <p><strong>Percent Funded</strong> - The ratio of the actual reserve balance to the fully funded balance.</p>
-    <p><strong>Remaining Useful Life (RUL)</strong> - The estimated number of years a component will continue to function before replacement.</p>
-    <p><strong>Useful Life (UL)</strong> - The total expected lifespan of a component from installation to replacement.</p>
-    <p><strong>Replacement Cost</strong> - The total cost to repair, restore, or replace a component.</p>
-    <p><strong>Funding Goals:</strong></p>
+    <p><strong>Capital Improvements</strong> - Additions to the association's common elements that were not previously part of the community. While these new components should be incorporated into future reserve studies for ongoing replacement planning, the initial construction costs should <em>not</em> be paid from the reserve fund.</p>
+    
+    <p><strong>Cash Flow Method</strong> - A method of creating a reserve funding plan in which contributions are structured to align with projected, fluctuating annual reserve expenditures. Various funding scenarios are modeled against anticipated expense timelines to determine the most suitable funding strategy.</p>
+    
+    <p><strong>Component</strong> - Individual items listed in the reserve study as identified through the physical analysis. These components represent the common elements of the community and generally meet the following criteria:</p>
+    <ol>
+      <li>The association is responsible for their upkeep.</li>
+      <li>They have a limited useful life.</li>
+      <li>Their remaining useful life can be reasonably predicted.</li>
+      <li>They exceed a minimum threshold cost.</li>
+    </ol>
+    <p><em>Note: Some jurisdictions may require specific components or groups of components to be included by statute.</em></p>
+    
+    <p><strong>Component Inventory</strong> - The process of identifying and quantifying all components to be included in the reserve study. This is achieved through on-site visual inspection, a review of association documents, past practices, and discussions with relevant association representatives.</p>
+    
+    <p><strong>Component Method</strong> - A funding method where the total reserve contribution is calculated based on the individual funding needs of each component.</p>
+    
+    <p><strong>Condition Assessment</strong> - The evaluation of a component's current condition, based on either visual inspection or reported data.</p>
+    
+    <p><strong>Effective Age</strong> - The difference between a component's useful life and its remaining useful life. This figure may differ from chronological age due to irregular patterns of wear or usage and is often used in reserve calculations.</p>
+    
+    <p><strong>Financial Analysis</strong> - The portion of the reserve study that assesses the current status of reserves (as cash or percent funded) and recommends a reserve contribution strategy. It also projects reserve income and expenditures over time. This represents one of the two primary parts of a reserve study.</p>
+    
+    <p><strong>Fully Funded</strong> - A reserve fund is considered fully funded when the actual or projected balance equals the fully funded balance (FFB), or 100% funded.</p>
+    
+    <p><strong>Fully Funded Balance (FFB)</strong> - An ideal benchmark reserve balance, representing the proportion of repair or replacement cost that corresponds with the fraction of the component's life that has been "used up."</p>
+    <p><strong>Formula:</strong> FFB = Current Cost × (Effective Age ÷ Useful Life)</p>
+    <p><strong>Example:</strong> A component with a $10,000 replacement cost, 10-year useful life, and 4 years of effective age would have an FFB of $4,000.</p>
+    
+    <p><strong>Fund Status</strong> - The financial position of the reserve fund, typically expressed in terms of cash value or percent funded.</p>
+    
+    <p><strong>Funding Goals</strong> - These are the primary reserve funding objectives, listed below from highest to lowest financial risk:</p>
     <ul>
-      <li><strong>Full Funding:</strong> Keep reserves at or near 100% funded.</li>
-      <li><strong>Threshold Funding:</strong> Maintain reserves above a specific amount.</li>
-      <li><strong>Baseline Funding:</strong> Ensure fund never drops below zero.</li>
+      <li><strong>Full Funding:</strong> Aim to keep reserves at or near 100% funded. This is the most conservative and financially secure goal. Some jurisdictions may have minimum legal requirements.</li>
+      <li><strong>Threshold Funding:</strong> Maintain reserve balances above a specific dollar amount or funding percentage. Depending on the chosen threshold, this approach may be more or less conservative than Full Funding.</li>
+      <li><strong>Baseline Funding:</strong> Ensure the reserve fund never drops below zero during the projection period. This is the highest-risk strategy due to the uncertainties in timing and cost of future replacements.</li>
     </ul>
+    
+    <p><strong>Funding Plan</strong> - A long-term strategy (minimum 20 years) that outlines how an association will fund anticipated reserve expenditures through scheduled contributions.</p>
+    
+    <p><strong>Funding Principles</strong> - Every funding plan must adhere to these core principles:</p>
+    <ol>
+      <li>Ensure funds are available when needed</li>
+      <li>Maintain a stable contribution rate over time</li>
+      <li>Ensure equitable contributions among owners over the years</li>
+      <li>Be fiscally responsible</li>
+    </ol>
+    
+    <p><strong>Life and Valuation Estimates</strong> - The task of determining each component's useful life, remaining useful life, and current repair or replacement cost.</p>
+    
+    <p><strong>Percent Funded</strong> - The ratio (as a percentage) of the actual or projected reserve balance to the fully funded balance at a specific point in time. While a useful indicator of financial health, it should be considered alongside trends and risk tolerance.</p>
+    
+    <p><strong>Physical Analysis</strong> - One of the two primary components of a reserve study, encompassing the component inventory, condition assessments, and life and cost estimates.</p>
+    
+    <p><strong>Remaining Useful Life (RUL)</strong> - Also called "remaining life (RL)," this is the estimated number of years a component will continue to function before replacement is necessary. Items scheduled for replacement in the current year are assigned a remaining life of zero.</p>
+    
+    <p><strong>Replacement Cost</strong> - The total cost to repair, restore, or replace a component to its original functional condition. This includes associated expenses such as design, permits, engineering, shipping, installation, and disposal.</p>
+    
+    <p><strong>Reserve Balance</strong> - The actual or projected amount of money available in the reserve fund at a given time, designated for major repairs or replacements. Also referred to as reserves, reserve accounts, or cash reserves. This is based on information provided and is not audited.</p>
+    
+    <p><strong>Reserve Provider</strong> - A professional who prepares reserve studies. Many hold credentials such as the Reserve Specialist (RS) designation from the Community Associations Institute (CAI), indicating competency in producing studies that meet national standards.</p>
+    
+    <p><strong>Reserve Provider Firm</strong> - A company whose core business includes preparing reserve studies for community associations.</p>
+    
+    <p><strong>Reserve Study</strong> - A strategic budgeting tool that identifies components the association must maintain or replace, assesses the current reserve fund status, and recommends a funding plan to meet future expenditures. It consists of two parts: the <strong>physical analysis</strong> and the <strong>financial analysis</strong>.</p>
+    
+    <p><strong>Useful Life (UL)</strong> - The total expected lifespan of a component from installation to replacement, assuming proper construction and maintenance in its current application.</p>
   </div>
 </div>
 
-<!-- ==================== RESPONSIBLE CHARGE, SPECIAL ASSESSMENT, PHYSICAL ANALYSIS (combined) ==================== -->
+<!-- ==================== RESPONSIBLE CHARGE ==================== -->
 <div id="responsible-charge" class="section-header">RESPONSIBLE CHARGE</div>
 <div class="content-section">
-  <p>A <strong>Reserve Specialist (RS)</strong> who is in responsible charge of a reserve study must provide consistent and effective oversight of all individuals performing tasks that directly impact the quality and accuracy of the study.</p>
+  <p>A <strong>Reserve Specialist (RS)</strong> who is in responsible charge of a reserve study must provide consistent and effective oversight of all individuals performing tasks that directly impact the quality and accuracy of the study. The RS must retain sufficient records to demonstrate that they exercised appropriate and regular supervision throughout the course of the project.</p>
+  <p>A Reserve Specialist will be considered <strong>not</strong> to have provided adequate supervision under the following circumstances:</p>
+  <ol>
+    <li><strong>Frequent or prolonged absence</strong> from the principal office where professional services are rendered—except when engaged in fieldwork or assigned to a project-specific field office.</li>
+    <li><strong>Failure to personally inspect or review</strong> subordinate work when such review is necessary or appropriate to ensure quality.</li>
+    <li><strong>Performing only a superficial or minimal review</strong> of plans or projects, rather than a thorough and detailed evaluation.</li>
+    <li><strong>Not being personally available</strong> for consultation or site inspections when circumstances reasonably require it, or failing to provide adequate notice of availability.</li>
+  </ol>
 </div>
 
+<!-- ==================== SPECIAL ASSESSMENT ==================== -->
 <div id="special-assessment" class="section-header">SPECIAL ASSESSMENT</div>
 <div class="content-section">
-  <p>A <strong>Special Assessment</strong> is a temporary fee imposed on association members in addition to regular dues or assessments.</p>
+  <p>A <strong>Special Assessment</strong> is a temporary fee imposed on association members in addition to regular dues or assessments. These assessments are typically used to cover unexpected or one-time expenses and are often subject to limitations or procedures outlined in the association's governing documents or applicable local laws.</p>
 </div>
 
+<!-- ==================== PHYSICAL ANALYSIS ==================== -->
 <div id="physical-analysis" class="section-header">PHYSICAL ANALYSIS</div>
 <div class="content-section">
   <p>The quantities used in the replacement cost estimates of the common elements were generated from field measurements taken during our site visit on {inspectionDate}. Current replacement costs were estimated using published construction cost data referenced in the Bibliography section of this report.</p>
+  <p>The remaining life expectancies of the common elements were determined through a visual site inspection of the Community, as well as information provided by the Property Manager and maintenance contractors familiar with the common elements of the Community. The common elements were identified through a review of the governing documents.</p>
+  <p>Please note that these estimates are based on the professional judgment and experience of this firm and were developed in accordance with generally accepted industry standards. However, actual costs and useful life expectancies may vary due to factors beyond our control, such as market fluctuations, usage patterns, maintenance practices, deterioration rates, and weather conditions.</p>
   <p>It is recommended that this reserve study be updated every three (3) to five (5) years.</p>
 </div>
 
@@ -686,9 +750,13 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div id="financial-results" class="section-header">FINANCIAL RESULTS</div>
 
 <div class="content-section">
-  <p>The primary goal of capital reserve planning is to provide adequate funding for the replacement of the capital components within the community.</p>
-  <p><strong>Current Funding</strong> reflects the beginning balance with the current annual contribution added and projected expenses subtracted each year.</p>
-  <p><strong>Full Funding</strong> represents the annual contribution and fund balances for each year as if each component were fully funded.</p>
+  <p>The primary goal of capital reserve planning is to provide adequate funding for the replacement of the capital components within the community. Effective planning ensures that expenditures for these projects are spread across many years, making funds available when they are needed. An adequately funded capital reserve will prevent the need for large fee increases, special assessments, and loans.</p>
+  
+  <p>Averaging the annual contributions results in consistent maintenance fees, which benefits homeowners and property values. The charts shown in this report provide a 30-year projection of the funding requirements for {projectName}. This reserve study funding analysis includes funding options: Full Funding and Current Funding.</p>
+  
+  <p><strong>Current Funding</strong> reflects the beginning balance with the current annual contribution added and projected expenses subtracted each year. The beginning balance and current annual contribution of {beginningReserveBalance} and {currentAnnualContribution} were provided by the Property Manager. Current funding demonstrates the balances over the projection period, assuming no change in the annual contribution.</p>
+  
+  <p><strong>Full Funding</strong> represents the annual contribution and fund balances for each year as if each component were fully funded. Full funding ensures that each component will accrue its full replacement cost during its remaining life expectancy.</p>
   
   <div class="recommendation-box blue">
     <div class="recommendation-header">📊 Reserve Study Funding Summary</div>
@@ -780,7 +848,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div id="recommendations" class="section-header section-header-orange">RECOMMENDATIONS</div>
 
 <div class="content-section">
-  <p>The following recommendations are based on our review of the community and information provided by the Association. {companyName} recommends the following:</p>
+  <p>The following recommendations are based on our review of the community and information provided by the Association and other representatives of {projectName}. It is our understanding that the components, their condition, and replacement costs have been reviewed and approved by the Association. {companyName} recommends the following:</p>
   
   <div class="recommendation-box">
     <div class="recommendation-header">💰 Financial Recommendation - RESERVE FUNDING</div>
@@ -803,19 +871,35 @@ export const DEFAULT_REPORT_TEMPLATE = `
     <div class="recommendation-body">
       <p>{companyName} recommends updating the reserve study <strong>Every Three (3) Years</strong>.</p>
       <p>New Jersey Law requires updates at a Maximum of <strong>Every Five (5) Years</strong>.</p>
+      <p>Regular updates will help avoid the necessity of large increases in the future.</p>
     </div>
   </div>
+  
+  <div class="sub-header">Final Statements</div>
+  <p>In the opinion of {companyName}, the components and conditions at {projectName} are correctly and reasonably represented. This opinion is based on the information provided by the Association and other sources noted within the report.</p>
+  <p>There are several variables that affect the useful lives and replacement costs of the common components. Economic forces, including material and labor prices, the overall economy, the construction industry, and local conditions, can have an effect on costs. Weather, maintenance procedures, usage, and other factors will also affect the longevity or life expectancy of the components.</p>
+  <p>This report is a financial budgetary tool and should not be used for contracting or bid proposals. The replacement costs used within this report were derived from comparable projects and other sources listed in this report. The costs provided are intended to replace the components with materials of similar quality. Generally, upgrades to components are not included in the costs unless specifically noted. Unforeseen conditions can have an adverse effect on projected costs, resulting in higher replacement costs than planned.</p>
 </div>
 
 <!-- ==================== DISCLOSURES & BIBLIOGRAPHY (same page) ==================== -->
 <div id="disclosures" class="section-header">DISCLOSURES</div>
 
 <div class="content-section">
-  <p>{companyName} is not aware of any conflicts of interest that would influence this study.</p>
-  <p>Physical observations were cursory and included only accessible common elements.</p>
+  <p>{companyName} is not aware of any involvement with the {projectName} that could result in any actual or perceived conflicts of interest that would influence the preparation of this study.</p>
+  
+  <p>The physical on-site observations performed in the preparation of this study were cursory in nature and only included the accessible common and limited common elements. The surfaces of the roofs were not walked unless specifically noted within this report, and no invasive testing was employed.</p>
+  
+  <p>Unless specifically noted within this report, {companyName} has not utilized any assumptions regarding interest, inflation, taxes, or any other outside economic factors.</p>
+  
   {updateDisclosure}
+  
   <p>This study was prepared by {preparedBy}, {companyName}.</p>
-  <p>The Reserve Study reflects information provided and was not audited.</p>
+  
+  <p>{companyName} is not aware of any material issues which, if not disclosed, would cause a distortion of the Association's situation.</p>
+  
+  <p>Information provided by the official representative of the Association regarding financial, physical, quantity, or historical issues will be deemed reliable by {companyName}. The Reserve Study reflects the information provided to the consultant and assembled for the Association's use, not for the purpose of performing an audit, quality/forensic analyses, or background checks of historical records.</p>
+  
+  <p>The actual or projected total presented in the Reserve Study is based upon the information provided and was not audited.</p>
 </div>
 
 <div id="bibliography" class="section-header">BIBLIOGRAPHY</div>
