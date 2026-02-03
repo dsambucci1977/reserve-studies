@@ -1,6 +1,9 @@
-// Professional Report Template - Beahm Consulting Format v7
-// Uses same placeholders as v5, but with spacing/layout fixes
-// Fixes: Removed cover box, compact footer, consolidated sections, fewer blank pages
+// Professional Report Template - Beahm Consulting Format v8
+// Fixes from v7:
+// 1. PM sections now use GREEN headers (not teal) to match PM Fund branding
+// 2. Added table header variants for green tables (.table-green th)
+// 3. Added page break before COMPONENTS NOTES section
+// 4. Fixed table header contrast issues
 
 export const DEFAULT_REPORT_TEMPLATE = `
 <!DOCTYPE html>
@@ -223,10 +226,12 @@ export const DEFAULT_REPORT_TEMPLATE = `
       border-radius: 3px;
     }
     
+    /* GREEN for PM sections - consistent with PM Fund branding */
     .section-header-green {
       background: linear-gradient(90deg, #166534 0%, #22c55e 100%);
     }
     
+    /* TEAL - kept for potential future use but PM should use green */
     .section-header-teal {
       background: linear-gradient(90deg, #0f766e 0%, #14b8a6 100%);
     }
@@ -326,6 +331,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
       font-size: 8pt;
     }
     
+    /* Default table headers - BLUE (for Reserve Fund sections) */
     th {
       background: #1e3a5f;
       color: white;
@@ -334,6 +340,20 @@ export const DEFAULT_REPORT_TEMPLATE = `
       font-weight: bold;
       border: 1px solid #1e3a5f;
       font-size: 7pt;
+    }
+    
+    /* GREEN table headers - for PM sections */
+    .table-green th {
+      background: #166534;
+      color: white;
+      border: 1px solid #166534;
+    }
+    
+    /* TEAL table headers - alternative option */
+    .table-teal th {
+      background: #0f766e;
+      color: white;
+      border: 1px solid #0f766e;
     }
     
     td {
@@ -366,10 +386,24 @@ export const DEFAULT_REPORT_TEMPLATE = `
     .cashflow-table td { padding: 2px 3px; text-align: right; }
     .cashflow-table td:first-child { text-align: center; font-weight: bold; background: #f1f5f9; }
     
+    /* PM Cash Flow Table - green variant */
+    .cashflow-table-green th {
+      background: #166534;
+      color: white;
+      border: 1px solid #166534;
+    }
+    
     /* ============ EXPENDITURE TABLE ============ */
     .expenditure-horizontal { font-size: 8pt; }
     .expenditure-horizontal th { padding: 4px; }
     .expenditure-horizontal td { padding: 3px; }
+    
+    /* PM Expenditure Table - green variant */
+    .expenditure-table-green th {
+      background: #166534;
+      color: white;
+      border: 1px solid #166534;
+    }
     
     /* ============ NOTES TABLE ============ */
     .notes-table td:first-child { width: 50px; text-align: center; font-weight: bold; background: #f1f5f9; }
@@ -563,7 +597,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div id="pm-fund-info" class="section-header section-header-green">PREVENTIVE MAINTENANCE FUND INFORMATION</div>
 
 <div class="content-section">
-  <table>
+  <table class="table-green">
     <tr><td style="width:60%;"><strong>Beginning Preventive Maintenance Balance:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{pmBeginningBalance}</td></tr>
     <tr><td><strong>Current Annual Contribution:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{pmCurrentContribution}</td></tr>
     <tr><td><strong>Current Percent Funded:</strong></td><td class="text-right text-bold" style="font-size:10pt;">{pmPercentFunded}</td></tr>
@@ -633,7 +667,11 @@ export const DEFAULT_REPORT_TEMPLATE = `
   {categorySections}
 </div>
 
-<!-- ==================== COMPONENT NOTES ==================== -->
+<!-- PAGE BREAK BEFORE COMPONENT NOTES -->
+<div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
+
+<!-- ==================== COMPONENT NOTES (NOW ON OWN PAGE) ==================== -->
 <div id="component-notes" class="section-header">COMPONENTS NOTES</div>
 
 <div class="content-section">
@@ -707,19 +745,19 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== PM SECTION (own page) ==================== -->
-<div id="pm-section" class="section-header section-header-teal">PREVENTIVE MAINTENANCE</div>
+<!-- ==================== PM SECTION (own page) - NOW GREEN ==================== -->
+<div id="pm-section" class="section-header section-header-green">PREVENTIVE MAINTENANCE</div>
 
 <div class="content-section">
-  <div class="sub-header">Component Schedule Summary</div>
+  <div class="sub-header" style="color: #166534; border-color: #166534;">Component Schedule Summary</div>
   {pmComponentSummaryTable}
 </div>
 
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== PM EXPENDITURES (before cash flow) ==================== -->
-<div id="pm-expenditures" class="section-header section-header-teal">PM EXPENDITURES</div>
+<!-- ==================== PM EXPENDITURES (before cash flow) - NOW GREEN ==================== -->
+<div id="pm-expenditures" class="section-header section-header-green">PM EXPENDITURES</div>
 
 <div class="content-section">
   {pmExpenditureTable}
@@ -728,8 +766,8 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== PM CASH FLOW ==================== -->
-<div id="pm-cash-flow" class="section-header section-header-teal">PM THIRTY YEAR CASH FLOW</div>
+<!-- ==================== PM CASH FLOW - NOW GREEN ==================== -->
+<div id="pm-cash-flow" class="section-header section-header-green">PM THIRTY YEAR CASH FLOW</div>
 
 <div class="content-section">
   {pmCashFlowTable}
