@@ -1,4 +1,5 @@
 
+
 // src/app/sites/[id]/page.js
 // Site Detail with Status Management and Study Type Display
 'use client';
