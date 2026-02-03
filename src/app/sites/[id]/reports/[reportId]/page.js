@@ -125,112 +125,127 @@ export default function ReportEditorPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* ============ TOP HEADER BAR ============ */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="px-4 py-3">
-          {/* Row 1: Navigation and Title */}
-          <div className="flex items-center justify-between mb-3">
+      
+      {/* ============ SECTION 1: REPORT TITLE BAR ============ */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link 
                 href={'/sites/' + siteId + '/reports'} 
-                className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
+                className="text-gray-500 hover:text-blue-600 text-sm flex items-center gap-1"
               >
                 ← Back to Reports
               </Link>
+              <div className="h-6 w-px bg-gray-300"></div>
               <div>
-                <h1 className="text-lg font-bold text-gray-800">
+                <h1 className="text-xl font-bold text-gray-800">
                   {studyType} Report - {reportDate}
                 </h1>
                 <p className="text-sm text-gray-500">
                   {site?.siteName || 'Site'} 
                   <span className={'ml-2 px-2 py-0.5 rounded text-xs font-medium ' + 
                     (report?.status === 'final' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700')}>
-                    •{report?.status || 'Draft'}
+                    {report?.status || 'Draft'}
                   </span>
+                  {hasChanges && (
+                    <span className="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+                      • Unsaved changes
+                    </span>
+                  )}
                 </p>
               </div>
-            </div>
-            
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setEditMode(!editMode)}
-                className={'px-4 py-2 rounded-lg font-medium text-sm transition-all ' + 
-                  (editMode 
-                    ? 'bg-orange-500 text-white shadow-md' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200')}
-              >
-                {editMode ? '✏️ Editing' : '👁️ View'}
-              </button>
-              
-              <button
-                onClick={() => handleSave('draft')}
-                disabled={saving || !hasChanges}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-              >
-                💾 Save
-              </button>
-              
-              <button
-                onClick={() => handleSave('final')}
-                disabled={saving}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
-              >
-                ✓ Finalize
-              </button>
-              
-              <button
-                onClick={handlePrint}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium text-sm hover:bg-purple-700 flex items-center gap-1"
-              >
-                🖨️ Print
-              </button>
-              
-              <button
-                onClick={() => setShowHtml(!showHtml)}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg font-medium text-sm hover:bg-gray-700 flex items-center gap-1"
-              >
-                {'</>'}  HTML
-              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ============ FORMATTING TOOLBAR (only in edit mode) ============ */}
+      {/* ============ SECTION 2: ACTION BUTTONS BAR ============ */}
+      <div className="bg-gray-50 border-b border-gray-200 sticky top-0 z-50">
+        <div className="px-6 py-3 flex items-center gap-3">
+          <button
+            onClick={() => setEditMode(!editMode)}
+            className={'px-4 py-2 rounded-lg font-medium text-sm transition-all flex items-center gap-2 ' + 
+              (editMode 
+                ? 'bg-orange-500 text-white shadow-md' 
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50')}
+          >
+            {editMode ? '✏️ Editing' : '👁️ View Mode'}
+          </button>
+          
+          <div className="h-6 w-px bg-gray-300"></div>
+          
+          <button
+            onClick={() => handleSave('draft')}
+            disabled={saving || !hasChanges}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            💾 Save Draft
+          </button>
+          
+          <button
+            onClick={() => handleSave('final')}
+            disabled={saving}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            ✓ Finalize
+          </button>
+          
+          <div className="h-6 w-px bg-gray-300"></div>
+          
+          <button
+            onClick={handlePrint}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium text-sm hover:bg-purple-700 flex items-center gap-2"
+          >
+            🖨️ Print
+          </button>
+          
+          <button
+            onClick={() => setShowHtml(!showHtml)}
+            className={'px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 ' +
+              (showHtml 
+                ? 'bg-gray-700 text-white' 
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50')}
+          >
+            {'</>'} HTML
+          </button>
+        </div>
+      </div>
+
+      {/* ============ SECTION 3: FORMATTING TOOLBAR (only in edit mode) ============ */}
       {editMode && (
-        <div className="bg-gray-50 border-b border-gray-200 sticky top-[72px] z-40">
+        <div className="bg-white border-b border-gray-200 sticky top-[56px] z-40 shadow-sm">
           {/* Row 1: Text Formatting */}
-          <div className="px-4 py-2 flex items-center gap-6 border-b border-gray-100">
+          <div className="px-6 py-2 flex items-center gap-6 border-b border-gray-100">
             {/* Text Style Group */}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-400 mr-2 w-10">Style</span>
-              <button onClick={() => execCommand('bold')} title="Bold (Ctrl+B)"
-                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 font-bold">
-                B
-              </button>
-              <button onClick={() => execCommand('italic')} title="Italic (Ctrl+I)"
-                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 italic">
-                I
-              </button>
-              <button onClick={() => execCommand('underline')} title="Underline (Ctrl+U)"
-                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 underline">
-                U
-              </button>
-              <button onClick={() => execCommand('strikeThrough')} title="Strikethrough"
-                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 line-through">
-                S
-              </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 uppercase tracking-wide w-12">Style</span>
+              <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1">
+                <button onClick={() => execCommand('bold')} title="Bold (Ctrl+B)"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white rounded font-bold text-gray-700">
+                  B
+                </button>
+                <button onClick={() => execCommand('italic')} title="Italic (Ctrl+I)"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white rounded italic text-gray-700">
+                  I
+                </button>
+                <button onClick={() => execCommand('underline')} title="Underline (Ctrl+U)"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white rounded underline text-gray-700">
+                  U
+                </button>
+                <button onClick={() => execCommand('strikeThrough')} title="Strikethrough"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white rounded line-through text-gray-700">
+                  S
+                </button>
+              </div>
             </div>
 
-            <div className="h-6 w-px bg-gray-300"></div>
-
             {/* Font Size Group */}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-400 mr-2">Size</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 uppercase tracking-wide">Size</span>
               <select 
                 onChange={(e) => execCommand('fontSize', e.target.value)}
-                className="h-8 px-2 border border-gray-300 rounded bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="h-8 px-3 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 defaultValue="3"
               >
                 <option value="1">8pt</option>
@@ -243,132 +258,141 @@ export default function ReportEditorPage() {
               </select>
             </div>
 
-            <div className="h-6 w-px bg-gray-300"></div>
-
             {/* Text Color Group */}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-400 mr-2">Color</span>
-              <button onClick={() => execCommand('foreColor', '#000000')} title="Black"
-                className="w-6 h-6 rounded border border-gray-300 bg-black hover:scale-110 transition-transform"></button>
-              <button onClick={() => execCommand('foreColor', '#dc2626')} title="Red"
-                className="w-6 h-6 rounded border border-gray-300 bg-red-600 hover:scale-110 transition-transform"></button>
-              <button onClick={() => execCommand('foreColor', '#2563eb')} title="Blue"
-                className="w-6 h-6 rounded border border-gray-300 bg-blue-600 hover:scale-110 transition-transform"></button>
-              <button onClick={() => execCommand('foreColor', '#16a34a')} title="Green"
-                className="w-6 h-6 rounded border border-gray-300 bg-green-600 hover:scale-110 transition-transform"></button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 uppercase tracking-wide">Color</span>
+              <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1">
+                <button onClick={() => execCommand('foreColor', '#000000')} title="Black"
+                  className="w-7 h-7 rounded bg-black hover:scale-110 transition-transform border-2 border-white shadow-sm"></button>
+                <button onClick={() => execCommand('foreColor', '#dc2626')} title="Red"
+                  className="w-7 h-7 rounded bg-red-600 hover:scale-110 transition-transform border-2 border-white shadow-sm"></button>
+                <button onClick={() => execCommand('foreColor', '#2563eb')} title="Blue"
+                  className="w-7 h-7 rounded bg-blue-600 hover:scale-110 transition-transform border-2 border-white shadow-sm"></button>
+                <button onClick={() => execCommand('foreColor', '#16a34a')} title="Green"
+                  className="w-7 h-7 rounded bg-green-600 hover:scale-110 transition-transform border-2 border-white shadow-sm"></button>
+              </div>
             </div>
 
-            <div className="h-6 w-px bg-gray-300"></div>
-
             {/* Highlight Group */}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-400 mr-2">Highlight</span>
-              <button onClick={() => execCommand('backColor', '#fef08a')} title="Yellow Highlight"
-                className="w-6 h-6 rounded border border-gray-300 bg-yellow-200 hover:scale-110 transition-transform"></button>
-              <button onClick={() => execCommand('backColor', '#bbf7d0')} title="Green Highlight"
-                className="w-6 h-6 rounded border border-gray-300 bg-green-200 hover:scale-110 transition-transform"></button>
-              <button onClick={() => execCommand('backColor', '#bfdbfe')} title="Blue Highlight"
-                className="w-6 h-6 rounded border border-gray-300 bg-blue-200 hover:scale-110 transition-transform"></button>
-              <button onClick={() => execCommand('backColor', '#fecaca')} title="Red Highlight"
-                className="w-6 h-6 rounded border border-gray-300 bg-red-200 hover:scale-110 transition-transform"></button>
-              <button onClick={() => execCommand('backColor', 'transparent')} title="Remove Highlight"
-                className="w-6 h-6 rounded border border-gray-300 bg-white hover:scale-110 transition-transform flex items-center justify-center text-gray-400 text-xs">
-                ✕
-              </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 uppercase tracking-wide">Highlight</span>
+              <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1">
+                <button onClick={() => execCommand('backColor', '#fef08a')} title="Yellow Highlight"
+                  className="w-7 h-7 rounded bg-yellow-200 hover:scale-110 transition-transform border-2 border-white shadow-sm"></button>
+                <button onClick={() => execCommand('backColor', '#bbf7d0')} title="Green Highlight"
+                  className="w-7 h-7 rounded bg-green-200 hover:scale-110 transition-transform border-2 border-white shadow-sm"></button>
+                <button onClick={() => execCommand('backColor', '#bfdbfe')} title="Blue Highlight"
+                  className="w-7 h-7 rounded bg-blue-200 hover:scale-110 transition-transform border-2 border-white shadow-sm"></button>
+                <button onClick={() => execCommand('backColor', '#fecaca')} title="Red Highlight"
+                  className="w-7 h-7 rounded bg-red-200 hover:scale-110 transition-transform border-2 border-white shadow-sm"></button>
+                <button onClick={() => execCommand('backColor', 'transparent')} title="Remove Highlight"
+                  className="w-7 h-7 rounded bg-white hover:scale-110 transition-transform border-2 border-gray-300 flex items-center justify-center text-gray-400 text-xs shadow-sm">
+                  ✕
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Row 2: Paragraph & Insert */}
-          <div className="px-4 py-2 flex items-center gap-6">
+          <div className="px-6 py-2 flex items-center gap-6">
             {/* Alignment Group */}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-400 mr-2">Align</span>
-              <button onClick={() => execCommand('justifyLeft')} title="Align Left"
-                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm">
-                ⫷
-              </button>
-              <button onClick={() => execCommand('justifyCenter')} title="Align Center"
-                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm">
-                ≡
-              </button>
-              <button onClick={() => execCommand('justifyRight')} title="Align Right"
-                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm">
-                ⫸
-              </button>
-              <button onClick={() => execCommand('justifyFull')} title="Justify"
-                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm">
-                ☰
-              </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 uppercase tracking-wide w-12">Align</span>
+              <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1">
+                <button onClick={() => execCommand('justifyLeft')} title="Align Left"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white rounded text-gray-700">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h14" />
+                  </svg>
+                </button>
+                <button onClick={() => execCommand('justifyCenter')} title="Align Center"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white rounded text-gray-700">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M7 12h10M5 18h14" />
+                  </svg>
+                </button>
+                <button onClick={() => execCommand('justifyRight')} title="Align Right"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white rounded text-gray-700">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M10 12h10M6 18h14" />
+                  </svg>
+                </button>
+                <button onClick={() => execCommand('justifyFull')} title="Justify"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white rounded text-gray-700">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
-
-            <div className="h-6 w-px bg-gray-300"></div>
 
             {/* Lists Group */}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-400 mr-2">Lists</span>
-              <button onClick={() => execCommand('insertUnorderedList')} title="Bullet List"
-                className="h-8 px-2 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1">
-                •≡
-              </button>
-              <button onClick={() => execCommand('insertOrderedList')} title="Numbered List"
-                className="h-8 px-2 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1">
-                1.
-              </button>
-              <button onClick={() => execCommand('outdent')} title="Decrease Indent"
-                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm">
-                ⇤
-              </button>
-              <button onClick={() => execCommand('indent')} title="Increase Indent"
-                className="w-8 h-8 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm">
-                ⇥
-              </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 uppercase tracking-wide">Lists</span>
+              <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1">
+                <button onClick={() => execCommand('insertUnorderedList')} title="Bullet List"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white rounded text-gray-700">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h.01M8 6h12M4 12h.01M8 12h12M4 18h.01M8 18h12" />
+                  </svg>
+                </button>
+                <button onClick={() => execCommand('insertOrderedList')} title="Numbered List"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white rounded text-gray-700 text-xs font-bold">
+                  1.
+                </button>
+                <button onClick={() => execCommand('outdent')} title="Decrease Indent"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white rounded text-gray-700">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14V5" />
+                  </svg>
+                </button>
+                <button onClick={() => execCommand('indent')} title="Increase Indent"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white rounded text-gray-700">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5v14" />
+                  </svg>
+                </button>
+              </div>
             </div>
-
-            <div className="h-6 w-px bg-gray-300"></div>
 
             {/* Insert Group */}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-400 mr-2">Insert</span>
-              <button onClick={insertPageBreak} title="Insert Page Break"
-                className="h-8 px-3 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1 text-orange-600">
-                📄 Page Break
-              </button>
-              <button onClick={insertHorizontalLine} title="Insert Horizontal Line"
-                className="h-8 px-3 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1">
-                — Line
-              </button>
-            </div>
-
-            <div className="h-6 w-px bg-gray-300"></div>
-
-            {/* Edit Group */}
-            <div className="flex items-center gap-1">
-              <button onClick={() => execCommand('undo')} title="Undo (Ctrl+Z)"
-                className="h-8 px-2 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1">
-                ↩ Undo
-              </button>
-              <button onClick={() => execCommand('redo')} title="Redo (Ctrl+Y)"
-                className="h-8 px-2 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1">
-                ↪ Redo
-              </button>
-              <button onClick={clearFormatting} title="Clear Formatting"
-                className="h-8 px-2 flex items-center justify-center hover:bg-white rounded border border-transparent hover:border-gray-300 text-sm gap-1 text-red-500">
-                ✕ Clear
-              </button>
-            </div>
-
-            {/* Unsaved Changes Indicator */}
-            {hasChanges && (
-              <div className="ml-auto flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-sm">
-                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
-                Unsaved changes
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 uppercase tracking-wide">Insert</span>
+              <div className="flex items-center gap-1">
+                <button onClick={insertPageBreak} title="Insert Page Break"
+                  className="h-8 px-3 flex items-center justify-center bg-orange-50 hover:bg-orange-100 rounded-lg text-sm text-orange-600 border border-orange-200">
+                  📄 Page Break
+                </button>
+                <button onClick={insertHorizontalLine} title="Insert Horizontal Line"
+                  className="h-8 px-3 flex items-center justify-center bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-600 border border-gray-200">
+                  ― Line
+                </button>
               </div>
-            )}
+            </div>
+
+            {/* Undo/Redo/Clear Group */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 uppercase tracking-wide">Edit</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => execCommand('undo')} title="Undo (Ctrl+Z)"
+                  className="h-8 px-3 flex items-center justify-center bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-600 border border-gray-200">
+                  ↩ Undo
+                </button>
+                <button onClick={() => execCommand('redo')} title="Redo (Ctrl+Y)"
+                  className="h-8 px-3 flex items-center justify-center bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-600 border border-gray-200">
+                  ↪ Redo
+                </button>
+                <button onClick={clearFormatting} title="Clear Formatting"
+                  className="h-8 px-3 flex items-center justify-center bg-red-50 hover:bg-red-100 rounded-lg text-sm text-red-600 border border-red-200">
+                  ✕ Clear
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ============ DOCUMENT AREA ============ */}
+      {/* ============ SECTION 4: DOCUMENT AREA ============ */}
       <div className="p-6">
         {showHtml ? (
           /* HTML View Mode */
