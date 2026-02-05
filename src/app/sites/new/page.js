@@ -80,37 +80,12 @@ export default function NewSitePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <Link href="/sites" className="text-2xl font-bold text-red-600 hover:text-red-700">
-              Pronoia Reserve Studies
-            </Link>
-            <div className="flex gap-4">
-              <Link
-                href="/dashboard"
-                className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/sites"
-                className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
-              >
-                Sites
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
           <Link
             href="/sites"
-            className="text-red-600 hover:text-red-700 text-sm font-medium"
+            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
           >
             ← Back to Sites
           </Link>
@@ -138,7 +113,7 @@ export default function NewSitePage() {
                 type="text"
                 value={projectNumber}
                 onChange={(e) => setProjectNumber(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="e.g., 25CA 003"
                 required
               />
@@ -156,7 +131,7 @@ export default function NewSitePage() {
                 type="text"
                 value={siteName}
                 onChange={(e) => setSiteName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="e.g., Willow Park Condominium Association"
                 required
               />
@@ -171,7 +146,7 @@ export default function NewSitePage() {
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="e.g., Hoboken, New Jersey"
                 required
               />
@@ -186,7 +161,7 @@ export default function NewSitePage() {
                 type="number"
                 value={numberOfUnits}
                 onChange={(e) => setNumberOfUnits(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="e.g., 71"
                 required
                 min="1"
@@ -195,9 +170,9 @@ export default function NewSitePage() {
 
             {/* Info Box */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="font-semibold text-blue-800 mb-2">What's Next?</h3>
+              <h3 className="font-semibold text-blue-800 mb-2">What&apos;s Next?</h3>
               <p className="text-blue-700 text-sm">
-                After creating the site, you'll be able to:
+                After creating the site, you&apos;ll be able to:
               </p>
               <ul className="text-blue-700 text-sm ml-4 mt-2 space-y-1 list-disc">
                 <li>Add complete project information (30+ fields)</li>
@@ -212,7 +187,7 @@ export default function NewSitePage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {loading ? 'Creating...' : 'Create Site'}
               </button>
