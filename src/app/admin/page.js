@@ -7,6 +7,27 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
+// All US states for dropdown
+const US_STATES = [
+  { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' }, { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' }, { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' }, { code: 'DE', name: 'Delaware' }, { code: 'FL', name: 'Florida' },
+  { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' }, { code: 'ID', name: 'Idaho' },
+  { code: 'IL', name: 'Illinois' }, { code: 'IN', name: 'Indiana' }, { code: 'IA', name: 'Iowa' },
+  { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' }, { code: 'LA', name: 'Louisiana' },
+  { code: 'ME', name: 'Maine' }, { code: 'MD', name: 'Maryland' }, { code: 'MA', name: 'Massachusetts' },
+  { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' }, { code: 'MS', name: 'Mississippi' },
+  { code: 'MO', name: 'Missouri' }, { code: 'MT', name: 'Montana' }, { code: 'NE', name: 'Nebraska' },
+  { code: 'NV', name: 'Nevada' }, { code: 'NH', name: 'New Hampshire' }, { code: 'NJ', name: 'New Jersey' },
+  { code: 'NM', name: 'New Mexico' }, { code: 'NY', name: 'New York' }, { code: 'NC', name: 'North Carolina' },
+  { code: 'ND', name: 'North Dakota' }, { code: 'OH', name: 'Ohio' }, { code: 'OK', name: 'Oklahoma' },
+  { code: 'OR', name: 'Oregon' }, { code: 'PA', name: 'Pennsylvania' }, { code: 'RI', name: 'Rhode Island' },
+  { code: 'SC', name: 'South Carolina' }, { code: 'SD', name: 'South Dakota' }, { code: 'TN', name: 'Tennessee' },
+  { code: 'TX', name: 'Texas' }, { code: 'UT', name: 'Utah' }, { code: 'VT', name: 'Vermont' },
+  { code: 'VA', name: 'Virginia' }, { code: 'WA', name: 'Washington' }, { code: 'WV', name: 'West Virginia' },
+  { code: 'WI', name: 'Wisconsin' }, { code: 'WY', name: 'Wyoming' }, { code: 'DC', name: 'District of Columbia' }
+];
+
 export default function AdminPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -18,7 +39,6 @@ export default function AdminPage() {
   const [userProfile, setUserProfile] = useState(null);
   const [users, setUsers] = useState([]);
   const [invitations, setInvitations] = useState([]);
-  
 
   useEffect(() => {
     if (!user) {
@@ -41,8 +61,8 @@ export default function AdminPage() {
       const userData = userDoc.data();
       setUserProfile(userData);
       
-      if (userData.role !== 'admin') {
-        setMessage('Access denied. Organization admin privileges required.');
+      if (userData.role !== 'admin' && userData.role !== 'super_admin') {
+        setMessage('Access denied. Admin privileges required.');
         setTimeout(() => router.push('/profile'), 2000);
         return;
       }
@@ -60,7 +80,6 @@ export default function AdminPage() {
       
       const orgData = { id: orgDoc.id, ...orgDoc.data() };
       setOrganization(orgData);
-      
       
       await loadUsers(userData.organizationId);
       await loadInvitations(userData.organizationId);
@@ -91,109 +110,92 @@ export default function AdminPage() {
     setInvitations(invitesList);
   };
 
-  const handleInviteUser = async (email, role) => {
-    try {
-      if (!email || !role) {
-        setMessage('Email and role are required');
-        return;
-      }
-      
-      const existingUserQuery = query(collection(db, 'users'), where('email', '==', email));
-      const existingUser = await getDocs(existingUserQuery);
-      if (!existingUser.empty) {
-        setMessage('User with this email already exists');
-        return;
-      }
-      
-      const existingInviteQuery = query(
-        collection(db, 'invitations'),
-        where('email', '==', email),
-        where('status', '==', 'pending')
-      );
-      const existingInvite = await getDocs(existingInviteQuery);
-      if (!existingInvite.empty) {
-        setMessage('Invitation already sent to this email');
-        return;
-      }
-      
-      const invitation = {
-        organizationId: userProfile.organizationId,
-        email: email,
-        role: role,
-        invitedBy: user.uid,
-        invitedAt: new Date(),
-        status: 'pending',
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      };
-      
-      await addDoc(collection(db, 'invitations'), invitation);
-      
-      setMessage(`Invitation sent to ${email}`);
-      await loadInvitations(userProfile.organizationId);
-      
-    } catch (error) {
-      console.error('Error inviting user:', error);
-      setMessage('Error sending invitation');
-    }
-  };
-
   const handleUpdateUserRole = async (userId, newRole) => {
     try {
-      await updateDoc(doc(db, 'users', userId), {
-        role: newRole,
-        updatedAt: new Date()
-      });
-      
+      await updateDoc(doc(db, 'users', userId), { role: newRole });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
       setMessage('User role updated');
-      await loadUsers(userProfile.organizationId);
-      
     } catch (error) {
-      console.error('Error updating user role:', error);
+      console.error('Error updating role:', error);
       setMessage('Error updating user role');
     }
   };
 
   const handleDeactivateUser = async (userId) => {
+    if (!confirm('Are you sure you want to deactivate this user?')) return;
     try {
-      await updateDoc(doc(db, 'users', userId), {
-        status: 'suspended',
-        updatedAt: new Date()
-      });
-      
+      await updateDoc(doc(db, 'users', userId), { status: 'inactive' });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: 'inactive' } : u));
       setMessage('User deactivated');
-      await loadUsers(userProfile.organizationId);
-      
     } catch (error) {
       console.error('Error deactivating user:', error);
       setMessage('Error deactivating user');
     }
   };
 
-  const handleCancelInvitation = async (invitationId) => {
+  const handleInviteUser = async (email, role) => {
     try {
-      await deleteDoc(doc(db, 'invitations', invitationId));
+      const inviteData = {
+        email,
+        role,
+        organizationId: organization.id,
+        organizationName: organization.name,
+        status: 'pending',
+        createdAt: new Date(),
+        invitedBy: user.uid
+      };
+      
+      await addDoc(collection(db, 'invitations'), inviteData);
+      await loadInvitations(organization.id);
+      setMessage(`Invitation sent to ${email}`);
+    } catch (error) {
+      console.error('Error sending invitation:', error);
+      setMessage('Error sending invitation');
+    }
+  };
+
+  const handleCancelInvitation = async (inviteId) => {
+    try {
+      await deleteDoc(doc(db, 'invitations', inviteId));
+      setInvitations(prev => prev.filter(i => i.id !== inviteId));
       setMessage('Invitation cancelled');
-      await loadInvitations(userProfile.organizationId);
     } catch (error) {
       console.error('Error cancelling invitation:', error);
       setMessage('Error cancelling invitation');
     }
   };
 
-  const handleUpdateOrganization = async (updatedData) => {
+  const handleUpdateOrganization = async (updates) => {
     try {
-      await setDoc(doc(db, 'organizations', organization.id), {
-        ...organization,
-        ...updatedData,
-        updatedAt: new Date(),
-        updatedBy: user.uid
-      }, { merge: true });
-      
-      setOrganization(prev => ({ ...prev, ...updatedData }));
-      setMessage('Organization settings saved successfully!');
+      await updateDoc(doc(db, 'organizations', organization.id), {
+        ...updates,
+        updatedAt: new Date()
+      });
+      setOrganization(prev => ({ ...prev, ...updates }));
+      setMessage('Organization settings saved');
     } catch (error) {
       console.error('Error updating organization:', error);
-      setMessage('Error saving organization settings');
+      setMessage('Error saving settings');
+    }
+  };
+
+  const handleSaveStateCompliance = async (stateCompliance) => {
+    try {
+      await updateDoc(doc(db, 'organizations', organization.id), {
+        'settings.stateCompliance': stateCompliance,
+        updatedAt: new Date()
+      });
+      setOrganization(prev => ({
+        ...prev,
+        settings: {
+          ...prev.settings,
+          stateCompliance
+        }
+      }));
+      setMessage('State compliance settings saved');
+    } catch (error) {
+      console.error('Error saving state compliance:', error);
+      setMessage('Error saving state compliance settings');
     }
   };
 
@@ -208,7 +210,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!userProfile || userProfile.role !== 'admin') {
+  if (!userProfile || (userProfile.role !== 'admin' && userProfile.role !== 'super_admin')) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -223,11 +225,13 @@ export default function AdminPage() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
+        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Organization Administration</h1>
           <p className="text-gray-600 mt-2">{organization?.name}</p>
         </div>
 
+        {/* Message */}
         {message && (
           <div className={`mb-6 p-4 rounded-lg ${
             message.includes('Error') || message.includes('denied')
@@ -244,6 +248,7 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* Tabs */}
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px">
@@ -251,7 +256,7 @@ export default function AdminPage() {
                 onClick={() => setActiveTab('users')}
                 className={`px-6 py-4 font-medium text-sm border-b-2 ${
                   activeTab === 'users'
-                    ? 'border-purple-600 text-purple-600'
+                    ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -261,17 +266,27 @@ export default function AdminPage() {
                 onClick={() => setActiveTab('invitations')}
                 className={`px-6 py-4 font-medium text-sm border-b-2 ${
                   activeTab === 'invitations'
-                    ? 'border-purple-600 text-purple-600'
+                    ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-gray-600 hover:text-gray-900'
                 }`}
               >
                 ✉️ Invitations ({invitations.length})
               </button>
               <button
+                onClick={() => setActiveTab('compliance')}
+                className={`px-6 py-4 font-medium text-sm border-b-2 ${
+                  activeTab === 'compliance'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🏛️ State Compliance
+              </button>
+              <button
                 onClick={() => setActiveTab('settings')}
                 className={`px-6 py-4 font-medium text-sm border-b-2 ${
                   activeTab === 'settings'
-                    ? 'border-purple-600 text-purple-600'
+                    ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -299,6 +314,13 @@ export default function AdminPage() {
               />
             )}
 
+            {activeTab === 'compliance' && (
+              <StateComplianceTab
+                stateCompliance={organization?.settings?.stateCompliance || []}
+                onSave={handleSaveStateCompliance}
+              />
+            )}
+
             {activeTab === 'settings' && (
               <OrganizationSettingsTab
                 organization={organization}
@@ -315,6 +337,7 @@ export default function AdminPage() {
   );
 }
 
+// ==================== USERS TAB ====================
 function UsersTab({ users, currentUserId, onUpdateRole, onDeactivate }) {
   return (
     <div>
@@ -331,34 +354,38 @@ function UsersTab({ users, currentUserId, onUpdateRole, onDeactivate }) {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {users.map(user => (
-              <tr key={user.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="font-medium text-gray-900">{user.displayName || 'Unknown'}</div>
+            {users.map(u => (
+              <tr key={u.id}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {u.displayName || 'No name'}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{user.email}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {u.email}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <select
-                    value={user.role}
-                    onChange={(e) => onUpdateRole(user.id, e.target.value)}
-                    disabled={user.id === currentUserId}
-                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 text-gray-900"
+                    value={u.role || 'specialist'}
+                    onChange={(e) => onUpdateRole(u.id, e.target.value)}
+                    disabled={u.id === currentUserId}
+                    className="text-sm border border-gray-300 rounded px-2 py-1 bg-white text-gray-900"
                   >
-                    <option value="admin">Admin</option>
                     <option value="specialist">Specialist</option>
+                    <option value="admin">Admin</option>
                   </select>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${
-                    user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  <span className={`px-2 py-1 text-xs rounded-full ${
+                    u.status === 'active' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
                   }`}>
-                    {user.status}
+                    {u.status || 'active'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  {user.id !== currentUserId && user.status === 'active' && (
+                  {u.id !== currentUserId && u.status === 'active' && (
                     <button
-                      onClick={() => onDeactivate(user.id)}
+                      onClick={() => onDeactivate(u.id)}
                       className="text-red-600 hover:text-red-800"
                     >
                       Deactivate
@@ -374,101 +401,286 @@ function UsersTab({ users, currentUserId, onUpdateRole, onDeactivate }) {
   );
 }
 
+// ==================== INVITATIONS TAB ====================
 function InvitationsTab({ invitations, onInvite, onCancel }) {
-  const [newEmail, setNewEmail] = useState('');
-  const [newRole, setNewRole] = useState('specialist');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('specialist');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onInvite(newEmail, newRole);
-    setNewEmail('');
-    setNewRole('specialist');
+    if (!email.trim()) return;
+    onInvite(email.trim(), role);
+    setEmail('');
+    setRole('specialist');
   };
 
   return (
     <div>
       <h2 className="text-xl font-bold text-gray-900 mb-4">Invite New User</h2>
       
-      <form onSubmit={handleSubmit} className="mb-8 p-4 bg-gray-50 rounded-lg">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
-            <input
-              type="email"
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
-              placeholder="user@example.com"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-            <select
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
-            >
-              <option value="specialist">Specialist</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
+      <form onSubmit={handleSubmit} className="mb-8 flex gap-4 items-end">
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="user@example.com"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="specialist">Specialist</option>
+            <option value="admin">Admin</option>
+          </select>
         </div>
         <button
           type="submit"
-          className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
         >
-          Send Invitation
+          Send Invite
         </button>
       </form>
 
-      <h3 className="text-lg font-bold text-gray-900 mb-4">Pending Invitations</h3>
-      <div className="space-y-4">
-        {invitations.length === 0 ? (
-          <p className="text-gray-600">No pending invitations</p>
-        ) : (
-          invitations.map(invite => (
-            <div key={invite.id} className="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div>
-                <div className="font-medium text-gray-900">{invite.email}</div>
-                <div className="text-sm text-gray-600">
-                  Role: {invite.role} • Expires: {new Date(invite.expiresAt.seconds * 1000).toLocaleDateString()}
+      {invitations.length > 0 && (
+        <>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">Pending Invitations</h3>
+          <div className="space-y-3">
+            {invitations.map(invite => (
+              <div key={invite.id} className="flex items-center justify-between bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div>
+                  <p className="font-medium text-gray-900">{invite.email}</p>
+                  <p className="text-sm text-gray-600">Role: {invite.role} • Sent: {invite.createdAt?.seconds ? new Date(invite.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
                 </div>
+                <button
+                  onClick={() => onCancel(invite.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Cancel
+                </button>
               </div>
-              <button
-                onClick={() => onCancel(invite.id)}
-                className="px-4 py-2 text-red-600 hover:text-red-800 font-medium"
-              >
-                Cancel
-              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ==================== STATE COMPLIANCE TAB ====================
+function StateComplianceTab({ stateCompliance, onSave }) {
+  const [states, setStates] = useState(stateCompliance || []);
+  const [selectedState, setSelectedState] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Filter out states that are already added
+  const availableStates = US_STATES.filter(
+    s => !states.find(existing => existing.code === s.code)
+  );
+
+  const handleAddState = () => {
+    if (!selectedState) return;
+    
+    const stateInfo = US_STATES.find(s => s.code === selectedState);
+    if (!stateInfo) return;
+    
+    // Default: NJ requires PM, others don't
+    const pmRequired = selectedState === 'NJ';
+    
+    setStates(prev => [...prev, {
+      code: stateInfo.code,
+      name: stateInfo.name,
+      pmRequired,
+      notes: ''
+    }].sort((a, b) => a.name.localeCompare(b.name)));
+    
+    setSelectedState('');
+  };
+
+  const handleTogglePM = (code) => {
+    setStates(prev => prev.map(s => 
+      s.code === code ? { ...s, pmRequired: !s.pmRequired } : s
+    ));
+  };
+
+  const handleUpdateNotes = (code, notes) => {
+    setStates(prev => prev.map(s => 
+      s.code === code ? { ...s, notes } : s
+    ));
+  };
+
+  const handleRemoveState = (code) => {
+    if (!confirm('Remove this state from your compliance configuration?')) return;
+    setStates(prev => prev.filter(s => s.code !== code));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave(states);
+    setSaving(false);
+  };
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">State Compliance Configuration</h2>
+        <p className="text-gray-600">
+          Configure which states your organization operates in and their compliance requirements. 
+          When PM (Property Maintenance) Fund is required, reserve study reports will automatically 
+          include PM fund calculations and sections.
+        </p>
+      </div>
+
+      {/* Add State */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <h3 className="text-sm font-semibold text-blue-800 mb-3">Add a State</h3>
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <select
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select a state...</option>
+              {availableStates.map(s => (
+                <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={handleAddState}
+            disabled={!selectedState}
+            className={`px-6 py-2 rounded-lg font-medium ${
+              selectedState
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            + Add State
+          </button>
+        </div>
+      </div>
+
+      {/* State List */}
+      {states.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+          <div className="text-4xl mb-3">🏛️</div>
+          <p className="text-gray-600 font-medium">No states configured yet</p>
+          <p className="text-gray-500 text-sm mt-1">Add the states your organization operates in to configure compliance requirements.</p>
+        </div>
+      ) : (
+        <div className="space-y-3 mb-6">
+          {states.map(state => (
+            <div key={state.code} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4 flex-1">
+                  {/* State Name & Code */}
+                  <div className="min-w-[180px]">
+                    <span className="font-bold text-gray-900">{state.name}</span>
+                    <span className="ml-2 text-sm text-gray-500">({state.code})</span>
+                  </div>
+                  
+                  {/* PM Required Toggle */}
+                  <div className="flex items-center gap-2">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={state.pmRequired}
+                        onChange={() => handleTogglePM(state.code)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                    <span className={`text-sm font-medium ${state.pmRequired ? 'text-blue-700' : 'text-gray-500'}`}>
+                      PM Fund {state.pmRequired ? 'Required' : 'Not Required'}
+                    </span>
+                  </div>
+                  
+                  {/* Status Badge */}
+                  {state.pmRequired && (
+                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
+                      Reports include PM sections
+                    </span>
+                  )}
+                </div>
+
+                {/* Remove Button */}
+                <button
+                  onClick={() => handleRemoveState(state.code)}
+                  className="text-gray-400 hover:text-red-600 transition-colors ml-4"
+                  title="Remove state"
+                >
+                  🗑️
+                </button>
+              </div>
+              
+              {/* Notes Field */}
+              <div className="mt-3">
+                <input
+                  type="text"
+                  value={state.notes || ''}
+                  onChange={(e) => handleUpdateNotes(state.code, e.target.value)}
+                  placeholder="Optional notes (e.g., NJ S2760 compliance, specific regulations...)"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-700 bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                />
+              </div>
             </div>
-          ))
-        )}
+          ))}
+        </div>
+      )}
+
+      {/* Info Box */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+        <h4 className="text-sm font-semibold text-amber-800 mb-1">💡 How this works</h4>
+        <p className="text-sm text-amber-700">
+          When a site&apos;s state has PM Fund marked as &quot;Required,&quot; the reserve study report will automatically 
+          include Property Maintenance fund calculations, the PM fund expenditure schedule, and PM-specific 
+          sections. States without PM requirements will generate reports with reserve fund sections only.
+        </p>
+      </div>
+
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className={`px-8 py-3 rounded-lg font-medium text-white ${
+            saving ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+        >
+          {saving ? 'Saving...' : 'Save Compliance Settings'}
+        </button>
       </div>
     </div>
   );
 }
 
+// ==================== ORGANIZATION SETTINGS TAB ====================
 function OrganizationSettingsTab({ organization, onSave, setMessage }) {
-  const [saving, setSaving] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [formData, setFormData] = useState({
     name: organization?.name || '',
-    address: organization?.address || '',
-    city: organization?.city || '',
-    state: organization?.state || '',
-    zipCode: organization?.zipCode || '',
-    phone: organization?.phone || '',
-    email: organization?.email || '',
-    website: organization?.website || '',
-    logoUrl: organization?.logoUrl || '',
-    preparedBy: organization?.preparedBy || '',
-    licenseNumber: organization?.licenseNumber || ''
+    address: organization?.settings?.address || '',
+    city: organization?.settings?.city || '',
+    state: organization?.settings?.state || '',
+    zip: organization?.settings?.zip || '',
+    phone: organization?.settings?.phone || '',
+    email: organization?.settings?.email || '',
+    website: organization?.settings?.website || '',
+    preparedBy: organization?.settings?.preparedBy || '',
+    licenseNumber: organization?.settings?.licenseNumber || '',
   });
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleLogoUpload = async (e) => {
@@ -476,287 +688,196 @@ function OrganizationSettingsTab({ organization, onSave, setMessage }) {
     if (!file) return;
     
     if (!file.type.startsWith('image/')) {
-      setMessage('Please upload an image file (PNG, JPG, etc.)');
-      return;
-    }
-    
-    if (file.size > 2 * 1024 * 1024) {
-      setMessage('Logo file must be less than 2MB');
+      setMessage('Please upload an image file');
       return;
     }
     
     try {
-      setUploadingLogo(true);
-      
-      const logoRef = ref(storage, `organizations/${organization.id}/logo-${Date.now()}`);
+      setLogoUploading(true);
+      const logoRef = ref(storage, `organizations/${organization.id}/logo`);
       await uploadBytes(logoRef, file);
       const logoUrl = await getDownloadURL(logoRef);
       
-      setFormData(prev => ({ ...prev, logoUrl }));
-      setMessage('Logo uploaded successfully!');
+      await onSave({ 'settings.logoUrl': logoUrl });
+      setMessage('Logo uploaded successfully');
     } catch (error) {
       console.error('Error uploading logo:', error);
-      setMessage('Error uploading logo: ' + error.message);
+      setMessage('Error uploading logo. Make sure Firebase Storage is enabled.');
     } finally {
-      setUploadingLogo(false);
+      setLogoUploading(false);
     }
   };
 
-  const handleRemoveLogo = () => {
-    setFormData(prev => ({ ...prev, logoUrl: '' }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setSaving(true);
-    await onSave(formData);
+    await onSave({
+      name: formData.name,
+      'settings.address': formData.address,
+      'settings.city': formData.city,
+      'settings.state': formData.state,
+      'settings.zip': formData.zip,
+      'settings.phone': formData.phone,
+      'settings.email': formData.email,
+      'settings.website': formData.website,
+      'settings.preparedBy': formData.preparedBy,
+      'settings.licenseNumber': formData.licenseNumber,
+    });
     setSaving(false);
   };
 
   return (
     <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-2">Organization Branding & Settings</h2>
-      <p className="text-gray-600 mb-6">Configure your company branding for report generation</p>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        
-        {/* Logo Section */}
-        <div className="bg-gray-50 rounded-lg p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-2">🎨 Company Logo</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            This logo will appear on the cover page of all generated reports. Recommended size: 300x100 pixels.
-          </p>
-          
-          <div className="flex items-start gap-6">
-            <div className="w-64 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-white overflow-hidden">
-              {formData.logoUrl ? (
-                <img 
-                  src={formData.logoUrl} 
-                  alt="Company Logo" 
-                  className="max-w-full max-h-full object-contain"
-                />
-              ) : (
-                <div className="text-center text-gray-400">
-                  <div className="text-4xl mb-2">🏢</div>
-                  <div className="text-sm">No logo uploaded</div>
-                </div>
-              )}
+      <h2 className="text-xl font-bold text-gray-900 mb-2">Branding & Settings</h2>
+      <p className="text-gray-600 mb-6">Configure your organization&apos;s branding and report settings.</p>
+      
+      {/* Logo Section */}
+      <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Organization Logo</h3>
+        <div className="flex items-center gap-6">
+          {organization?.settings?.logoUrl ? (
+            <img 
+              src={organization.settings.logoUrl} 
+              alt="Organization Logo" 
+              className="h-16 w-auto object-contain bg-white border rounded p-2"
+            />
+          ) : (
+            <div className="h-16 w-32 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-sm">
+              No logo
             </div>
-            
-            <div className="flex flex-col gap-3">
-              <label className="cursor-pointer">
-                <span className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-block font-medium text-sm">
-                  {uploadingLogo ? 'Uploading...' : formData.logoUrl ? 'Change Logo' : 'Upload Logo'}
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  disabled={uploadingLogo}
-                  className="hidden"
-                />
-              </label>
-              
-              {formData.logoUrl && (
-                <button
-                  type="button"
-                  onClick={handleRemoveLogo}
-                  className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium text-left"
-                >
-                  Remove Logo
-                </button>
-              )}
-              
-              <p className="text-xs text-gray-500">PNG, JPG, or SVG (max 2MB)</p>
-            </div>
+          )}
+          <div>
+            <label className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+              {logoUploading ? 'Uploading...' : 'Upload Logo'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                className="hidden"
+                disabled={logoUploading}
+              />
+            </label>
+            <p className="text-xs text-gray-500 mt-2">PNG, JPG, or SVG. Recommended: 300x100px</p>
           </div>
         </div>
+      </div>
 
-        {/* Company Information */}
-        <div className="bg-gray-50 rounded-lg p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">🏢 Company Information</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
-                placeholder="Beahm Consulting, LLC"
-              />
-            </div>
-            
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
-              <input
-                type="text"
-                name="address"
-                value={formData.address}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
-                placeholder="1709 Langhorne Newtown Road, Suite 4"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-              <input
-                type="text"
-                name="city"
-                value={formData.city}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
-                placeholder="Langhorne"
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                <select
-                  name="state"
-                  value={formData.state}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
-                >
-                  <option value="">Select</option>
-                  <option value="PA">PA</option>
-                  <option value="NJ">NJ</option>
-                  <option value="NY">NY</option>
-                  <option value="DE">DE</option>
-                  <option value="MD">MD</option>
-                  <option value="CA">CA</option>
-                  <option value="FL">FL</option>
-                  <option value="TX">TX</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Zip Code</label>
-                <input
-                  type="text"
-                  name="zipCode"
-                  value={formData.zipCode}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
-                  placeholder="19047"
-                />
-              </div>
-            </div>
+      {/* Company Info */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => handleChange('name', e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+          <input
+            type="tel"
+            value={formData.phone}
+            onChange={(e) => handleChange('phone', e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+          <input
+            type="text"
+            value={formData.address}
+            onChange={(e) => handleChange('address', e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+          <input
+            type="text"
+            value={formData.city}
+            onChange={(e) => handleChange('city', e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+            <input
+              type="text"
+              value={formData.state}
+              onChange={(e) => handleChange('state', e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+            <input
+              type="text"
+              value={formData.zip}
+              onChange={(e) => handleChange('zip', e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+            />
           </div>
         </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input
+            type="email"
+            value={formData.email}
+            onChange={(e) => handleChange('email', e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+          <input
+            type="text"
+            value={formData.website}
+            onChange={(e) => handleChange('website', e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
 
-        {/* Contact Information */}
-        <div className="bg-gray-50 rounded-lg p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">📞 Contact Information</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
-                placeholder="732-207-7850"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
-                placeholder="info@beahmconsulting.com"
-              />
-            </div>
-            
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-              <input
-                type="url"
-                name="website"
-                value={formData.website}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
-                placeholder="https://www.beahmconsulting.com"
-              />
-            </div>
+      {/* Report Settings */}
+      <div className="border-t border-gray-200 pt-6 mb-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Report Settings</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Prepared By</label>
+            <input
+              type="text"
+              value={formData.preparedBy}
+              onChange={(e) => handleChange('preparedBy', e.target.value)}
+              placeholder="Name for report cover page"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">License Number</label>
+            <input
+              type="text"
+              value={formData.licenseNumber}
+              onChange={(e) => handleChange('licenseNumber', e.target.value)}
+              placeholder="Professional license #"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+            />
           </div>
         </div>
+      </div>
 
-        {/* Report Settings */}
-        <div className="bg-gray-50 rounded-lg p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">📄 Report Settings</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Prepared By (Name)</label>
-              <input
-                type="text"
-                name="preparedBy"
-                value={formData.preparedBy}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
-                placeholder="Jordan Beahm"
-              />
-              <p className="text-xs text-gray-500 mt-1">This name appears in report disclosures</p>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">License/Certification Number</label>
-              <input
-                type="text"
-                name="licenseNumber"
-                value={formData.licenseNumber}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
-                placeholder="RS #12345"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Preview Section */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="text-lg font-bold text-blue-900 mb-2">👁️ Report Footer Preview</h3>
-          <p className="text-sm text-blue-700 mb-4">This is how your company info will appear in report footers:</p>
-          
-          <div className="border border-blue-200 rounded-lg p-4 bg-white text-center">
-            <div className="text-sm font-bold text-gray-800">
-              {formData.name || 'Company Name'}
-            </div>
-            <div className="text-xs text-gray-600">
-              {[
-                formData.address,
-                formData.city,
-                formData.state,
-                formData.zipCode
-              ].filter(Boolean).join(', ') || 'Address'}
-              {formData.phone && ` • ${formData.phone}`}
-            </div>
-          </div>
-        </div>
-
-        {/* Save Button */}
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 font-medium"
-          >
-            {saving ? 'Saving...' : 'Save Settings'}
-          </button>
-        </div>
-      </form>
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleSubmit}
+          disabled={saving}
+          className={`px-8 py-3 rounded-lg font-medium text-white ${
+            saving ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+        >
+          {saving ? 'Saving...' : 'Save Settings'}
+        </button>
+      </div>
     </div>
   );
 }
