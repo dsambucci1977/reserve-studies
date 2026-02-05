@@ -36,23 +36,18 @@ export default function Home() {
             setOrganization(orgDoc.data());
           }
           
-          // Load study stats
+          // Load study stats - load all sites (consistent with sites/page.js)
           try {
-            // Try organization-filtered query first
-            let studiesList = [];
-            try {
-              const sitesQuery = query(
-                collection(db, 'sites'),
-                where('organizationId', '==', userData.organizationId)
-              );
-              const sitesSnapshot = await getDocs(sitesQuery);
-              studiesList = sitesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            } catch (queryError) {
-              // Fallback: load all sites if org query fails (e.g., missing index or field)
-              console.log('Org query failed, loading all sites:', queryError);
-              const allSitesSnapshot = await getDocs(collection(db, 'sites'));
-              studiesList = allSitesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            }
+            const allSitesSnapshot = await getDocs(collection(db, 'sites'));
+            let studiesList = allSitesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            
+            // Debug: log what we're working with
+            console.log('Dashboard stats - all studies:', studiesList.map(s => ({
+              siteName: s.siteName,
+              projectNumber: s.projectNumber,
+              status: s.status,
+              organizationId: s.organizationId
+            })));
             
             // Count unique site names (actual properties/communities)
             const uniqueSiteNames = new Set(
