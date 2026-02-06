@@ -22,6 +22,27 @@ const STUDY_TYPES = {
   'level2': 'Level 2 Update'
 };
 
+// State abbreviation mapping
+const STATE_ABBREVIATIONS = {
+  'New Jersey': 'NJ',
+  'Pennsylvania': 'PA',
+  'California': 'CA',
+  'New York': 'NY',
+  'Florida': 'FL',
+  'Texas': 'TX',
+  'Connecticut': 'CT',
+  'Delaware': 'DE',
+  'Maryland': 'MD',
+  'Virginia': 'VA',
+};
+
+const getStateAbbreviation = (state) => {
+  if (!state) return '—';
+  const trimmed = state.trim();
+  if (trimmed.length <= 3) return trimmed.toUpperCase();
+  return STATE_ABBREVIATIONS[trimmed] || trimmed;
+};
+
 export default function SitesPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -30,6 +51,7 @@ export default function SitesPage() {
   const [groupedSites, setGroupedSites] = useState({});
   const [loading, setLoading] = useState(true);
   const [organization, setOrganization] = useState(null);
+  const [stateCompliance, setStateCompliance] = useState([]);
   const [users, setUsers] = useState({});
   
   // Filter states
@@ -65,7 +87,16 @@ export default function SitesPage() {
         if (userData.organizationId) {
           const orgDoc = await getDoc(doc(db, 'organizations', userData.organizationId));
           if (orgDoc.exists()) {
-            setOrganization(orgDoc.data());
+            const orgData = orgDoc.data();
+            setOrganization(orgData);
+            
+            // Load state compliance settings from org
+            // Handles different possible storage locations
+            const sc = orgData.settings?.stateCompliance 
+              || orgData.stateCompliance 
+              || orgData.settings?.states
+              || [];
+            setStateCompliance(Array.isArray(sc) ? sc : Object.values(sc));
           }
         }
       }
@@ -103,10 +134,33 @@ export default function SitesPage() {
     }
   };
 
+  // Check if PM is required for a given state based on org compliance settings
+  const isPMRequired = (siteState) => {
+    if (!siteState || stateCompliance.length === 0) return null;
+    
+    const abbrev = getStateAbbreviation(siteState);
+    const fullName = siteState.trim();
+    
+    const match = stateCompliance.find(sc => {
+      // Handle various possible field names for state identifier
+      const scAbbrev = (sc.abbreviation || sc.abbrev || sc.code || '').toUpperCase();
+      const scName = (sc.name || sc.state || sc.stateName || '').toLowerCase();
+      return (
+        scAbbrev === abbrev.toUpperCase() ||
+        scName === fullName.toLowerCase()
+      );
+    });
+    
+    if (!match) return null;
+    
+    // Check various possible field names for PM requirement
+    return match.pmRequired === true 
+      || match.pmFundRequired === true;
+  };
+
   const applyFilters = () => {
     let filtered = [...sites];
     
-    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(site => 
         site.siteName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -114,7 +168,6 @@ export default function SitesPage() {
       );
     }
     
-    // Status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(site => {
         const status = site.status?.toLowerCase() || 'draft';
@@ -124,7 +177,6 @@ export default function SitesPage() {
     
     setFilteredSites(filtered);
     
-    // Group sites by siteName (Project Name)
     const grouped = {};
     filtered.forEach(site => {
       const groupName = site.siteName || 'Ungrouped';
@@ -134,10 +186,8 @@ export default function SitesPage() {
       grouped[groupName].push(site);
     });
     
-    // Sort sites within each group by projectNumber or updatedAt
     Object.keys(grouped).forEach(groupName => {
       grouped[groupName].sort((a, b) => {
-        // Sort by project number if available, otherwise by updated date
         if (a.projectNumber && b.projectNumber) {
           return a.projectNumber.localeCompare(b.projectNumber);
         }
@@ -169,7 +219,6 @@ export default function SitesPage() {
         updatedAt: new Date()
       });
       
-      // Update local state
       setSites(prev => prev.map(s => 
         s.id === siteId ? { ...s, status: newStatus, updatedAt: { seconds: Date.now() / 1000 } } : s
       ));
@@ -194,15 +243,12 @@ export default function SitesPage() {
     try {
       setDeleting(siteId);
       
-      // Delete all components first
       const componentsSnapshot = await getDocs(collection(db, `sites/${siteId}/components`));
       const deletePromises = componentsSnapshot.docs.map(doc => deleteDoc(doc.ref));
       await Promise.all(deletePromises);
       
-      // Delete the site
       await deleteDoc(doc(db, 'sites', siteId));
       
-      // Remove from local state
       setSites(prev => prev.filter(s => s.id !== siteId));
       
       alert('Site deleted successfully');
@@ -233,6 +279,32 @@ export default function SitesPage() {
     if (!timestamp) return 'N/A';
     const date = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
     return date.toLocaleDateString();
+  };
+
+  const renderPMBadge = (siteState) => {
+    const pmRequired = isPMRequired(siteState);
+    
+    if (pmRequired === null) {
+      return (
+        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">
+          —
+        </span>
+      );
+    }
+    
+    if (pmRequired) {
+      return (
+        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+          ✓ Active
+        </span>
+      );
+    }
+    
+    return (
+      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+        Not Required
+      </span>
+    );
   };
 
   if (loading) {
@@ -361,7 +433,6 @@ export default function SitesPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {/* Show location if all sites have the same location */}
                       {groupSites[0]?.city && groupSites[0]?.state && (
                         <span className="text-sm text-gray-500 hidden sm:inline">
                           📍 {groupSites[0].city}, {groupSites[0].state}
@@ -372,23 +443,29 @@ export default function SitesPage() {
                   
                   {/* Group Content - Study List */}
                   {isExpanded && (
-                    <div className="border-t border-gray-200">
+                    <div className="border-t border-gray-200 overflow-x-auto">
                       <table className="w-full">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Project Number
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Study Type
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              State
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              PM
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Status
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Last Updated
                             </th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Actions
                             </th>
                           </tr>
@@ -396,23 +473,34 @@ export default function SitesPage() {
                         <tbody className="divide-y divide-gray-200">
                           {groupSites.map(site => {
                             const statusInfo = getStatusInfo(site.status);
+                            const siteState = site.companyState || site.state || '';
                             return (
                               <tr 
                                 key={site.id} 
                                 className="hover:bg-gray-50 cursor-pointer transition-colors"
                                 onClick={() => router.push(`/sites/${site.id}`)}
                               >
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center">
-                                    <span className="font-medium text-blue-600 hover:text-blue-800">
-                                      {site.projectNumber || 'No Project #'}
-                                    </span>
-                                  </div>
+                                <td className="px-4 py-4">
+                                  <span className="font-medium text-blue-600 hover:text-blue-800">
+                                    {site.projectNumber || 'No Project #'}
+                                  </span>
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-700">
+                                <td className="px-4 py-4 text-sm text-gray-700">
                                   {getStudyTypeLabel(site.studyType)}
                                 </td>
-                                <td className="px-6 py-4">
+                                <td className="px-4 py-4">
+                                  {siteState ? (
+                                    <span className="text-sm font-medium text-gray-700">
+                                      {getStateAbbreviation(siteState)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-sm text-gray-400">—</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-4">
+                                  {renderPMBadge(siteState)}
+                                </td>
+                                <td className="px-4 py-4">
                                   <select
                                     value={site.status || 'draft'}
                                     onChange={(e) => handleStatusChange(site.id, e.target.value, e)}
@@ -427,10 +515,10 @@ export default function SitesPage() {
                                     <option value="sent">📤 Sent to Client</option>
                                   </select>
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-500">
+                                <td className="px-4 py-4 text-sm text-gray-500">
                                   {formatDate(site.updatedAt)}
                                 </td>
-                                <td className="px-6 py-4 text-right">
+                                <td className="px-4 py-4 text-right">
                                   <div className="flex items-center justify-end gap-2">
                                     <Link
                                       href={`/sites/${site.id}/calculate`}
@@ -478,6 +566,12 @@ export default function SitesPage() {
                 {label}
               </span>
             ))}
+            <span className="px-3 py-1 text-xs font-medium rounded-full flex items-center gap-1 bg-green-100 text-green-700">
+              ✓ PM Active
+            </span>
+            <span className="px-3 py-1 text-xs font-medium rounded-full flex items-center gap-1 bg-gray-100 text-gray-500">
+              PM Not Required
+            </span>
           </div>
         </div>
 
