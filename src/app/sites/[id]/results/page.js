@@ -1,5 +1,6 @@
 // src/app/sites/[id]/results/page.js
-// DUAL FUND RESULTS PAGE - Reserve and PM with Current vs Full Funding
+// CONDITIONAL DUAL FUND RESULTS PAGE - Shows PM only when required by state
+// v9: Reads pmRequired flag from saved calculation results
 
 'use client';
 
@@ -34,7 +35,8 @@ export default function ResultsPage() {
         setSite(siteData);
         setResults(projectionsData);
         
-        console.log('📊 Loaded dual fund results:', projectionsData);
+        console.log('📊 Loaded results:', projectionsData);
+        console.log('PM Required:', projectionsData?.pmRequired !== false);
       } catch (error) {
         console.error('Error:', error);
       } finally {
@@ -55,7 +57,7 @@ export default function ResultsPage() {
 
   if (!results) {
     return (
-    <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50">
         <main className="max-w-4xl mx-auto px-4 py-8">
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">No Results Yet</h2>
@@ -72,6 +74,9 @@ export default function ResultsPage() {
     );
   }
 
+  // Read PM requirement from saved results (backwards compatible - default true)
+  const pmRequired = results.pmRequired !== false;
+  
   const reserveFund = results.reserveFund || {};
   const pmFund = results.pmFund || {};
   const reserveCashFlow = results.reserveCashFlow || [];
@@ -107,18 +112,21 @@ export default function ResultsPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Reserve Study Results</h1>
             <p className="text-gray-700 mt-2">{site?.siteName}</p>
-            <p className="text-sm text-purple-600 mt-1">🔵 NJ Dual Fund System</p>
+            <p className="text-sm mt-1" style={{ color: pmRequired ? '#9333ea' : '#2563eb' }}>
+              {pmRequired ? '🔵 Dual Fund System (Reserve + PM)' : '🔵 Reserve Fund Only'}
+              <span className="text-gray-500 ml-2">• State: {site?.companyState || 'Not set'}</span>
+            </p>
           </div>
           <Link
             href={`/sites/${siteId}/calculate`}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+            className={`px-6 py-3 text-white rounded-lg font-medium ${pmRequired ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}
           >
             Recalculate
           </Link>
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className={`grid grid-cols-1 ${pmRequired ? 'lg:grid-cols-2' : 'lg:grid-cols-1 max-w-2xl'} gap-6 mb-8`}>
           {/* Reserve Fund Summary */}
           <div className="bg-blue-50 border-2 border-blue-500 rounded-lg p-6">
             <h2 className="text-xl font-bold text-blue-900 mb-4">💰 Reserve Fund</h2>
@@ -150,36 +158,38 @@ export default function ResultsPage() {
             </div>
           </div>
 
-          {/* PM Fund Summary */}
-          <div className="bg-purple-50 border-2 border-purple-500 rounded-lg p-6">
-            <h2 className="text-xl font-bold text-purple-900 mb-4">🟣 PM Fund</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white rounded p-3">
-                <div className="text-xs text-gray-600">Percent Funded</div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {pmFund.percentFunded?.toFixed(2)}%
+          {/* PM Fund Summary - Only show when PM is required */}
+          {pmRequired && (
+            <div className="bg-purple-50 border-2 border-purple-500 rounded-lg p-6">
+              <h2 className="text-xl font-bold text-purple-900 mb-4">🟣 PM Fund</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white rounded p-3">
+                  <div className="text-xs text-gray-600">Percent Funded</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {pmFund.percentFunded?.toFixed(2)}%
+                  </div>
                 </div>
-              </div>
-              <div className="bg-white rounded p-3">
-                <div className="text-xs text-gray-600">Current Balance</div>
-                <div className="text-xl font-bold text-gray-900">
-                  ${Math.round(pmFund.currentBalance || 0).toLocaleString()}
+                <div className="bg-white rounded p-3">
+                  <div className="text-xs text-gray-600">Current Balance</div>
+                  <div className="text-xl font-bold text-gray-900">
+                    ${Math.round(pmFund.currentBalance || 0).toLocaleString()}
+                  </div>
                 </div>
-              </div>
-              <div className="bg-white rounded p-3">
-                <div className="text-xs text-gray-600">Current Contribution</div>
-                <div className="text-xl font-bold text-gray-900">
-                  ${Math.round(pmFund.currentContribution || 0).toLocaleString()}
+                <div className="bg-white rounded p-3">
+                  <div className="text-xs text-gray-600">Current Contribution</div>
+                  <div className="text-xl font-bold text-gray-900">
+                    ${Math.round(pmFund.currentContribution || 0).toLocaleString()}
+                  </div>
                 </div>
-              </div>
-              <div className="bg-white rounded p-3">
-                <div className="text-xs text-gray-600">Recommended</div>
-                <div className="text-xl font-bold text-gray-900">
-                  ${Math.round(pmFund.recommendedContribution || 0).toLocaleString()}
+                <div className="bg-white rounded p-3">
+                  <div className="text-xs text-gray-600">Recommended</div>
+                  <div className="text-xl font-bold text-gray-900">
+                    ${Math.round(pmFund.recommendedContribution || 0).toLocaleString()}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -216,16 +226,19 @@ export default function ResultsPage() {
               >
                 💰 Reserve Fund Cash Flow
               </button>
-              <button
-                onClick={() => setActiveTab('pm-cashflow')}
-                className={`px-6 py-3 font-medium whitespace-nowrap ${
-                  activeTab === 'pm-cashflow'
-                    ? 'text-purple-600 border-b-2 border-purple-600'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                🟣 PM Fund Cash Flow
-              </button>
+              {/* PM Cash Flow tab - only show when PM required */}
+              {pmRequired && (
+                <button
+                  onClick={() => setActiveTab('pm-cashflow')}
+                  className={`px-6 py-3 font-medium whitespace-nowrap ${
+                    activeTab === 'pm-cashflow'
+                      ? 'text-purple-600 border-b-2 border-purple-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  🟣 PM Fund Cash Flow
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab('expenditure-schedule')}
                 className={`px-6 py-3 font-medium whitespace-nowrap ${
@@ -253,7 +266,7 @@ export default function ResultsPage() {
           <div className="p-6">
             {activeTab === 'threshold' && (
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">📉 Threshold Projection - NJ Compliance Analysis</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">📉 Threshold Projection - Compliance Analysis</h3>
                 <p className="text-sm text-gray-600 mb-6">
                   Shows 30-year projections under three funding scenarios: 10% Threshold, 5% Threshold, and Baseline (0%)
                 </p>
@@ -262,11 +275,10 @@ export default function ResultsPage() {
                   <div className="flex items-start gap-3">
                     <div className="text-3xl">⚠️</div>
                     <div>
-                      <h4 className="font-bold text-orange-900 mb-1">NJ Threshold Requirement</h4>
+                      <h4 className="font-bold text-orange-900 mb-1">Threshold Requirement</h4>
                       <p className="text-sm text-orange-800">
-                        New Jersey law requires reserve studies to demonstrate funding adequacy at different threshold levels.
                         This analysis shows projected balances under reduced contribution scenarios to ensure the association
-                        maintains minimum safe funding levels.
+                        maintains minimum safe funding levels over the 30-year projection period.
                       </p>
                     </div>
                   </div>
@@ -367,7 +379,7 @@ export default function ResultsPage() {
                     </div>
                   </div>
 
-                  {/* Full Funding (NEW!) */}
+                  {/* Full Funding */}
                   <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4">
                     <h4 className="font-bold text-green-900 mb-2">Full Funding</h4>
                     <p className="text-xs text-green-800 mb-3">
@@ -440,51 +452,22 @@ export default function ResultsPage() {
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {reserveCashFlow.map((row, index) => {
-                          // Use pre-calculated threshold projections if available, otherwise fallback to calculation
-                          const proj10 = thresholds.projection10 && thresholds.projection10[index] 
-                            ? thresholds.projection10[index]
-                            : { expenditures: row.expenditures, endingBalance: 0 };
-                          
-                          const proj5 = thresholds.projection5 && thresholds.projection5[index]
-                            ? thresholds.projection5[index]
-                            : { expenditures: row.expenditures, endingBalance: 0 };
-                          
-                          const projBase = thresholds.projectionBaseline && thresholds.projectionBaseline[index]
-                            ? thresholds.projectionBaseline[index]
-                            : { expenditures: row.expenditures, endingBalance: 0 };
-                          
-                          // Full Funding uses the actual reserve cash flow
+                          const proj10 = thresholds.projection10?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
+                          const proj5 = thresholds.projection5?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
+                          const projBase = thresholds.projectionBaseline?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
                           const projFull = row;
                           
                           return (
                             <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-3 py-2 text-center font-bold text-gray-900 border-r border-gray-300">
-                                {row.year}
-                              </td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-red-50 border-l border-gray-300">
-                                ${Math.round(proj10.expenditures).toLocaleString()}
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-red-50">
-                                ${Math.round(proj10.endingBalance).toLocaleString()}
-                              </td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-yellow-50 border-l border-gray-300">
-                                ${Math.round(proj5.expenditures).toLocaleString()}
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-yellow-50">
-                                ${Math.round(proj5.endingBalance).toLocaleString()}
-                              </td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-gray-50 border-l border-gray-300">
-                                ${Math.round(projBase.expenditures).toLocaleString()}
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-gray-50">
-                                ${Math.round(projBase.endingBalance).toLocaleString()}
-                              </td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-green-50 border-l border-gray-300">
-                                ${Math.round(projFull.expenditures).toLocaleString()}
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-green-50">
-                                ${Math.round(projFull.endingBalance).toLocaleString()}
-                              </td>
+                              <td className="px-3 py-2 text-center font-bold text-gray-900 border-r border-gray-300">{row.year}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 bg-red-50 border-l border-gray-300">${Math.round(proj10.expenditures).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-red-50">${Math.round(proj10.endingBalance).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 bg-yellow-50 border-l border-gray-300">${Math.round(proj5.expenditures).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-yellow-50">${Math.round(proj5.endingBalance).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 bg-gray-50 border-l border-gray-300">${Math.round(projBase.expenditures).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-gray-50">${Math.round(projBase.endingBalance).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 bg-green-50 border-l border-gray-300">${Math.round(projFull.expenditures).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-green-50">${Math.round(projFull.endingBalance).toLocaleString()}</td>
                             </tr>
                           );
                         })}
@@ -496,7 +479,7 @@ export default function ResultsPage() {
                 {/* Compliance Status */}
                 <div className={`mt-6 ${thresholds.compliant10 && thresholds.compliant5 ? 'bg-green-50 border-green-300' : 'bg-orange-50 border-orange-300'} border rounded-lg p-4`}>
                   <h4 className={`font-bold mb-2 ${thresholds.compliant10 && thresholds.compliant5 ? 'text-green-900' : 'text-orange-900'}`}>
-                    {thresholds.compliant10 && thresholds.compliant5 ? '✓ NJ Compliance Status' : '⚠ NJ Compliance Status'}
+                    {thresholds.compliant10 && thresholds.compliant5 ? '✓ Compliance Status' : '⚠ Compliance Status'}
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
@@ -580,7 +563,8 @@ export default function ResultsPage() {
               </div>
             )}
 
-            {activeTab === 'pm-cashflow' && (
+            {/* PM Cash Flow - only rendered when PM is required */}
+            {activeTab === 'pm-cashflow' && pmRequired && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-4">🟣 PM Fund - 30-Year Cash Flow Projection</h3>
                 <div className="overflow-x-auto">
@@ -661,19 +645,22 @@ export default function ResultsPage() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {['Sitework', 'Building', 'Interior', 'Exterior', 'Electrical', 'Special', 'Mechanical'].map((category, idx) => {
-                          const categoryComponents = schedule.filter(s => !s.isPM && s.category === category);
+                        {['Sitework', 'Building', 'Interior', 'Exterior', 'Electrical', 'Special', 'Mechanical'].map((category) => {
+                          // When PM not required, include all components in reserve
+                          const categoryComponents = schedule.filter(s => {
+                            if (pmRequired) return !s.isPM && s.category === category;
+                            return s.category === category; // all components are reserve
+                          });
                           const totalCost = categoryComponents.reduce((sum, c) => sum + (c.cost || 0), 0);
                           
-                          if (categoryComponents.length === 0) {
-                            return null; // Don't show empty categories
-                          }
+                          if (categoryComponents.length === 0) return null;
                           
-                          // Count how many categories have components
                           const categoriesWithComponents = ['Sitework', 'Building', 'Interior', 'Exterior', 'Electrical', 'Special', 'Mechanical']
-                            .filter(cat => schedule.filter(s => !s.isPM && s.category === cat).length > 0);
+                            .filter(cat => {
+                              if (pmRequired) return schedule.filter(s => !s.isPM && s.category === cat).length > 0;
+                              return schedule.filter(s => s.category === cat).length > 0;
+                            });
                           
-                          // If only ONE category has components, show the TOTAL values
                           if (categoriesWithComponents.length === 1) {
                             return (
                               <tr key={category} className="border-b border-gray-300">
@@ -700,7 +687,6 @@ export default function ResultsPage() {
                             );
                           }
                           
-                          // Multiple categories - use pro-rata distribution
                           const categoryShare = totalCost / (reserveFund.totalReplacementCost || 1);
                           const categoryFunds = (reserveFund.currentBalance || 0) * categoryShare;
                           const categoryNeeded = (reserveFund.fullyFundedBalance || 0) * categoryShare;
@@ -758,69 +744,71 @@ export default function ResultsPage() {
                   </div>
                 </div>
 
-                {/* PM Fund Summary */}
-                <div>
-                  <h4 className="text-md font-bold text-purple-900 mb-3">🟣 PM Fund Component Summary</h4>
-                  <div className="overflow-x-auto border border-gray-300 rounded-lg">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-purple-900">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Items</th>
-                          <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">Percent<br/>Funded</th>
-                          <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Replacement Cost<br/>Totals</th>
-                          <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Current Reserve<br/>Funds</th>
-                          <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Funds<br/>Needed</th>
-                          <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Annual<br/>Funding</th>
-                          <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Full Funded<br/>Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        <tr className="bg-white">
-                          <td className="px-4 py-2 text-sm text-gray-900 font-medium">Preventive Maintenance</td>
-                          <td className="px-4 py-2 text-center text-sm text-gray-900">
-                            {pmFund.componentCount > 0 ? `${pmFund.percentFunded?.toFixed(0)}%` : '#DIV/0!'}
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-900">
-                            ${Math.round(pmFund.totalReplacementCost || 0).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-900">
-                            ${Math.round(pmFund.currentBalance || 0).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-900">
-                            ${Math.round(pmFund.fullyFundedBalance || 0).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-900">
-                            ${Math.round(pmFund.recommendedContribution || 0).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-900">
-                            ${Math.round(pmFund.fullyFundedBalance || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-purple-100 font-bold border-t-2 border-purple-900">
-                          <td className="px-4 py-3 text-sm text-purple-900">Totals</td>
-                          <td className="px-4 py-3 text-center text-sm text-purple-900">
-                            {pmFund.componentCount > 0 ? `${pmFund.percentFunded?.toFixed(0)}%` : '#DIV/0!'}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-purple-900">
-                            ${Math.round(pmFund.totalReplacementCost || 0).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-purple-900">
-                            ${Math.round(pmFund.currentBalance || 0).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-purple-900">
-                            ${Math.round(pmFund.fullyFundedBalance || 0).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-purple-900">
-                            ${Math.round(pmFund.recommendedContribution || 0).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-purple-900">
-                            ${Math.round(pmFund.fullyFundedBalance || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                {/* PM Fund Summary - Only show when PM required */}
+                {pmRequired && (
+                  <div>
+                    <h4 className="text-md font-bold text-purple-900 mb-3">🟣 PM Fund Component Summary</h4>
+                    <div className="overflow-x-auto border border-gray-300 rounded-lg">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-purple-900">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Items</th>
+                            <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">Percent<br/>Funded</th>
+                            <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Replacement Cost<br/>Totals</th>
+                            <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Current Reserve<br/>Funds</th>
+                            <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Funds<br/>Needed</th>
+                            <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Annual<br/>Funding</th>
+                            <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Full Funded<br/>Balance</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          <tr className="bg-white">
+                            <td className="px-4 py-2 text-sm text-gray-900 font-medium">Preventive Maintenance</td>
+                            <td className="px-4 py-2 text-center text-sm text-gray-900">
+                              {pmFund.componentCount > 0 ? `${pmFund.percentFunded?.toFixed(0)}%` : '#DIV/0!'}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">
+                              ${Math.round(pmFund.totalReplacementCost || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">
+                              ${Math.round(pmFund.currentBalance || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">
+                              ${Math.round(pmFund.fullyFundedBalance || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">
+                              ${Math.round(pmFund.recommendedContribution || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">
+                              ${Math.round(pmFund.fullyFundedBalance || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr className="bg-purple-100 font-bold border-t-2 border-purple-900">
+                            <td className="px-4 py-3 text-sm text-purple-900">Totals</td>
+                            <td className="px-4 py-3 text-center text-sm text-purple-900">
+                              {pmFund.componentCount > 0 ? `${pmFund.percentFunded?.toFixed(0)}%` : '#DIV/0!'}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-purple-900">
+                              ${Math.round(pmFund.totalReplacementCost || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-purple-900">
+                              ${Math.round(pmFund.currentBalance || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-purple-900">
+                              ${Math.round(pmFund.fullyFundedBalance || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-purple-900">
+                              ${Math.round(pmFund.recommendedContribution || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-purple-900">
+                              ${Math.round(pmFund.fullyFundedBalance || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -852,9 +840,9 @@ export default function ResultsPage() {
                         </td>
                       </tr>
                       
-                      {/* Reserve Fund Components */}
+                      {/* Reserve Fund Components (or all components when PM not required) */}
                       {schedule
-                        .filter(item => !item.isPM && item.category === 'Building')
+                        .filter(item => pmRequired ? (!item.isPM && item.category === 'Building') : item.category === 'Building')
                         .sort((a, b) => a.description.localeCompare(b.description))
                         .map((item, idx) => (
                           <tr key={`reserve-${idx}`} className={idx % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
@@ -880,8 +868,8 @@ export default function ResultsPage() {
                           </tr>
                         ))}
                       
-                      {/* Building Exterior Category Header (PM Fund) */}
-                      {schedule.some(item => item.isPM) && (
+                      {/* PM Fund Components - Only show when PM required and has PM items */}
+                      {pmRequired && schedule.some(item => item.isPM) && (
                         <>
                           <tr className="bg-purple-100 sticky" style={{top: '48px', zIndex: 15}}>
                             <td colSpan="31" className="px-3 py-2 text-sm font-bold text-purple-900 uppercase sticky left-0 z-20 bg-purple-100 border-r-2 border-gray-300">
@@ -889,7 +877,6 @@ export default function ResultsPage() {
                             </td>
                           </tr>
                           
-                          {/* PM Fund Components */}
                           {schedule
                             .filter(item => item.isPM)
                             .sort((a, b) => a.description.localeCompare(b.description))
@@ -941,34 +928,38 @@ export default function ResultsPage() {
                 </div>
                 
                 {/* Summary Cards */}
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className={`mt-6 grid grid-cols-1 ${pmRequired ? 'md:grid-cols-3' : 'md:grid-cols-1 max-w-md'} gap-4`}>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="text-sm text-blue-700 font-medium">Reserve Fund Total</div>
                     <div className="text-2xl font-bold text-blue-900">
-                      ${Math.round(schedule.filter(s => !s.isPM).reduce((sum, s) => sum + s.cost, 0)).toLocaleString()}
+                      ${Math.round(schedule.filter(s => pmRequired ? !s.isPM : true).reduce((sum, s) => sum + s.cost, 0)).toLocaleString()}
                     </div>
                     <div className="text-xs text-blue-600 mt-1">
-                      {schedule.filter(s => !s.isPM).length} components over 30 years
+                      {schedule.filter(s => pmRequired ? !s.isPM : true).length} components over 30 years
                     </div>
                   </div>
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <div className="text-sm text-purple-700 font-medium">PM Fund Total</div>
-                    <div className="text-2xl font-bold text-purple-900">
-                      ${Math.round(schedule.filter(s => s.isPM).reduce((sum, s) => sum + s.cost, 0)).toLocaleString()}
+                  {pmRequired && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <div className="text-sm text-purple-700 font-medium">PM Fund Total</div>
+                      <div className="text-2xl font-bold text-purple-900">
+                        ${Math.round(schedule.filter(s => s.isPM).reduce((sum, s) => sum + s.cost, 0)).toLocaleString()}
+                      </div>
+                      <div className="text-xs text-purple-600 mt-1">
+                        {schedule.filter(s => s.isPM).length} components over 30 years
+                      </div>
                     </div>
-                    <div className="text-xs text-purple-600 mt-1">
-                      {schedule.filter(s => s.isPM).length} components over 30 years
+                  )}
+                  {pmRequired && (
+                    <div className="bg-gray-100 border border-gray-300 rounded-lg p-4">
+                      <div className="text-sm text-gray-700 font-medium">Combined Total</div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        ${Math.round(schedule.reduce((sum, s) => sum + s.cost, 0)).toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1">
+                        All {schedule.length} components
+                      </div>
                     </div>
-                  </div>
-                  <div className="bg-gray-100 border border-gray-300 rounded-lg p-4">
-                    <div className="text-sm text-gray-700 font-medium">Combined Total</div>
-                    <div className="text-2xl font-bold text-gray-900">
-                      ${Math.round(schedule.reduce((sum, s) => sum + s.cost, 0)).toLocaleString()}
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      All {schedule.length} components
-                    </div>
-                  </div>
+                  )}
                 </div>
                 
                 {/* Legend */}
@@ -979,10 +970,12 @@ export default function ResultsPage() {
                       <div className="w-8 h-4 bg-blue-200 border border-blue-300"></div>
                       <span className="text-gray-700">Reserve Fund Expenditure</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-4 bg-purple-200 border border-purple-300"></div>
-                      <span className="text-gray-700">PM Fund Expenditure</span>
-                    </div>
+                    {pmRequired && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-4 bg-purple-200 border border-purple-300"></div>
+                        <span className="text-gray-700">PM Fund Expenditure</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -999,7 +992,9 @@ export default function ResultsPage() {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Component</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Cost</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Category</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Fund</th>
+                        {pmRequired && (
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Fund</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1009,13 +1004,15 @@ export default function ResultsPage() {
                           <td className="px-4 py-3 text-sm text-gray-900">{item.description}</td>
                           <td className="px-4 py-3 text-sm text-gray-900 text-right">${Math.round(item.cost).toLocaleString()}</td>
                           <td className="px-4 py-3 text-sm text-gray-700">{item.category}</td>
-                          <td className="px-4 py-3 text-center">
-                            {item.isPM ? (
-                              <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded font-medium">PM</span>
-                            ) : (
-                              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded font-medium">Reserve</span>
-                            )}
-                          </td>
+                          {pmRequired && (
+                            <td className="px-4 py-3 text-center">
+                              {item.isPM ? (
+                                <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded font-medium">PM</span>
+                              ) : (
+                                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded font-medium">Reserve</span>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -1029,10 +1026,13 @@ export default function ResultsPage() {
         {/* Success Message */}
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <p className="text-green-900 font-medium">
-            ✅ NJ Dual Fund Calculations Complete!
+            ✅ {pmRequired ? 'Dual Fund Calculations Complete!' : 'Reserve Fund Calculations Complete!'}
           </p>
           <p className="text-green-800 text-sm mt-1">
-            Reserve Fund and PM Fund calculated separately with 30-year projections showing Current vs Full Funding scenarios.
+            {pmRequired 
+              ? 'Reserve Fund and PM Fund calculated separately with 30-year projections showing Current vs Full Funding scenarios.'
+              : 'Reserve Fund calculated with 30-year projections showing Current vs Full Funding scenarios.'
+            }
           </p>
         </div>
       </main>
