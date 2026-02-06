@@ -1,9 +1,14 @@
-// Report Generation Engine - Professional Version v8
-// FIXES from v7:
-// 1. PM Cash Flow tables now use GREEN headers (not blue)
-// 2. PM Expenditure tables now use GREEN headers
-// 3. PM Component Summary tables now use GREEN headers
-// 4. Added isPM parameter to table generation functions
+// Report Generation Engine - Professional Version v9
+// NEW in v9:
+// 1. Conditional PM sections - strips PM blocks when state doesn't require PM
+// 2. Conditional Update sections - strips UPDATE blocks for Full studies
+// 3. Conditional NJ compliance text - strips NJ blocks for non-NJ states
+// 4. Reads organization stateCompliance settings to determine PM requirement
+// 5. When PM not required, all components treated as Reserve Fund
+// FIXES from v8:
+// 1. PM Cash Flow tables use GREEN headers (not blue)
+// 2. PM Expenditure tables use GREEN headers
+// 3. PM Component Summary tables use GREEN headers
 
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -34,6 +39,78 @@ export function formatDate(date) {
     year: 'numeric', month: 'long', day: 'numeric'
   });
 }
+
+// =============================================================================
+// CONDITIONAL BLOCK STRIPPING (NEW in v9)
+// =============================================================================
+
+/**
+ * Determine PM requirement from organization's state compliance settings
+ */
+export function isPMRequiredForState(stateCompliance = [], siteState = '') {
+  if (!siteState || !stateCompliance.length) return true; // Default to true for safety
+  
+  const stateConfig = stateCompliance.find(
+    s => s.abbreviation === siteState || s.name === siteState
+  );
+  
+  if (!stateConfig) return true; // State not configured = default to PM required
+  
+  return stateConfig.pmRequired === true || stateConfig.pmFundRequired === true;
+}
+
+/**
+ * Strip conditional blocks from template HTML based on site configuration
+ * 
+ * Marker types:
+ *   <!--PM_START-->...<!--PM_END-->       = PM-only content (removed when PM not required)
+ *   <!--NOPM_START-->...<!--NOPM_END-->   = Reserve-only content (removed when PM IS required)
+ *   <!--UPDATE_START-->...<!--UPDATE_END-->= Update study content (removed for Full studies)
+ *   <!--NJ_START-->...<!--NJ_END-->       = NJ-specific compliance text (removed for non-NJ)
+ */
+export function stripConditionalBlocks(html, options = {}) {
+  const { pmRequired = true, isUpdate = false, stateAbbreviation = '' } = options;
+  
+  let processed = html;
+  
+  // PM CONDITIONAL BLOCKS
+  if (pmRequired) {
+    // Keep PM blocks, remove NOPM blocks
+    processed = processed.replace(/<!--PM_START-->/g, '');
+    processed = processed.replace(/<!--PM_END-->/g, '');
+    processed = processed.replace(/<!--NOPM_START-->[\s\S]*?<!--NOPM_END-->/g, '');
+  } else {
+    // Remove PM blocks, keep NOPM blocks
+    processed = processed.replace(/<!--PM_START-->[\s\S]*?<!--PM_END-->/g, '');
+    processed = processed.replace(/<!--NOPM_START-->/g, '');
+    processed = processed.replace(/<!--NOPM_END-->/g, '');
+  }
+  
+  // UPDATE STUDY CONDITIONAL BLOCKS
+  if (isUpdate) {
+    processed = processed.replace(/<!--UPDATE_START-->/g, '');
+    processed = processed.replace(/<!--UPDATE_END-->/g, '');
+  } else {
+    processed = processed.replace(/<!--UPDATE_START-->[\s\S]*?<!--UPDATE_END-->/g, '');
+  }
+  
+  // STATE-SPECIFIC CONDITIONAL BLOCKS
+  if (stateAbbreviation === 'NJ') {
+    processed = processed.replace(/<!--NJ_START-->/g, '');
+    processed = processed.replace(/<!--NJ_END-->/g, '');
+  } else {
+    processed = processed.replace(/<!--NJ_START-->[\s\S]*?<!--NJ_END-->/g, '');
+  }
+  
+  // Clean up double blank lines left from block removal
+  processed = processed.replace(/\n\s*\n\s*\n/g, '\n\n');
+  
+  return processed;
+}
+
+// =============================================================================
+// DATA LOADING
+// =============================================================================
 
 export async function loadReportData(siteId, organizationId) {
   try {
@@ -69,7 +146,7 @@ export async function loadReportData(siteId, organizationId) {
       }
     }
 
-    // FIXED: Load results from projections subcollection
+    // Load results from projections subcollection
     var results = {};
     try {
       var projectionsDoc = await getDoc(doc(db, 'sites', siteId, 'projections', 'latest'));
@@ -91,17 +168,14 @@ export async function loadReportData(siteId, organizationId) {
 }
 
 // Generate Study Type content for cover page and Level of Service
-// Supports: "Level 1 Full" (default) and "Level 2 Update"
 function getStudyTypeContent(studyType) {
-  // Default to Level 1 Full if not specified
   var type = (studyType || 'Level 1 Full').toLowerCase();
   
   if (type.includes('level 2') || type.includes('update')) {
-    // LEVEL 2: RESERVE STUDY UPDATE
     return {
       studyTypeName: 'Reserve Study Update',
-      coverTitle: 'RESERVE STUDY UPDATE', // Changed from "RESERVE STUDY"
-      coverSubtitle: '', // No additional subtitle needed - title says UPDATE
+      coverTitle: 'RESERVE STUDY UPDATE',
+      coverSubtitle: '',
       levelOfServiceText: '<p>This report includes a <strong>Level 2: Reserve Study Update</strong>, With Site Visit/On-Site Review. A reserve study update consists of the following five key tasks:</p>' +
         '<ul>' +
         '<li><strong>Component Inventory</strong></li>' +
@@ -110,16 +184,14 @@ function getStudyTypeContent(studyType) {
         '<li><strong>Fund Status Evaluation</strong></li>' +
         '<li><strong>Development of a Funding Plan</strong></li>' +
         '</ul>',
-      // Update-specific disclosure text
       updateDisclosure: '<p>Update reports are reliant on the information provided in the previous report.</p>',
       isUpdate: true
     };
   } else {
-    // LEVEL 1: FULL RESERVE STUDY (default)
     return {
       studyTypeName: 'Full Reserve Study',
-      coverTitle: 'RESERVE STUDY', // Standard title
-      coverSubtitle: '', // No subtitle for full study
+      coverTitle: 'RESERVE STUDY',
+      coverSubtitle: '',
       levelOfServiceText: '<p>This report includes a <strong>Level 1: Full Reserve Study</strong>, With Site Visit/On-Site Review. A full reserve study consists of the following five key tasks:</p>' +
         '<ul>' +
         '<li><strong>Component Inventory</strong></li>' +
@@ -128,40 +200,36 @@ function getStudyTypeContent(studyType) {
         '<li><strong>Fund Status Evaluation</strong></li>' +
         '<li><strong>Development of a Funding Plan</strong></li>' +
         '</ul>',
-      updateDisclosure: '', // No update disclosure for full studies
+      updateDisclosure: '',
       isUpdate: false
     };
   }
 }
 
 // =============================================================================
-// COLOR CONSTANTS - Centralized color definitions for consistency
+// COLOR CONSTANTS
 // =============================================================================
 const COLORS = {
-  // Reserve Fund colors (Blue)
   reserve: {
-    headerBg: '#1e3a5f',      // Dark navy blue
-    headerLight: '#3b82f6',    // Lighter blue for contrast columns
+    headerBg: '#1e3a5f',
+    headerLight: '#3b82f6',
     text: 'white'
   },
-  // PM Fund colors (Green)
   pm: {
-    headerBg: '#166534',       // Dark green
-    headerLight: '#22c55e',    // Lighter green for contrast columns
+    headerBg: '#166534',
+    headerLight: '#22c55e',
     text: 'white'
   }
 };
 
 // =============================================================================
-// Component Summary Table with full column names and PM/Note indicators
-// UPDATED: Added isPM parameter for green headers
+// Component Summary Table
 // =============================================================================
 function generateComponentSummaryTable(components, notes, showPMColumn, isPM = false) {
   if (!components || components.length === 0) {
     return '<p><em>No components found</em></p>';
   }
 
-  // Use green for PM tables, blue for reserve tables
   var headerBg = isPM ? COLORS.pm.headerBg : COLORS.reserve.headerBg;
 
   var sorted = components.slice().sort(function(a, b) {
@@ -191,7 +259,6 @@ function generateComponentSummaryTable(components, notes, showPMColumn, isPM = f
     var cost = parseFloat(comp.totalCost) || 0;
     totalCost += cost;
     
-    // Find note number if assigned
     var noteNum = '';
     if (comp.assignedNoteId) {
       var note = notes.find(function(n) { return n.id === comp.assignedNoteId; });
@@ -217,7 +284,6 @@ function generateComponentSummaryTable(components, notes, showPMColumn, isPM = f
     html += '</tr>';
   });
 
-  // Total row
   html += '<tr class="total-row">';
   var colSpanBefore = 5;
   html += '<td colspan="' + colSpanBefore + '" class="text-right"><strong>TOTAL:</strong></td>';
@@ -230,21 +296,27 @@ function generateComponentSummaryTable(components, notes, showPMColumn, isPM = f
   return html;
 }
 
-// Category table - returns empty string if no components (skip empty categories)
 function generateCategoryTable(components, category, notes) {
   var filtered = components.filter(function(c) { 
     return c.category === category && !c.isPreventiveMaintenance; 
   });
   if (filtered.length === 0) return '';
-  return generateComponentSummaryTable(filtered, notes, false, false); // Reserve = blue
+  return generateComponentSummaryTable(filtered, notes, false, false);
 }
 
-// Component Notes Table - sorted numerically by note ID, no duplicates
+// v9: Category table that includes ALL components (for non-PM states)
+function generateCategoryTableAll(components, category, notes) {
+  var filtered = components.filter(function(c) { 
+    return c.category === category; 
+  });
+  if (filtered.length === 0) return '';
+  return generateComponentSummaryTable(filtered, notes, false, false);
+}
+
 function generateComponentNotesTable(components, notes) {
   var withNotes = components.filter(function(c) { return c.assignedNoteId; });
   if (withNotes.length === 0) return '<p><em>No component notes assigned</em></p>';
 
-  // Build unique notes list sorted by componentId numerically
   var uniqueNotes = [];
   var seenIds = {};
   
@@ -261,7 +333,6 @@ function generateComponentNotesTable(components, notes) {
     }
   });
   
-  // Sort by note number numerically
   uniqueNotes.sort(function(a, b) { return a.noteId - b.noteId; });
 
   var html = '<table class="notes-table">';
@@ -284,14 +355,13 @@ function generateComponentNotesTable(components, notes) {
 }
 
 // =============================================================================
-// Cash Flow Table - UPDATED with isPM parameter for green headers
+// Cash Flow Table
 // =============================================================================
 function generateCashFlowTable(cashFlow, fundInfo, fundType) {
   if (!cashFlow || cashFlow.length === 0) {
     return '<p><em>No cash flow data available. Please run calculations first.</em></p>';
   }
 
-  // FIXED: Use green colors for PM tables, blue for reserve
   var isPM = fundType === 'pm';
   var headerBg = isPM ? COLORS.pm.headerBg : COLORS.reserve.headerBg;
   var currentBg = isPM ? COLORS.pm.headerLight : COLORS.reserve.headerLight;
@@ -317,14 +387,12 @@ function generateCashFlowTable(cashFlow, fundInfo, fundType) {
   html += '</tr>';
   html += '</thead><tbody>';
 
-  // Track cumulative for full funding calculation
   var cumulativeExpend = 0;
   
   cashFlow.forEach(function(row, index) {
     var bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
     var balanceClass = (row.endingBalance || 0) < 0 ? ' style="color:red;font-weight:bold;"' : '';
     
-    // Calculate full funding ending balance
     cumulativeExpend += (row.expenditures || 0);
     var fullFundingBalance = currentBalance + (recommendedContribution * (index + 1)) - cumulativeExpend;
     
@@ -339,7 +407,6 @@ function generateCashFlowTable(cashFlow, fundInfo, fundType) {
     html += '</tr>';
   });
 
-  // Totals row
   var totalContributions = cashFlow.reduce(function(sum, r) { return sum + (r.contributions || 0); }, 0);
   var totalExpend = cashFlow.reduce(function(sum, r) { return sum + (r.expenditures || 0); }, 0);
   
@@ -357,16 +424,16 @@ function generateCashFlowTable(cashFlow, fundInfo, fundType) {
   return html;
 }
 
-// Full Threshold Projection Table with all 4 scenarios - FIXED CARD HEIGHTS
+// =============================================================================
+// Threshold Projection Table
+// =============================================================================
 function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginningBalance) {
-  // Check if we have threshold data
   if (!thresholds || Object.keys(thresholds).length === 0) {
     return '<p><em>No threshold data available. Please run calculations first.</em></p>';
   }
 
   var startingBalance = beginningBalance || reserveFund.currentBalance || 0;
   
-  // Extract the 4 scenarios from thresholds
   var scenarios = {
     threshold10: {
       name: '10% Threshold',
@@ -402,17 +469,15 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
     }
   };
 
-  // Build summary cards section
   var html = '<div style="margin-bottom: 20px;">';
   html += '<p style="font-size: 9pt; color: #666; margin-bottom: 15px;">Shows 30-year projections under four funding scenarios: 10% Threshold, 5% Threshold, Baseline (0%), and Full Funding.</p>';
   
-  // NJ Compliance Notice
   html += '<div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 6px; padding: 10px; margin-bottom: 15px;">';
-  html += '<div style="font-weight: bold; color: #92400e;">⚠ NJ Threshold Requirement</div>';
-  html += '<p style="font-size: 9pt; margin: 5px 0 0 0; color: #78350f;">New Jersey law requires reserve studies to demonstrate funding adequacy at different threshold levels. This analysis shows projected balances under reduced contribution scenarios to ensure the association maintains minimum safe funding levels.</p>';
+  html += '<div style="font-weight: bold; color: #92400e;">⚠ Threshold Requirement</div>';
+  html += '<p style="font-size: 9pt; margin: 5px 0 0 0; color: #78350f;">This analysis shows projected balances under reduced contribution scenarios to ensure the association maintains minimum safe funding levels.</p>';
   html += '</div>';
 
-  // Summary cards grid - FIXED with equal height cards using table layout
+  // Summary cards grid
   html += '<table style="width: 100%; border-collapse: separate; border-spacing: 10px; margin-bottom: 20px;">';
   html += '<tr>';
   
@@ -479,7 +544,7 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   html += '</td>';
 
   html += '</tr></table>';
-  html += '</div>'; // End summary section
+  html += '</div>';
 
   // Page break before the 30-year table
   html += '<div class="page-break"></div>';
@@ -508,19 +573,16 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   html += '</tr>';
   html += '</thead><tbody>';
 
-  // Generate rows - use projection10 as base for years
   var baseProjection = scenarios.threshold10.projection || reserveCashFlow || [];
   var fullFundingBalance = startingBalance;
   
   baseProjection.forEach(function(row, index) {
     var bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
     
-    // Get data for each scenario
     var row10 = scenarios.threshold10.projection[index] || {};
     var row5 = scenarios.threshold5.projection[index] || {};
     var rowBaseline = scenarios.baseline.projection[index] || {};
     
-    // Calculate full funding balance for this year
     var expenditures = row.expenditures || 0;
     fullFundingBalance = fullFundingBalance + scenarios.fullFunding.contribution - expenditures;
     
@@ -531,19 +593,15 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
     html += '<tr style="background:' + bgColor + ';">';
     html += '<td class="text-center text-bold">' + (row.year || row10.year || (2026 + index)) + '</td>';
     
-    // 10% Threshold
     html += '<td class="text-right">' + formatCurrency(row10.expenditures || expenditures) + '</td>';
     html += '<td class="text-right" style="' + balance10Class + '">' + formatCurrency(row10.endingBalance) + '</td>';
     
-    // 5% Threshold
     html += '<td class="text-right">' + formatCurrency(row5.expenditures || expenditures) + '</td>';
     html += '<td class="text-right" style="' + balance5Class + '">' + formatCurrency(row5.endingBalance) + '</td>';
     
-    // Baseline
     html += '<td class="text-right">' + formatCurrency(rowBaseline.expenditures || expenditures) + '</td>';
     html += '<td class="text-right" style="' + balanceBaselineClass + '">' + formatCurrency(rowBaseline.endingBalance) + '</td>';
     
-    // Full Funding
     html += '<td class="text-right">' + formatCurrency(expenditures) + '</td>';
     html += '<td class="text-right">' + formatCurrency(fullFundingBalance) + '</td>';
     
@@ -555,7 +613,6 @@ function generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginn
   return html;
 }
 
-// Helper function to calculate full funding final balance
 function calculateFullFundingFinalBalance(cashFlow, contribution, startingBalance) {
   if (!cashFlow || cashFlow.length === 0) return startingBalance;
   
@@ -567,7 +624,7 @@ function calculateFullFundingFinalBalance(cashFlow, contribution, startingBalanc
 }
 
 // =============================================================================
-// Horizontal Expenditure Table - UPDATED with isPM parameter for green headers
+// Expenditure Table
 // =============================================================================
 function generateExpenditureTable(components, startYear, years, isPM) {
   startYear = parseInt(startYear) || 2026;
@@ -581,10 +638,8 @@ function generateExpenditureTable(components, startYear, years, isPM) {
     return '<p><em>No ' + (isPM ? 'PM' : 'reserve') + ' components found</em></p>';
   }
 
-  // FIXED: Use green for PM tables, blue for reserve
   var headerColor = isPM ? COLORS.pm.headerBg : COLORS.reserve.headerBg;
 
-  // Build year data - only years with expenditures
   var yearData = [];
   for (var i = 0; i < years; i++) {
     var year = startYear + i;
@@ -616,7 +671,6 @@ function generateExpenditureTable(components, startYear, years, isPM) {
     return '<p><em>No expenditures scheduled in the next ' + years + ' years</em></p>';
   }
 
-  // Horizontal table: Years as rows
   var html = '<table class="expenditure-horizontal">';
   html += '<thead><tr style="background:' + headerColor + '; color:white;">';
   html += '<th style="width:80px; background:' + headerColor + '; color:white;">Year</th>';
@@ -637,7 +691,74 @@ function generateExpenditureTable(components, startYear, years, isPM) {
     html += '</tr>';
   });
 
-  // Grand total
+  var grandTotal = yearData.reduce(function(sum, yd) { return sum + yd.total; }, 0);
+  html += '<tr class="total-row">';
+  html += '<td colspan="2" class="text-right"><strong>TOTAL ALL YEARS:</strong></td>';
+  html += '<td class="text-right"><strong>' + formatCurrency(grandTotal) + '</strong></td>';
+  html += '</tr>';
+
+  html += '</tbody></table>';
+  return html;
+}
+
+// v9: Expenditure table for ALL components (non-PM states)
+function generateExpenditureTableAll(components, startYear, years) {
+  startYear = parseInt(startYear) || 2026;
+  years = years || 30;
+  
+  if (components.length === 0) {
+    return '<p><em>No components found</em></p>';
+  }
+
+  var headerColor = COLORS.reserve.headerBg;
+
+  var yearData = [];
+  for (var i = 0; i < years; i++) {
+    var year = startYear + i;
+    var expenditures = [];
+    var total = 0;
+    
+    components.forEach(function(comp) {
+      var replaceYear = parseInt(comp.replacementYear) || (startYear + (parseInt(comp.remainingUsefulLife) || 0));
+      
+      if (replaceYear === year) {
+        expenditures.push({
+          name: comp.description,
+          cost: parseFloat(comp.totalCost) || 0
+        });
+        total += parseFloat(comp.totalCost) || 0;
+      }
+    });
+    
+    if (total > 0) {
+      yearData.push({ year: year, expenditures: expenditures, total: total });
+    }
+  }
+
+  if (yearData.length === 0) {
+    return '<p><em>No expenditures scheduled in the next ' + years + ' years</em></p>';
+  }
+
+  var html = '<table class="expenditure-horizontal">';
+  html += '<thead><tr style="background:' + headerColor + '; color:white;">';
+  html += '<th style="width:80px; background:' + headerColor + '; color:white;">Year</th>';
+  html += '<th style="background:' + headerColor + '; color:white;">Components to be Replaced</th>';
+  html += '<th style="width:120px; text-align:right; background:' + headerColor + '; color:white;">Total Cost</th>';
+  html += '</tr></thead><tbody>';
+
+  yearData.forEach(function(yd, index) {
+    var bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+    var componentList = yd.expenditures.map(function(e) {
+      return e.name + ' (' + formatCurrency(e.cost) + ')';
+    }).join('; ');
+    
+    html += '<tr style="background:' + bgColor + ';">';
+    html += '<td class="text-center text-bold">' + yd.year + '</td>';
+    html += '<td style="font-size:9pt;">' + componentList + '</td>';
+    html += '<td class="text-right text-bold">' + formatCurrency(yd.total) + '</td>';
+    html += '</tr>';
+  });
+
   var grandTotal = yearData.reduce(function(sum, yd) { return sum + yd.total; }, 0);
   html += '<tr class="total-row">';
   html += '<td colspan="2" class="text-right"><strong>TOTAL ALL YEARS:</strong></td>';
@@ -649,22 +770,24 @@ function generateExpenditureTable(components, startYear, years, isPM) {
 }
 
 // =============================================================================
-// PM Summary Table - UPDATED to use green headers
+// PM Summary Table
 // =============================================================================
 function generatePMSummaryTable(components, notes) {
   var pmComponents = components.filter(function(c) { return c.isPreventiveMaintenance; });
   if (pmComponents.length === 0) return '<p><em>No preventive maintenance components</em></p>';
-  // FIXED: Pass isPM=true for green headers
   return generateComponentSummaryTable(pmComponents, notes, false, true);
 }
 
 // Generate category sections - skip empty categories
-function generateCategorySections(components, notes) {
+function generateCategorySections(components, notes, includeAllComponents) {
   var categories = ['Sitework', 'Building', 'Building Exterior', 'Interior', 'Electrical', 'Mechanical', 'Special'];
   var html = '';
   
   categories.forEach(function(cat) {
-    var table = generateCategoryTable(components, cat, notes);
+    // v9: When includeAllComponents is true, don't filter out PM components
+    var table = includeAllComponents 
+      ? generateCategoryTableAll(components, cat, notes)
+      : generateCategoryTable(components, cat, notes);
     if (table) {
       html += '<div class="sub-header">' + cat + '</div>';
       html += table;
@@ -678,7 +801,9 @@ function generateCategorySections(components, notes) {
   return html;
 }
 
-// Main Report Generation
+// =============================================================================
+// MAIN REPORT GENERATION (v9 - with conditional block stripping)
+// =============================================================================
 export function generateReport(template, data) {
   var site = data.site;
   var components = data.components;
@@ -688,8 +813,34 @@ export function generateReport(template, data) {
   
   console.log('Generating report with results:', results ? Object.keys(results) : 'none');
   
-  var reserveComponents = components.filter(function(c) { return !c.isPreventiveMaintenance; });
-  var pmComponents = components.filter(function(c) { return c.isPreventiveMaintenance; });
+  // ========================================
+  // v9: DETERMINE PM REQUIREMENT FROM ORG SETTINGS
+  // ========================================
+  var stateCompliance = organization?.settings?.stateCompliance || [];
+  var siteState = site.companyState || site.state || '';
+  var pmRequired = isPMRequiredForState(stateCompliance, siteState);
+  
+  // Also check if results have the flag (set by calculate page)
+  if (results.pmRequired !== undefined) {
+    pmRequired = results.pmRequired;
+  }
+  
+  console.log('🏛️ State:', siteState, '| PM Required:', pmRequired);
+  
+  // ========================================
+  // v9: SPLIT COMPONENTS BASED ON PM REQUIREMENT
+  // ========================================
+  var reserveComponents, pmComponents;
+  
+  if (pmRequired) {
+    // Standard dual-fund: separate reserve and PM
+    reserveComponents = components.filter(function(c) { return !c.isPreventiveMaintenance; });
+    pmComponents = components.filter(function(c) { return c.isPreventiveMaintenance; });
+  } else {
+    // No PM fund: ALL components are reserve
+    reserveComponents = components;
+    pmComponents = [];
+  }
   
   var totalReplacementCost = reserveComponents.reduce(function(sum, c) { 
     return sum + (parseFloat(c.totalCost) || 0); 
@@ -706,21 +857,15 @@ export function generateReport(template, data) {
   var pmCashFlow = results.pmCashFlow || [];
   var thresholds = results.thresholds || {};
 
-  console.log('Reserve Fund:', reserveFund);
-  console.log('PM Fund:', pmFund);
-  console.log('Thresholds:', thresholds);
-
   var startYear = parseInt(site.beginningYear) || new Date().getFullYear();
   var location = ((site.city || '') + ', ' + (site.state || '')).replace(/^,\s*|,\s*$/g, '') || 'Location';
 
-  // Use values from results, with fallbacks to site data
   var percentFunded = reserveFund.percentFunded || 0;
   var recommendedContribution = reserveFund.recommendedContribution || 0;
   var pmPercentFunded = pmFund.percentFunded || 0;
   var pmRecommendedContribution = pmFund.recommendedContribution || 0;
   var beginningBalance = parseFloat(site.beginningReserveBalance) || reserveFund.currentBalance || 0;
 
-  // Get Study Type content for cover page and Level of Service
   var studyTypeContent = getStudyTypeContent(site.studyType);
 
   // Build organization branding strings
@@ -732,17 +877,18 @@ export function generateReport(template, data) {
   var orgPhone = organization.phone || '';
   var orgLogo = organization.logoUrl || '';
   
-  // Build full address string
   var addressParts = [orgAddress, orgCity, orgState, orgZip].filter(Boolean);
   var companyFullAddress = addressParts.join(', ');
   var companyAddress = orgCity && orgState ? (orgCity + ', ' + orgState + ' ' + orgZip) : '';
   var companyPhone = orgPhone ? ('C:' + orgPhone) : '';
   
-  // Build logo HTML
   var organizationLogo = orgLogo 
     ? '<img src="' + orgLogo + '" alt="' + orgName + '" />'
     : '';
 
+  // ========================================
+  // v9: BUILD PLACEHOLDERS - PM-aware
+  // ========================================
   var placeholders = {
     // Study Type placeholders
     coverTitle: studyTypeContent.coverTitle,
@@ -778,7 +924,7 @@ export function generateReport(template, data) {
     masterDeedPreparedBy: site.masterDeedPreparedBy || '{prepared by}',
     masterDeedDate: site.masterDeedDate || '{dated}',
     
-    // Reserve Fund Financial - use results data
+    // Reserve Fund Financial
     beginningReserveBalance: formatCurrency(site.beginningReserveBalance || reserveFund.currentBalance),
     currentAnnualContribution: formatCurrency(site.currentAnnualContribution || reserveFund.currentContribution),
     percentFunded: formatPercent(percentFunded),
@@ -787,7 +933,7 @@ export function generateReport(template, data) {
     averageAnnualContribution: formatCurrency(recommendedContribution),
     thresholdContribution: formatCurrency(thresholds.multiplier10 ? recommendedContribution * thresholds.multiplier10 : 0),
     
-    // PM Fund Financial - use results data
+    // PM Fund Financial (will be empty strings when PM not required, but markers strip the sections anyway)
     pmBeginningBalance: formatCurrency(site.beginningPMBalance || pmFund.currentBalance),
     pmCurrentContribution: formatCurrency(site.currentPMContribution || pmFund.currentContribution),
     pmPercentFunded: formatPercent(pmPercentFunded),
@@ -805,19 +951,33 @@ export function generateReport(template, data) {
                        percentFunded >= 50 ? 'marginally adequate' : 'inadequate',
     fundingRecommendation: 'increasing the annual contribution to ' + formatCurrency(recommendedContribution),
     
-    // Generated Tables - FIXED: pass correct fundType for PM tables
-    componentSummaryTable: generateComponentSummaryTable(reserveComponents, notes, true, false), // Reserve = blue
-    categorySections: generateCategorySections(components, notes),
+    // Generated Tables
+    // v9: When PM not required, show PM column = false, include all components in reserve tables
+    componentSummaryTable: pmRequired 
+      ? generateComponentSummaryTable(reserveComponents, notes, true, false)
+      : generateComponentSummaryTable(components, notes, false, false), // All components, no PM column
+    categorySections: generateCategorySections(components, notes, !pmRequired),
     componentNotesTable: generateComponentNotesTable(components, notes),
-    reserveCashFlowTable: generateCashFlowTable(reserveCashFlow, reserveFund, 'reserve'), // Reserve = blue
+    reserveCashFlowTable: generateCashFlowTable(reserveCashFlow, reserveFund, 'reserve'),
     thresholdProjectionTable: generateThresholdTable(thresholds, reserveCashFlow, reserveFund, beginningBalance),
-    expenditureScheduleTable: generateExpenditureTable(components, startYear, 30, false), // Reserve = blue
-    pmComponentSummaryTable: generatePMSummaryTable(components, notes), // PM = green (handled inside function)
-    pmCashFlowTable: generateCashFlowTable(pmCashFlow, pmFund, 'pm'), // PM = green
-    pmExpenditureTable: generateExpenditureTable(components, startYear, 30, true) // PM = green
+    expenditureScheduleTable: pmRequired 
+      ? generateExpenditureTable(components, startYear, 30, false)
+      : generateExpenditureTableAll(components, startYear, 30), // All components in one table
+    pmComponentSummaryTable: generatePMSummaryTable(components, notes),
+    pmCashFlowTable: generateCashFlowTable(pmCashFlow, pmFund, 'pm'),
+    pmExpenditureTable: generateExpenditureTable(components, startYear, 30, true)
   };
 
-  var html = template;
+  // ========================================
+  // v9: STRIP CONDITIONAL BLOCKS FIRST, THEN REPLACE PLACEHOLDERS
+  // ========================================
+  var html = stripConditionalBlocks(template, {
+    pmRequired: pmRequired,
+    isUpdate: studyTypeContent.isUpdate,
+    stateAbbreviation: siteState,
+  });
+  
+  // Now replace placeholders on the processed template
   Object.keys(placeholders).forEach(function(key) {
     var regex = new RegExp('\\{' + key + '\\}', 'g');
     html = html.replace(regex, placeholders[key] || '');
