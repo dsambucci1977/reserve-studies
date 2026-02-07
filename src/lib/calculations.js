@@ -389,7 +389,7 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
       });
       
       // Contributions: year 1 = starting snapshot (no contribution)
-      const contributions = year === 1 ? 0 : constantContribution;
+      const contributions = constantContribution;
       
       const beginningBalance = year === 1
         ? projectInfo.beginningReserveBalance
