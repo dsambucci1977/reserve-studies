@@ -1,12 +1,17 @@
 // src/lib/calculations.js
-// Reserve Study Calculation Engine v2
-// Fixes from v1:
-// 1. Annual Funding = Total Cost / Useful Life (straight-line accrual, matches old program)
-// 2. Summary includes per-category FFB for proper distribution
-// 3. Percent Funded uses beginning balance (not ending balance after contributions)
-// 4. Full Funding Balance calculation unchanged (correct)
-// 5. Added currentReserveFunds per category (distributed by FFB ratio)
-// 6. Added fundsNeeded per category (FFB - current reserve funds)
+// Reserve Study Calculation Engine v3
+// Fixes from v2:
+// 1. REMOVED costAdjustmentFactor from calculateComponent() - unitCost in Firebase 
+//    already includes cost adj (was being double-applied, inflating costs by 1.15x)
+// 2. Annual Funding = totalCost / remainingLife (not usefulLife)
+//    This matches the old program and represents what must be set aside each year
+//    over the REMAINING life to fully fund the component by replacement time.
+//    Components with 0 remaining life use usefulLife as fallback.
+// Carries forward from v2:
+// - Per-category FFB distribution (byCategory)
+// - Percent Funded uses beginning balance
+// - currentReserveFunds distributed by FFB ratio
+// - fundsNeeded = FFB - currentReserveFunds
 
 /**
  * Calculate complete 30-year reserve study projections
@@ -84,20 +89,21 @@ function calculateYear(year, projectInfo, components, previousYears) {
  * Calculate single component for a specific year
  * 
  * KEY FORMULAS (matching old program):
- *   Total Cost = Quantity × Unit Cost × Cost Adjustment Factor × Inflation
- *   Full Funding Balance (FFB) = Total Cost × (Effective Age / Useful Life)
- *   Annual Funding = Total Cost / Useful Life  (straight-line accrual)
+ *   Total Cost = Quantity × Unit Cost × Inflation
+ *     NOTE: costAdjustmentFactor is NOT applied here because unitCost from Firebase
+ *     already includes it. The cost adj factor was applied when components were
+ *     imported/created. Applying it again would inflate costs by ~15%.
  *   
- * NOTE: Annual Funding uses straight-line (totalCost / usefulLife), NOT the gap method
- *       (totalCost - FFB) / remainingLife. The straight-line method matches the old
- *       program's output and represents what should be set aside each year over the
- *       component's full life cycle.
+ *   Full Funding Balance (FFB) = Total Cost × (Effective Age / Useful Life)
+ *   
+ *   Annual Funding = Total Cost / Remaining Life
+ *     This is the amount needed each year over the remaining life to have the full
+ *     replacement cost available when the component needs replacement. For components
+ *     with 0 remaining life (due for replacement now), usefulLife is used as fallback.
  */
 function calculateComponent(component, year, fiscalYear, projectInfo, inflationMultiplier) {
-  // Apply cost adjustment factor and inflation
-  const costPerUnit = (component.costPerUnit || 0) * 
-                      projectInfo.costAdjustmentFactor * 
-                      inflationMultiplier;
+  // Apply inflation ONLY (costAdjustmentFactor already in unitCost from Firebase)
+  const costPerUnit = (component.costPerUnit || 0) * inflationMultiplier;
   
   // Total Cost
   const totalCost = (component.quantity || 0) * costPerUnit;
@@ -116,11 +122,16 @@ function calculateComponent(component, year, fiscalYear, projectInfo, inflationM
     fullFundingBalance = totalCost;
   }
   
-  // Annual Funding = Total Cost / Useful Life (straight-line accrual)
-  // This is the amount that should be set aside each year over the component's
-  // entire useful life to have the full replacement cost available when needed.
+  // Annual Funding = Total Cost / Remaining Life
+  // This represents the annual amount needed to fully fund this component
+  // by its replacement date. For year 1 calculations, use the original
+  // remaining life. If remaining life is 0 (replacement due now), fall back
+  // to useful life to avoid division by zero.
   let annualFunding = 0;
-  if (component.typicalUsefulLife > 0) {
+  if (remainingLife > 0) {
+    annualFunding = totalCost / remainingLife;
+  } else if (component.typicalUsefulLife > 0) {
+    // Component is due for replacement now - use useful life for the next cycle
     annualFunding = totalCost / component.typicalUsefulLife;
   }
   
@@ -182,7 +193,7 @@ function aggregateByComponentType(components) {
 /**
  * Calculate reserve fund balance (Projection sheet)
  * 
- * FIX: Percent Funded now uses beginning balance (before contributions/interest),
+ * Percent Funded uses beginning balance (before contributions/interest),
  * which represents the actual funded status at the start of the fiscal year.
  */
 function calculateReserveFundBalance(year, totals, projectInfo, components, previousYears) {
@@ -207,7 +218,6 @@ function calculateReserveFundBalance(year, totals, projectInfo, components, prev
   const endingBalance = beginningBalance + contributions + interest - expenditures;
   
   // Percent funded uses BEGINNING balance (before contributions)
-  // This represents the actual funded status at the start of the year
   const percentFunded = totals.overall.fullFundingBalance > 0
     ? beginningBalance / totals.overall.fullFundingBalance
     : 0;
@@ -339,7 +349,7 @@ function calculateYearWithThreshold(year, projectInfo, components, thresholdRate
 /**
  * Calculate summary for dashboard
  * 
- * v2: Now includes per-category breakdown with FFB, currentReserveFunds (distributed
+ * Includes per-category breakdown with FFB, currentReserveFunds (distributed
  * by FFB ratio), fundsNeeded, and annualFunding for the Component Schedule Summary table.
  */
 function calculateSummary(yearOne, projectInfo) {
