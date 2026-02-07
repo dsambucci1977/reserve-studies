@@ -379,7 +379,7 @@ export default function CalculatePage() {
       });
       
       const beginningBalance = runningBalance;
-      const contributions = projectInfo.currentAnnualContribution;
+      const contributions = year === 0 ? 0 : projectInfo.currentAnnualContribution;
       const interest = beginningBalance * projectInfo.interestRate;
       const expenditures = yearExpenditures;
       const endingBalance = beginningBalance + contributions + interest - expenditures;
