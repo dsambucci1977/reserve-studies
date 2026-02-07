@@ -373,7 +373,7 @@ export default function CalculatePage() {
         if (replacementYear === fiscalYear) {
           const yearsFromNow = year;
           const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, yearsFromNow);
-          const inflatedCost = (comp.totalCost || 0) * projectInfo.costAdjustmentFactor * inflationMultiplier;
+          const inflatedCost = (comp.totalCost || 0) * inflationMultiplier;
           yearExpenditures += inflatedCost;
         }
       });
