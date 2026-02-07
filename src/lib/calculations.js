@@ -21,8 +21,8 @@
 export function calculateReserveStudy(projectInfo, components) {
   const years = [];
   
-  // Calculate each year (1-30)
-  for (let year = 1; year <= 30; year++) {
+  // Calculate each year (1-31): year 1 = starting snapshot, years 2-31 = 30 contributing years
+  for (let year = 1; year <= 31; year++) {
     const yearProjection = calculateYear(
       year,
       projectInfo,
@@ -262,8 +262,9 @@ function calculateReserveFundBalance(year, totals, projectInfo, components, prev
     beginningBalance = previousYears[year - 2].reserveBalance.endingBalance;
   }
   
-  // Contributions (current annual contribution)
-  const contributions = projectInfo.currentAnnualContribution;
+  // Contributions: Year 1 is starting snapshot (no contribution)
+  // Contributions begin in year 2
+  const contributions = year === 1 ? 0 : projectInfo.currentAnnualContribution;
   
   // Interest earned
   const interest = beginningBalance * projectInfo.interestRate;
@@ -337,7 +338,8 @@ function buildExpenditureSchedule(components, years) {
 function calculateThresholdScenario(projectInfo, components, thresholdRate) {
   const years = [];
   
-  for (let year = 1; year <= 30; year++) {
+  // 31 years: year 1 = starting snapshot (no contributions), years 2-31 = 30 contributing years
+  for (let year = 1; year <= 31; year++) {
     const yearProjection = calculateYearWithThreshold(
       year,
       projectInfo,
@@ -348,17 +350,26 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
     years.push(yearProjection);
   }
   
+  // Total and average over 30 contributing years (skip year 1 starting snapshot)
   const totalContributions = sum(years, y => y.reserveBalance.contributions);
+  const averageAnnualContribution = totalContributions / 30;
   
   return {
     thresholdRate,
     years,
-    totalContributions
+    totalContributions,
+    averageAnnualContribution
   };
 }
 
 /**
  * Calculate year with threshold multiplier
+ * 
+ * When thresholdRate is null: Full Funding scenario - uses year-specific annualFunding
+ * When thresholdRate is a number: Threshold scenario - uses annualFunding * (1 + rate)
+ * 
+ * Year 1 is the "as of" starting point - no contributions are added.
+ * Contributions begin in year 2.
  */
 function calculateYearWithThreshold(year, projectInfo, components, thresholdRate, previousYears) {
   const fiscalYear = projectInfo.beginningYear + year - 1;
@@ -370,10 +381,18 @@ function calculateYearWithThreshold(year, projectInfo, components, thresholdRate
   
   const totals = aggregateByComponentType(componentBreakdowns);
   
-  // Adjust contributions based on threshold
-  let contributions = projectInfo.currentAnnualContribution;
-  if (thresholdRate !== null) {
-    contributions = totals.overall.annualFunding * (1 + thresholdRate);
+  // Determine contributions
+  // Year 1 = starting snapshot, no contributions
+  // Year 2+: depends on scenario type
+  let contributions = 0;
+  if (year > 1) {
+    if (thresholdRate === null) {
+      // Full Funding: use year-specific recommended annual funding
+      contributions = totals.overall.annualFunding;
+    } else {
+      // Threshold: use annual funding adjusted by threshold rate
+      contributions = totals.overall.annualFunding * (1 + thresholdRate);
+    }
   }
   
   let beginningBalance = year === 1 
