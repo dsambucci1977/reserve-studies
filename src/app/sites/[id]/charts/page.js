@@ -78,6 +78,7 @@ export default function ChartsPage() {
   const [components, setComponents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState('cashflow');
+  const [pmRequired, setPmRequired] = useState(true);
 
   useEffect(() => {
     if (user && siteId) loadData();
@@ -89,14 +90,18 @@ export default function ChartsPage() {
       
       // Load site
       const siteDoc = await getDoc(doc(db, 'sites', siteId));
+      let siteData = null;
       if (siteDoc.exists()) {
-        setSite({ id: siteDoc.id, ...siteDoc.data() });
+        siteData = { id: siteDoc.id, ...siteDoc.data() };
+        setSite(siteData);
       }
 
       // Load projections/results
       const projectionsDoc = await getDoc(doc(db, 'sites', siteId, 'projections', 'latest'));
+      let resultsData = null;
       if (projectionsDoc.exists()) {
-        setResults(projectionsDoc.data());
+        resultsData = projectionsDoc.data();
+        setResults(resultsData);
       }
 
       // Load components
@@ -104,6 +109,46 @@ export default function ChartsPage() {
       const componentsSnap = await getDocs(collection(db, 'sites', siteId, 'components'));
       const comps = componentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setComponents(comps);
+
+      // ========================================
+      // CHECK PM REQUIREMENT
+      // ========================================
+      // First check saved results flag (set by calculate page)
+      if (resultsData?.pmRequired !== undefined) {
+        setPmRequired(resultsData.pmRequired);
+        console.log('📊 Charts PM from results:', resultsData.pmRequired);
+      } else {
+        // Fall back to org stateCompliance lookup
+        try {
+          let orgId = siteData?.organizationId;
+          if (!orgId && user) {
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            if (userDoc.exists()) {
+              orgId = userDoc.data()?.organizationId;
+            }
+          }
+          
+          if (orgId) {
+            const orgDoc = await getDoc(doc(db, 'organizations', orgId));
+            if (orgDoc.exists()) {
+              const stateCompliance = orgDoc.data()?.settings?.stateCompliance || [];
+              const siteState = siteData?.companyState || '';
+              
+              const stateConfig = stateCompliance.find(
+                s => s.code === siteState || s.name === siteState || 
+                     s.abbreviation === siteState || s.code === siteState.toUpperCase()
+              );
+              
+              if (stateConfig) {
+                setPmRequired(stateConfig.pmRequired === true);
+                console.log('📊 Charts PM from org settings:', stateConfig.pmRequired);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Charts: Could not check PM requirement:', err);
+        }
+      }
 
     } catch (error) {
       console.error('Error loading data:', error);
@@ -148,18 +193,18 @@ export default function ChartsPage() {
   const pmFund = results.pmFund || {};
   const thresholds = results.thresholds || {};
   
-  // Debug: Log the results structure to console
-  console.log('Charts Data Debug:', {
-    reserveFund,
-    pmFund,
-    thresholds,
-    siteCurrentContribution: site?.currentAnnualContribution,
-    componentsCount: components.length,
-    reserveComponentsCount: components.filter(c => !c.isPreventiveMaintenance).length,
-    pmComponentsCount: components.filter(c => c.isPreventiveMaintenance).length,
-  });
+  // Check PM component classification
+  const isPMComponent = (c) => c.isPreventiveMaintenance || c.isPM || c.type === 'pm' || c.fundType === 'pm';
+  
+  // When PM not required, ALL components are reserve
+  const reserveComponents = pmRequired 
+    ? components.filter(c => !isPMComponent(c))
+    : components;
+  const pmComponents = pmRequired 
+    ? components.filter(c => isPMComponent(c))
+    : [];
 
-  // Cash Flow Chart Data - combine current and full funding
+  // Cash Flow Chart Data
   const cashFlowData = reserveCashFlow.map((row, index) => {
     const fullFundingBalance = (reserveFund.currentBalance || 0) + 
       ((reserveFund.recommendedContribution || 0) * (index + 1)) - 
@@ -181,13 +226,7 @@ export default function ChartsPage() {
       amount: row.expenditures
     }));
 
-  // Component Cost Breakdown Data
-  // Check multiple possible field names for PM classification
-  const isPMComponent = (c) => c.isPreventiveMaintenance || c.isPM || c.type === 'pm' || c.fundType === 'pm';
-  const reserveComponents = components.filter(c => !isPMComponent(c));
-  const pmComponents = components.filter(c => isPMComponent(c));
-  
-  // Group by category for pie chart
+  // Group by category for pie chart - use reserveComponents (which includes all when PM not required)
   const categoryTotals = {};
   reserveComponents.forEach(comp => {
     const cat = comp.category || 'Other';
@@ -199,7 +238,6 @@ export default function ChartsPage() {
     .sort((a, b) => b.value - a.value);
 
   // Funding Scenarios Comparison Data
-  // Thresholds store multipliers, so we calculate the actual contribution amounts
   const currentContribution = reserveFund.currentContribution || site?.currentAnnualContribution || 0;
   
   const scenarioData = [
@@ -232,7 +270,7 @@ export default function ChartsPage() {
     { name: 'Unfunded', value: Math.max(100 - percentFunded, 0) }
   ];
 
-  // Reserve vs PM Comparison - using exact field names from calculate page
+  // Reserve vs PM Comparison (only used when pmRequired)
   const fundComparisonData = [
     {
       name: 'Current Balance',
@@ -251,13 +289,14 @@ export default function ChartsPage() {
     }
   ];
 
+  // Build tabs - conditionally include PM comparison tab
   const chartTabs = [
     { id: 'cashflow', label: '30-Year Cash Flow', icon: '📈' },
     { id: 'expenditures', label: 'Expenditures', icon: '📊' },
     { id: 'funded', label: 'Percent Funded', icon: '🎯' },
     { id: 'scenarios', label: 'Funding Scenarios', icon: '⚖️' },
     { id: 'components', label: 'Component Costs', icon: '🥧' },
-    { id: 'comparison', label: 'Reserve vs PM', icon: '🔄' }
+    ...(pmRequired ? [{ id: 'comparison', label: 'Reserve vs PM', icon: '🔄' }] : [])
   ];
 
   return (
@@ -439,7 +478,7 @@ export default function ChartsPage() {
             <h2 className="text-xl font-bold text-gray-800 mb-2">Reserve Fund Health</h2>
             <p className="text-gray-500 text-sm mb-6">Current percent funded status</p>
             
-            <div className="grid grid-cols-2 gap-8">
+            <div className={`grid ${pmRequired ? 'grid-cols-2' : 'grid-cols-1 max-w-md mx-auto'} gap-8`}>
               {/* Reserve Fund Gauge */}
               <div className="text-center">
                 <h3 className="font-semibold text-gray-700 mb-4">Reserve Fund</h3>
@@ -485,53 +524,55 @@ export default function ChartsPage() {
                 </div>
               </div>
 
-              {/* PM Fund Gauge */}
-              <div className="text-center">
-                <h3 className="font-semibold text-gray-700 mb-4">PM Fund</h3>
-                <div className="h-64 relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: 'Funded', value: Math.min(pmFund.percentFunded || 0, 100) },
-                          { name: 'Unfunded', value: Math.max(100 - (pmFund.percentFunded || 0), 0) }
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        startAngle={180}
-                        endAngle={0}
-                        innerRadius={80}
-                        outerRadius={110}
-                        paddingAngle={0}
-                        dataKey="value"
-                      >
-                        <Cell fill={(pmFund.percentFunded || 0) >= 70 ? '#22c55e' : (pmFund.percentFunded || 0) >= 30 ? '#f59e0b' : '#dc2626'} />
-                        <Cell fill="#e5e7eb" />
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex items-center justify-center" style={{ marginTop: '-20px' }}>
-                    <div className="text-center">
-                      <p className={`text-4xl font-bold ${
-                        (pmFund.percentFunded || 0) >= 70 ? 'text-green-600' : 
-                        (pmFund.percentFunded || 0) >= 30 ? 'text-yellow-600' : 'text-red-600'
-                      }`}>
-                        {(pmFund.percentFunded || 0).toFixed(1)}%
-                      </p>
-                      <p className="text-sm text-gray-500">Funded</p>
+              {/* PM Fund Gauge - only show when PM is required */}
+              {pmRequired && (
+                <div className="text-center">
+                  <h3 className="font-semibold text-gray-700 mb-4">PM Fund</h3>
+                  <div className="h-64 relative">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Funded', value: Math.min(pmFund.percentFunded || 0, 100) },
+                            { name: 'Unfunded', value: Math.max(100 - (pmFund.percentFunded || 0), 0) }
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          startAngle={180}
+                          endAngle={0}
+                          innerRadius={80}
+                          outerRadius={110}
+                          paddingAngle={0}
+                          dataKey="value"
+                        >
+                          <Cell fill={(pmFund.percentFunded || 0) >= 70 ? '#22c55e' : (pmFund.percentFunded || 0) >= 30 ? '#f59e0b' : '#dc2626'} />
+                          <Cell fill="#e5e7eb" />
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex items-center justify-center" style={{ marginTop: '-20px' }}>
+                      <div className="text-center">
+                        <p className={`text-4xl font-bold ${
+                          (pmFund.percentFunded || 0) >= 70 ? 'text-green-600' : 
+                          (pmFund.percentFunded || 0) >= 30 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {(pmFund.percentFunded || 0).toFixed(1)}%
+                        </p>
+                        <p className="text-sm text-gray-500">Funded</p>
+                      </div>
                     </div>
                   </div>
+                  <div className="mt-2">
+                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                      (pmFund.percentFunded || 0) >= 70 ? 'bg-green-100 text-green-700' : 
+                      (pmFund.percentFunded || 0) >= 30 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                    }`}>
+                      {(pmFund.percentFunded || 0) >= 70 ? '✓ Good Standing' : 
+                       (pmFund.percentFunded || 0) >= 30 ? '⚠ Fair' : '⚠ Underfunded'}
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-2">
-                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                    (pmFund.percentFunded || 0) >= 70 ? 'bg-green-100 text-green-700' : 
-                    (pmFund.percentFunded || 0) >= 30 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                  }`}>
-                    {(pmFund.percentFunded || 0) >= 70 ? '✓ Good Standing' : 
-                     (pmFund.percentFunded || 0) >= 30 ? '⚠ Fair' : '⚠ Underfunded'}
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Funding Level Guide */}
@@ -656,8 +697,8 @@ export default function ChartsPage() {
           </div>
         )}
 
-        {/* Reserve vs PM Comparison */}
-        {activeChart === 'comparison' && (
+        {/* Reserve vs PM Comparison - only show when PM is required */}
+        {activeChart === 'comparison' && pmRequired && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-2">Reserve Fund vs PM Fund</h2>
             <p className="text-gray-500 text-sm mb-6">Side-by-side comparison of both funds</p>
