@@ -1,6 +1,12 @@
 // src/lib/calculations.js
-// Reserve Study Calculation Engine
-// Replicates all Google Sheets formulas
+// Reserve Study Calculation Engine v2
+// Fixes from v1:
+// 1. Annual Funding = Total Cost / Useful Life (straight-line accrual, matches old program)
+// 2. Summary includes per-category FFB for proper distribution
+// 3. Percent Funded uses beginning balance (not ending balance after contributions)
+// 4. Full Funding Balance calculation unchanged (correct)
+// 5. Added currentReserveFunds per category (distributed by FFB ratio)
+// 6. Added fundsNeeded per category (FFB - current reserve funds)
 
 /**
  * Calculate complete 30-year reserve study projections
@@ -37,7 +43,7 @@ export function calculateReserveStudy(projectInfo, components) {
     years,
     expenditureSchedule,
     thresholdScenarios,
-    summary: calculateSummary(years[0]) // Year 1 summary
+    summary: calculateSummary(years[0], projectInfo) // Year 1 summary with project info
   };
 }
 
@@ -76,37 +82,46 @@ function calculateYear(year, projectInfo, components, previousYears) {
 
 /**
  * Calculate single component for a specific year
- * Replicates Year sheet formulas (columns F, G, L, M)
+ * 
+ * KEY FORMULAS (matching old program):
+ *   Total Cost = Quantity × Unit Cost × Cost Adjustment Factor × Inflation
+ *   Full Funding Balance (FFB) = Total Cost × (Effective Age / Useful Life)
+ *   Annual Funding = Total Cost / Useful Life  (straight-line accrual)
+ *   
+ * NOTE: Annual Funding uses straight-line (totalCost / usefulLife), NOT the gap method
+ *       (totalCost - FFB) / remainingLife. The straight-line method matches the old
+ *       program's output and represents what should be set aside each year over the
+ *       component's full life cycle.
  */
 function calculateComponent(component, year, fiscalYear, projectInfo, inflationMultiplier) {
   // Apply cost adjustment factor and inflation
-  // Column F: Value (Cost Adjustment Factor)
-  // Column G: Cost Per Unit (with inflation)
   const costPerUnit = (component.costPerUnit || 0) * 
                       projectInfo.costAdjustmentFactor * 
                       inflationMultiplier;
   
-  // Column H: Total Cost
+  // Total Cost
   const totalCost = (component.quantity || 0) * costPerUnit;
   
-  // Column J: Estimated Remaining Life for this year
+  // Remaining Life for this year
   const remainingLife = Math.max(0, component.estimatedRemainingLife - (year - 1));
   
-  // Column M: Full Funding Balance
-  // Formula: If remaining life > 0, calculate accumulated funding, else full cost
+  // Full Funding Balance (FFB)
+  // FFB = Total Cost × (Effective Age / Useful Life)
+  // Effective Age = Useful Life - Remaining Life
   let fullFundingBalance;
-  if (remainingLife > 0) {
-    const yearsElapsed = component.typicalUsefulLife - component.estimatedRemainingLife + (year - 1);
-    fullFundingBalance = (totalCost / component.typicalUsefulLife) * yearsElapsed;
+  if (component.typicalUsefulLife > 0) {
+    const effectiveAge = component.typicalUsefulLife - remainingLife;
+    fullFundingBalance = (totalCost / component.typicalUsefulLife) * effectiveAge;
   } else {
     fullFundingBalance = totalCost;
   }
   
-  // Column L: Annual Funding
-  // Formula: (Total Cost - Full Funding Balance) / Remaining Life
+  // Annual Funding = Total Cost / Useful Life (straight-line accrual)
+  // This is the amount that should be set aside each year over the component's
+  // entire useful life to have the full replacement cost available when needed.
   let annualFunding = 0;
-  if (remainingLife > 0) {
-    annualFunding = (totalCost - fullFundingBalance) / remainingLife;
+  if (component.typicalUsefulLife > 0) {
+    annualFunding = totalCost / component.typicalUsefulLife;
   }
   
   // Check if component is replaced this year
@@ -166,6 +181,9 @@ function aggregateByComponentType(components) {
 
 /**
  * Calculate reserve fund balance (Projection sheet)
+ * 
+ * FIX: Percent Funded now uses beginning balance (before contributions/interest),
+ * which represents the actual funded status at the start of the fiscal year.
  */
 function calculateReserveFundBalance(year, totals, projectInfo, components, previousYears) {
   // Beginning balance
@@ -188,9 +206,10 @@ function calculateReserveFundBalance(year, totals, projectInfo, components, prev
   // Ending balance
   const endingBalance = beginningBalance + contributions + interest - expenditures;
   
-  // Percent funded
+  // Percent funded uses BEGINNING balance (before contributions)
+  // This represents the actual funded status at the start of the year
   const percentFunded = totals.overall.fullFundingBalance > 0
-    ? endingBalance / totals.overall.fullFundingBalance
+    ? beginningBalance / totals.overall.fullFundingBalance
     : 0;
   
   // Get list of components replaced this year
@@ -230,7 +249,6 @@ function buildExpenditureSchedule(components, years) {
     typeComponents.forEach(comp => {
       const componentSchedule = {};
       
-      // For each year, get expenditure for this component
       years.forEach(yearData => {
         const yearComp = yearData.componentBreakdowns.find(
           cb => cb.componentId === comp.id
@@ -276,9 +294,6 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
  * Calculate year with threshold multiplier
  */
 function calculateYearWithThreshold(year, projectInfo, components, thresholdRate, previousYears) {
-  // Similar to calculateYear but with threshold adjustments
-  // This is a simplified version - full implementation would match your Google Sheets threshold logic
-  
   const fiscalYear = projectInfo.beginningYear + year - 1;
   const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year - 1);
   
@@ -291,11 +306,9 @@ function calculateYearWithThreshold(year, projectInfo, components, thresholdRate
   // Adjust contributions based on threshold
   let contributions = projectInfo.currentAnnualContribution;
   if (thresholdRate !== null) {
-    // Apply threshold multiplier (simplified - adjust based on your actual formula)
     contributions = totals.overall.annualFunding * (1 + thresholdRate);
   }
   
-  // Calculate reserve balance with adjusted contributions
   let beginningBalance = year === 1 
     ? projectInfo.beginningReserveBalance 
     : previousYears[year - 2].reserveBalance.endingBalance;
@@ -304,7 +317,7 @@ function calculateYearWithThreshold(year, projectInfo, components, thresholdRate
   const expenditures = totals.overall.expenditures;
   const endingBalance = beginningBalance + contributions + interest - expenditures;
   const percentFunded = totals.overall.fullFundingBalance > 0
-    ? endingBalance / totals.overall.fullFundingBalance
+    ? beginningBalance / totals.overall.fullFundingBalance
     : 0;
   
   return {
@@ -325,20 +338,53 @@ function calculateYearWithThreshold(year, projectInfo, components, thresholdRate
 
 /**
  * Calculate summary for dashboard
+ * 
+ * v2: Now includes per-category breakdown with FFB, currentReserveFunds (distributed
+ * by FFB ratio), fundsNeeded, and annualFunding for the Component Schedule Summary table.
  */
-function calculateSummary(yearOne) {
+function calculateSummary(yearOne, projectInfo) {
+  const beginningBalance = projectInfo.beginningReserveBalance || 0;
+  const totalFFB = yearOne.totals.overall.fullFundingBalance || 0;
+  
+  // Build per-category data with proper distribution
+  const byCategory = Object.entries(yearOne.totals)
+    .filter(([key]) => key !== 'overall')
+    .map(([category, data]) => {
+      // Distribute beginning balance by FFB ratio (matches old program)
+      const ffbShare = totalFFB > 0 ? (data.fullFundingBalance / totalFFB) : 0;
+      const currentReserveFunds = beginningBalance * ffbShare;
+      const fundsNeeded = data.fullFundingBalance - currentReserveFunds;
+      
+      // Per-category percent funded
+      const percentFunded = data.fullFundingBalance > 0 
+        ? (currentReserveFunds / data.fullFundingBalance) * 100 
+        : 0;
+      
+      return {
+        category,
+        count: data.count,
+        totalCost: data.totalCost,
+        fullFundingBalance: data.fullFundingBalance,
+        annualFunding: data.annualFunding,
+        currentReserveFunds: currentReserveFunds,
+        fundsNeeded: fundsNeeded,
+        percentFunded: percentFunded,
+        expenditures: data.expenditures
+      };
+    });
+  
+  // Overall funds needed
+  const totalFundsNeeded = totalFFB - beginningBalance;
+  
   return {
     totalComponents: yearOne.componentBreakdowns.length,
     totalReplacementCost: yearOne.totals.overall.totalCost,
-    currentReserveFunds: yearOne.reserveBalance.beginningBalance,
+    currentReserveFunds: beginningBalance,
     recommendedAnnualFunding: yearOne.totals.overall.annualFunding,
     percentFunded: yearOne.reserveBalance.percentFunded,
-    byCategory: Object.entries(yearOne.totals)
-      .filter(([key]) => key !== 'overall')
-      .map(([category, data]) => ({
-        category,
-        ...data
-      }))
+    fullyFundedBalance: totalFFB,
+    fundsNeeded: totalFundsNeeded,
+    byCategory: byCategory
   };
 }
 
