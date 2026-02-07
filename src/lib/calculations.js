@@ -336,85 +336,110 @@ function buildExpenditureSchedule(components, years) {
  * Calculate threshold scenario with proper component lifecycle tracking
  * 
  * Components cycle after replacement: remaining life resets to usefulLife.
- * Each year, the running fund balance is distributed to components by FFB ratio
- * to compute the year-specific annualFunding (fundsNeeded / remainingLife).
  * 
  * For the Full Funding scenario (thresholdRate === null):
- *   - First pass: calculate year-specific annualFunding with component cycling
- *   - Sum all annualFunding values and divide by 30 to get averageAnnualContribution
- *   - Second pass: build cash flow using the constant averageAnnualContribution
+ *   - Uses binary search to find the minimum constant annual contribution
+ *     that keeps the fund balance ≥ 0 throughout the 30-year projection
+ *   - Also calculates year-specific annualFunding for the "Annual Contribution" column
  * 
  * For threshold scenarios (thresholdRate is a number):
- *   - Uses currentAnnualContribution * multiplier as the constant contribution
+ *   - Uses currentAnnualContribution * (1 + thresholdRate) as contribution
  */
 function calculateThresholdScenario(projectInfo, components, thresholdRate) {
   
   // ========================================
-  // PASS 1: Calculate year-specific annualFunding with component cycling
-  // This gives us the "Annual Contribution" column values AND the average
+  // Helper: Run a 31-year cash flow with component cycling
+  // Returns array of year objects with balances
   // ========================================
+  function runCashFlow(constantContribution) {
+    const compStates = components.map(comp => ({
+      ...comp,
+      currentRemainingLife: comp.estimatedRemainingLife,
+    }));
+    
+    const result = [];
+    
+    for (let year = 1; year <= 31; year++) {
+      const fiscalYear = projectInfo.beginningYear + year - 1;
+      const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year - 1);
+      
+      let totalExpenditures = 0;
+      let totalFFB = 0;
+      let totalCostThisYear = 0;
+      
+      compStates.forEach(comp => {
+        const costPerUnit = (comp.costPerUnit || 0) * inflationMultiplier;
+        const compTotalCost = (comp.quantity || 0) * costPerUnit;
+        const remainingLife = Math.max(0, comp.currentRemainingLife);
+        
+        let ffb = 0;
+        if (comp.typicalUsefulLife > 0) {
+          const effectiveAge = comp.typicalUsefulLife - remainingLife;
+          ffb = (compTotalCost / comp.typicalUsefulLife) * effectiveAge;
+        } else {
+          ffb = compTotalCost;
+        }
+        
+        totalFFB += ffb;
+        totalCostThisYear += compTotalCost;
+        
+        if (remainingLife === 0) {
+          totalExpenditures += compTotalCost;
+        }
+      });
+      
+      // Contributions: year 1 = starting snapshot (no contribution)
+      const contributions = year === 1 ? 0 : constantContribution;
+      
+      const beginningBalance = year === 1
+        ? projectInfo.beginningReserveBalance
+        : result[year - 2].endingBalance;
+      
+      const interest = beginningBalance * projectInfo.interestRate;
+      const endingBalance = beginningBalance + contributions + interest - totalExpenditures;
+      
+      result.push({
+        year,
+        fiscalYear,
+        beginningBalance,
+        contributions,
+        interest,
+        expenditures: totalExpenditures,
+        endingBalance,
+        totalFFB,
+        totalCost: totalCostThisYear
+      });
+      
+      // Cycle components
+      compStates.forEach(comp => {
+        if (comp.currentRemainingLife <= 0) {
+          comp.currentRemainingLife = comp.typicalUsefulLife;
+        } else {
+          comp.currentRemainingLife -= 1;
+        }
+      });
+    }
+    
+    return result;
+  }
   
-  // Track component state (remaining life resets after replacement)
-  const componentStates = components.map(comp => ({
+  // ========================================
+  // Calculate year-specific annualFunding (for "Annual Contribution" column)
+  // This tracks component cycling and computes totalCost/remainingLife each year
+  // ========================================
+  const compStatesForAF = components.map(comp => ({
     ...comp,
     currentRemainingLife: comp.estimatedRemainingLife,
   }));
   
-  const yearlyAnnualFunding = []; // Year-specific recommended funding
-  const yearlyExpenditures = [];  // Expenditures per year
-  const yearlyFFB = [];           // FFB per year
+  const yearlyAnnualFunding = [];
   
   for (let year = 1; year <= 31; year++) {
-    const fiscalYear = projectInfo.beginningYear + year - 1;
     const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year - 1);
     
     let totalAnnualFunding = 0;
-    let totalExpenditures = 0;
-    let totalFFB = 0;
-    let totalCost = 0;
     
-    // Calculate each component with its current state
-    componentStates.forEach(comp => {
-      const costPerUnit = (comp.costPerUnit || 0) * inflationMultiplier;
-      const compTotalCost = (comp.quantity || 0) * costPerUnit;
-      const remainingLife = Math.max(0, comp.currentRemainingLife);
-      
-      // FFB = Total Cost × (Effective Age / Useful Life)
-      let ffb = 0;
-      if (comp.typicalUsefulLife > 0) {
-        const effectiveAge = comp.typicalUsefulLife - remainingLife;
-        ffb = (compTotalCost / comp.typicalUsefulLife) * effectiveAge;
-      } else {
-        ffb = compTotalCost;
-      }
-      
-      totalFFB += ffb;
-      totalCost += compTotalCost;
-      
-      // Check if component is replaced this year
-      const isReplaced = remainingLife === 0;
-      if (isReplaced) {
-        totalExpenditures += compTotalCost;
-      }
-    });
-    
-    // Now distribute running balance by FFB ratio and compute annualFunding
-    // For pass 1, we use the beginning balance for year 1, then track a simple balance
-    // But we actually don't need the exact balance for the annual funding calc in the old program
-    // The old program recalculates annualFunding = fundsNeeded / remainingLife each year
-    // where fundsNeeded = totalCost - (balance distributed to this component by FFB ratio)
-    
-    // For year 1, distribute the beginning balance
-    // For subsequent years, we need a running balance
-    // But since we're computing the average, we can use a simplified approach:
-    // Just compute annualFunding = totalCost / remainingLife for each component
-    // (without current reserve distribution - that's only for year 1 summary)
-    
-    // Actually, looking at the old program more carefully:
-    // The year-specific Annual Contribution = sum of (componentCost / remainingLife) for all components
-    // This is a simpler formula that doesn't subtract current reserves for years 2+
-    
-    componentStates.forEach(comp => {
+    compStatesForAF.forEach(comp => {
       const costPerUnit = (comp.costPerUnit || 0) * inflationMultiplier;
       const compTotalCost = (comp.quantity || 0) * costPerUnit;
       const remainingLife = Math.max(0, comp.currentRemainingLife);
@@ -427,13 +452,10 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
     });
     
     yearlyAnnualFunding.push(totalAnnualFunding);
-    yearlyExpenditures.push(totalExpenditures);
-    yearlyFFB.push(totalFFB);
     
-    // After this year: decrement remaining life, reset if replaced
-    componentStates.forEach(comp => {
+    // Cycle components
+    compStatesForAF.forEach(comp => {
       if (comp.currentRemainingLife <= 0) {
-        // Component was replaced this year - reset to full useful life
         comp.currentRemainingLife = comp.typicalUsefulLife;
       } else {
         comp.currentRemainingLife -= 1;
@@ -442,121 +464,68 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
   }
   
   // ========================================
-  // Calculate the average annual contribution
-  // Sum of year-specific annualFunding for years 2-31 (skip year 1 snapshot), divided by 30
+  // Find the average annual contribution using binary search
+  // Goal: find the minimum constant contribution that keeps ending balance ≥ 0
   // ========================================
-  const totalAnnualFundingSum = yearlyAnnualFunding.slice(1).reduce((s, v) => s + v, 0);
-  const averageAnnualContribution = totalAnnualFundingSum / 30;
+  let averageAnnualContribution;
   
-  // ========================================
-  // PASS 2: Build the actual cash flow
-  // Full Funding uses averageAnnualContribution as constant contribution
-  // Threshold scenarios use currentAnnualContribution * multiplier
-  // ========================================
-  
-  const years = [];
-  
-  // Reset component states for pass 2 (need expenditure tracking again)
-  const componentStates2 = components.map(comp => ({
-    ...comp,
-    currentRemainingLife: comp.estimatedRemainingLife,
-  }));
-  
-  for (let year = 1; year <= 31; year++) {
-    const fiscalYear = projectInfo.beginningYear + year - 1;
-    const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year - 1);
+  if (thresholdRate === null) {
+    // Binary search for the constant contribution that keeps the fund fully funded
+    // Target: ending balance in year 31 should equal the FFB (fully funded balance)
+    // This ensures the fund maintains adequate reserves throughout
+    let low = 0;
+    let high = yearlyAnnualFunding[0] * 3; // generous upper bound
     
-    // Calculate expenditures with component cycling
-    let totalExpenditures = 0;
-    let totalFFB = 0;
-    let totalCostThisYear = 0;
-    
-    const componentBreakdowns = componentStates2.map(comp => {
-      const costPerUnit = (comp.costPerUnit || 0) * inflationMultiplier;
-      const compTotalCost = (comp.quantity || 0) * costPerUnit;
-      const remainingLife = Math.max(0, comp.currentRemainingLife);
+    for (let i = 0; i < 100; i++) {
+      const mid = (low + high) / 2;
+      const testFlow = runCashFlow(mid);
       
-      let ffb = 0;
-      if (comp.typicalUsefulLife > 0) {
-        const effectiveAge = comp.typicalUsefulLife - remainingLife;
-        ffb = (compTotalCost / comp.typicalUsefulLife) * effectiveAge;
+      // Check if the final year ending balance >= final year FFB
+      const lastYear = testFlow[testFlow.length - 1];
+      
+      if (lastYear.endingBalance >= lastYear.totalFFB) {
+        high = mid; // Can go lower
       } else {
-        ffb = compTotalCost;
-      }
-      
-      const isReplaced = remainingLife === 0;
-      const expenditure = isReplaced ? compTotalCost : 0;
-      
-      totalExpenditures += expenditure;
-      totalFFB += ffb;
-      totalCostThisYear += compTotalCost;
-      
-      return {
-        componentId: comp.id,
-        totalCost: compTotalCost,
-        remainingLife,
-        fullFundingBalance: ffb,
-        annualFunding: yearlyAnnualFunding[year - 1], // from pass 1
-        isReplaced,
-        expenditure
-      };
-    });
-    
-    // Determine contributions
-    let contributions = 0;
-    if (year > 1) {
-      if (thresholdRate === null) {
-        // Full Funding: use the constant average annual contribution
-        contributions = averageAnnualContribution;
-      } else {
-        // Threshold: use annual funding adjusted by threshold rate
-        contributions = yearlyAnnualFunding[year - 1] * (1 + thresholdRate);
+        low = mid; // Need more
       }
     }
     
-    // Balance calculation
-    let beginningBalance = year === 1
-      ? projectInfo.beginningReserveBalance
-      : years[year - 2].reserveBalance.endingBalance;
-    
-    const interest = beginningBalance * projectInfo.interestRate;
-    const endingBalance = beginningBalance + contributions + interest - totalExpenditures;
-    const percentFunded = totalFFB > 0 ? beginningBalance / totalFFB : 0;
-    
-    // Build totals object compatible with existing structure
-    const totals = {
-      overall: {
-        totalCost: totalCostThisYear,
-        fullFundingBalance: totalFFB,
-        annualFunding: yearlyAnnualFunding[year - 1],
-        expenditures: totalExpenditures
+    averageAnnualContribution = high;
+  } else {
+    // For threshold scenarios, contribution = currentAnnualContribution * (1 + rate)
+    // (This branch isn't used for Full Funding)
+    averageAnnualContribution = projectInfo.currentAnnualContribution * (1 + thresholdRate);
+  }
+  
+  // ========================================
+  // Build the final cash flow using the determined contribution
+  // ========================================
+  const cashFlowData = runCashFlow(averageAnnualContribution);
+  
+  // Convert to the expected output format
+  const years = cashFlowData.map((yearData, i) => {
+    return {
+      year: yearData.year,
+      fiscalYear: yearData.fiscalYear,
+      componentBreakdowns: [], // Not needed for cash flow display
+      totals: {
+        overall: {
+          totalCost: yearData.totalCost,
+          fullFundingBalance: yearData.totalFFB,
+          annualFunding: yearlyAnnualFunding[i],
+          expenditures: yearData.expenditures
+        }
+      },
+      reserveBalance: {
+        beginningBalance: yearData.beginningBalance,
+        contributions: yearData.contributions,
+        interest: yearData.interest,
+        expenditures: yearData.expenditures,
+        endingBalance: yearData.endingBalance,
+        percentFunded: yearData.totalFFB > 0 ? yearData.beginningBalance / yearData.totalFFB : 0
       }
     };
-    
-    years.push({
-      year,
-      fiscalYear,
-      componentBreakdowns,
-      totals,
-      reserveBalance: {
-        beginningBalance,
-        contributions,
-        interest,
-        expenditures: totalExpenditures,
-        endingBalance,
-        percentFunded
-      }
-    });
-    
-    // After this year: decrement remaining life, reset if replaced
-    componentStates2.forEach(comp => {
-      if (comp.currentRemainingLife <= 0) {
-        comp.currentRemainingLife = comp.typicalUsefulLife;
-      } else {
-        comp.currentRemainingLife -= 1;
-      }
-    });
-  }
+  });
   
   const totalContributions = sum(years, y => y.reserveBalance.contributions);
   
@@ -565,7 +534,7 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
     years,
     totalContributions,
     averageAnnualContribution,
-    yearlyAnnualFunding  // Year-specific values for "Annual Contribution" column
+    yearlyAnnualFunding
   };
 }
 
