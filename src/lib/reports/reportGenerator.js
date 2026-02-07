@@ -51,12 +51,13 @@ export function isPMRequiredForState(stateCompliance = [], siteState = '') {
   if (!siteState || !stateCompliance.length) return true; // Default to true for safety
   
   const stateConfig = stateCompliance.find(
-    s => s.abbreviation === siteState || s.name === siteState
+    s => s.code === siteState || s.name === siteState || 
+         s.abbreviation === siteState || s.code === siteState.toUpperCase()
   );
   
   if (!stateConfig) return true; // State not configured = default to PM required
   
-  return stateConfig.pmRequired === true || stateConfig.pmFundRequired === true;
+  return stateConfig.pmRequired === true;
 }
 
 /**
