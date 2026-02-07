@@ -362,7 +362,7 @@ export default function CalculatePage() {
     const startYear = projectInfo.beginningYear;
     let runningBalance = projectInfo.beginningReserveBalance;
     
-    for (let year = 0; year < 30; year++) {
+    for (let year = 0; year < 31; year++) {
       const fiscalYear = startYear + year;
       
       // Calculate expenditures for this year
