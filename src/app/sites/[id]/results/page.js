@@ -1,6 +1,10 @@
 // src/app/sites/[id]/results/page.js
 // CONDITIONAL DUAL FUND RESULTS PAGE - Shows PM only when required by state
-// v9: Reads pmRequired flag from saved calculation results
+// v9.1: Fixes Component Schedule Summary table calculations
+// - Current Reserve Funds distributed by FFB ratio (not replacement cost ratio)
+// - Funds Needed = Full Funded Balance - Current Reserve Funds (not just FFB)
+// - Annual Funding from calculations engine (straight-line: totalCost / usefulLife)
+// - Per-category percent funded = current reserve funds / FFB
 
 'use client';
 
@@ -98,6 +102,81 @@ export default function ResultsPage() {
     projection5: [],
     projectionBaseline: []
   };
+
+  // ========================================
+  // HELPER: Build per-category summary data
+  // Distributes beginning balance by FFB ratio (matches old program)
+  // ========================================
+  const buildCategorySummary = (fund, fundSchedule, isPM) => {
+    const categories = isPM 
+      ? ['Preventive Maintenance'] 
+      : ['Sitework', 'Building', 'Interior', 'Exterior', 'Electrical', 'Special', 'Mechanical'];
+    
+    const totalFFB = fund.fullyFundedBalance || 0;
+    const beginningBalance = fund.currentBalance || 0;
+    const totalAnnualFunding = fund.recommendedContribution || 0;
+    const totalReplacementCost = fund.totalReplacementCost || 0;
+    
+    // Use per-category data from calculation results if available
+    const calcCategories = fund.byCategory || [];
+    
+    return categories.map(category => {
+      // Try to find pre-calculated category data first
+      const calcCat = calcCategories.find(c => c.category === category);
+      
+      if (calcCat && calcCat.count > 0) {
+        return {
+          category,
+          count: calcCat.count,
+          replacementCost: calcCat.totalCost,
+          currentReserveFunds: calcCat.currentReserveFunds,
+          fundsNeeded: calcCat.fundsNeeded,
+          annualFunding: calcCat.annualFunding,
+          fullFundedBalance: calcCat.fullFundingBalance,
+          percentFunded: calcCat.percentFunded,
+        };
+      }
+      
+      // Fallback: calculate from schedule data using FFB distribution
+      const categoryItems = fundSchedule.filter(s => {
+        if (isPM) return s.isPM;
+        return s.category === category && (pmRequired ? !s.isPM : true);
+      });
+      
+      if (categoryItems.length === 0) return null;
+      
+      const catReplacementCost = categoryItems.reduce((sum, c) => sum + (c.cost || 0), 0);
+      
+      // Distribute by FFB ratio (not replacement cost ratio)
+      // Since we don't have per-category FFB in fallback, use replacement cost as proxy
+      // but properly compute funds needed
+      const costShare = totalReplacementCost > 0 ? catReplacementCost / totalReplacementCost : 0;
+      const catFFB = totalFFB * costShare;
+      const ffbShare = totalFFB > 0 ? catFFB / totalFFB : 0;
+      const catCurrentFunds = beginningBalance * ffbShare;
+      const catFundsNeeded = catFFB - catCurrentFunds;
+      const catAnnualFunding = totalAnnualFunding * costShare;
+      const catPercentFunded = catFFB > 0 ? (catCurrentFunds / catFFB) * 100 : 0;
+      
+      return {
+        category,
+        count: categoryItems.length,
+        replacementCost: catReplacementCost,
+        currentReserveFunds: catCurrentFunds,
+        fundsNeeded: catFundsNeeded,
+        annualFunding: catAnnualFunding,
+        fullFundedBalance: catFFB,
+        percentFunded: catPercentFunded,
+      };
+    }).filter(Boolean);
+  };
+
+  const reserveCategorySummary = buildCategorySummary(reserveFund, schedule, false);
+  const pmCategorySummary = pmRequired ? buildCategorySummary(pmFund, schedule, true) : [];
+
+  // Calculate totals for Funds Needed (FFB - beginning balance)
+  const reserveFundsNeeded = (reserveFund.fullyFundedBalance || 0) - (reserveFund.currentBalance || 0);
+  const pmFundsNeeded = pmRequired ? ((pmFund.fullyFundedBalance || 0) - (pmFund.currentBalance || 0)) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -289,9 +368,7 @@ export default function ResultsPage() {
                   {/* 10% Threshold */}
                   <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4">
                     <h4 className="font-bold text-red-900 mb-2">10% Threshold</h4>
-                    <p className="text-xs text-red-800 mb-3">
-                      Reduced contributions maintaining 10% minimum
-                    </p>
+                    <p className="text-xs text-red-800 mb-3">Reduced contributions maintaining 10% minimum</p>
                     <div className="space-y-2">
                       <div className="bg-white rounded p-2">
                         <div className="text-xs text-gray-600">Multiplier</div>
@@ -320,9 +397,7 @@ export default function ResultsPage() {
                   {/* 5% Threshold */}
                   <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
                     <h4 className="font-bold text-yellow-900 mb-2">5% Threshold</h4>
-                    <p className="text-xs text-yellow-800 mb-3">
-                      Reduced contributions maintaining 5% minimum
-                    </p>
+                    <p className="text-xs text-yellow-800 mb-3">Reduced contributions maintaining 5% minimum</p>
                     <div className="space-y-2">
                       <div className="bg-white rounded p-2">
                         <div className="text-xs text-gray-600">Multiplier</div>
@@ -351,9 +426,7 @@ export default function ResultsPage() {
                   {/* Baseline (0%) */}
                   <div className="bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
                     <h4 className="font-bold text-gray-900 mb-2">Baseline (0%)</h4>
-                    <p className="text-xs text-gray-800 mb-3">
-                      Minimum to avoid negatives
-                    </p>
+                    <p className="text-xs text-gray-800 mb-3">Minimum to avoid negatives</p>
                     <div className="space-y-2">
                       <div className="bg-white rounded p-2">
                         <div className="text-xs text-gray-600">Multiplier</div>
@@ -382,9 +455,7 @@ export default function ResultsPage() {
                   {/* Full Funding */}
                   <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4">
                     <h4 className="font-bold text-green-900 mb-2">Full Funding</h4>
-                    <p className="text-xs text-green-800 mb-3">
-                      Recommended contribution (100%)
-                    </p>
+                    <p className="text-xs text-green-800 mb-3">Recommended contribution (100%)</p>
                     <div className="space-y-2">
                       <div className="bg-white rounded p-2">
                         <div className="text-xs text-gray-600">Multiplier</div>
@@ -455,7 +526,6 @@ export default function ResultsPage() {
                           const proj10 = thresholds.projection10?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
                           const proj5 = thresholds.projection5?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
                           const projBase = thresholds.projectionBaseline?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
-                          const projFull = row;
                           
                           return (
                             <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
@@ -466,8 +536,8 @@ export default function ResultsPage() {
                               <td className="px-3 py-2 text-right font-medium text-gray-900 bg-yellow-50">${Math.round(proj5.endingBalance).toLocaleString()}</td>
                               <td className="px-3 py-2 text-right text-gray-900 bg-gray-50 border-l border-gray-300">${Math.round(projBase.expenditures).toLocaleString()}</td>
                               <td className="px-3 py-2 text-right font-medium text-gray-900 bg-gray-50">${Math.round(projBase.endingBalance).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-green-50 border-l border-gray-300">${Math.round(projFull.expenditures).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-green-50">${Math.round(projFull.endingBalance).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 bg-green-50 border-l border-gray-300">${Math.round(row.expenditures).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-green-50">${Math.round(row.endingBalance).toLocaleString()}</td>
                             </tr>
                           );
                         })}
@@ -530,25 +600,36 @@ export default function ResultsPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {reserveCashFlow.map((row, index) => (
-                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="px-3 py-2 text-sm font-bold text-gray-900 text-center border-r border-gray-300">{row.year}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900 text-right">${Math.round(row.contributions).toLocaleString()}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900 text-right">${Math.round(row.expenditures).toLocaleString()}</td>
-                          <td className="px-3 py-2 text-sm font-medium text-gray-900 text-right border-r border-gray-300">${Math.round(row.endingBalance).toLocaleString()}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900 text-right bg-green-50">${Math.round(reserveFund.recommendedContribution || 0).toLocaleString()}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900 text-right bg-green-50">${Math.round(reserveFund.recommendedContribution || 0).toLocaleString()}</td>
-                          <td className="px-3 py-2 text-sm font-medium text-gray-900 text-right bg-green-50">
-                            ${Math.round((reserveFund.currentBalance || 0) + (reserveFund.recommendedContribution || 0) * (index + 1) - row.expenditures).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
+                      {reserveCashFlow.map((row, index) => {
+                        // Track cumulative expenditures for full funding balance
+                        const cumulativeExpend = reserveCashFlow.slice(0, index + 1).reduce((s, r) => s + (r.expenditures || 0), 0);
+                        const fullFundingBalance = (reserveFund.currentBalance || 0) + (reserveFund.recommendedContribution || 0) * (index + 1) - cumulativeExpend;
+                        
+                        return (
+                          <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-3 py-2 text-sm font-bold text-gray-900 text-center border-r border-gray-300">{row.year}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900 text-right">${Math.round(row.contributions).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900 text-right">${Math.round(row.expenditures).toLocaleString()}</td>
+                            <td className={`px-3 py-2 text-sm font-medium text-right border-r border-gray-300 ${row.endingBalance < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                              ${Math.round(row.endingBalance).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 text-sm text-gray-900 text-right bg-green-50">${Math.round(reserveFund.recommendedContribution || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900 text-right bg-green-50">${Math.round(reserveFund.recommendedContribution || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-sm font-medium text-gray-900 text-right bg-green-50">
+                              ${Math.round(fullFundingBalance).toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
                       <tr className="bg-gray-100 font-bold">
                         <td className="px-3 py-3 text-sm text-gray-900 text-center border-r border-gray-300">TOTAL</td>
                         <td className="px-3 py-3 text-sm text-gray-900 text-right">
                           ${Math.round(reserveCashFlow.reduce((sum, r) => sum + r.contributions, 0)).toLocaleString()}
                         </td>
-                        <td className="px-3 py-3 text-sm text-gray-900 text-right" colSpan="2"></td>
+                        <td className="px-3 py-3 text-sm text-gray-900 text-right">
+                          ${Math.round(reserveCashFlow.reduce((sum, r) => sum + r.expenditures, 0)).toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 border-r border-gray-300"></td>
                         <td className="px-3 py-3 text-sm text-gray-900 text-right bg-green-50">
                           ${Math.round((reserveFund.recommendedContribution || 0) * 30).toLocaleString()}
                         </td>
@@ -591,25 +672,35 @@ export default function ResultsPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {pmCashFlow.map((row, index) => (
-                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="px-3 py-2 text-sm font-bold text-gray-900 text-center border-r border-gray-300">{row.year}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900 text-right">${Math.round(row.contributions).toLocaleString()}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900 text-right">${Math.round(row.expenditures).toLocaleString()}</td>
-                          <td className="px-3 py-2 text-sm font-medium text-gray-900 text-right border-r border-gray-300">${Math.round(row.endingBalance).toLocaleString()}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900 text-right bg-green-50">${Math.round(pmFund.recommendedContribution || 0).toLocaleString()}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900 text-right bg-green-50">${Math.round(pmFund.recommendedContribution || 0).toLocaleString()}</td>
-                          <td className="px-3 py-2 text-sm font-medium text-gray-900 text-right bg-green-50">
-                            ${Math.round((pmFund.currentBalance || 0) + (pmFund.recommendedContribution || 0) * (index + 1) - row.expenditures).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
+                      {pmCashFlow.map((row, index) => {
+                        const cumulativeExpend = pmCashFlow.slice(0, index + 1).reduce((s, r) => s + (r.expenditures || 0), 0);
+                        const fullFundingBalance = (pmFund.currentBalance || 0) + (pmFund.recommendedContribution || 0) * (index + 1) - cumulativeExpend;
+                        
+                        return (
+                          <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-3 py-2 text-sm font-bold text-gray-900 text-center border-r border-gray-300">{row.year}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900 text-right">${Math.round(row.contributions).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900 text-right">${Math.round(row.expenditures).toLocaleString()}</td>
+                            <td className={`px-3 py-2 text-sm font-medium text-right border-r border-gray-300 ${row.endingBalance < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                              ${Math.round(row.endingBalance).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 text-sm text-gray-900 text-right bg-green-50">${Math.round(pmFund.recommendedContribution || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900 text-right bg-green-50">${Math.round(pmFund.recommendedContribution || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-sm font-medium text-gray-900 text-right bg-green-50">
+                              ${Math.round(fullFundingBalance).toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
                       <tr className="bg-gray-100 font-bold">
                         <td className="px-3 py-3 text-sm text-gray-900 text-center border-r border-gray-300">TOTAL</td>
                         <td className="px-3 py-3 text-sm text-gray-900 text-right">
                           ${Math.round(pmCashFlow.reduce((sum, r) => sum + r.contributions, 0)).toLocaleString()}
                         </td>
-                        <td className="px-3 py-3 text-sm text-gray-900 text-right" colSpan="2"></td>
+                        <td className="px-3 py-3 text-sm text-gray-900 text-right">
+                          ${Math.round(pmCashFlow.reduce((sum, r) => sum + r.expenditures, 0)).toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 border-r border-gray-300"></td>
                         <td className="px-3 py-3 text-sm text-gray-900 text-right bg-green-50">
                           ${Math.round((pmFund.recommendedContribution || 0) * 30).toLocaleString()}
                         </td>
@@ -624,6 +715,9 @@ export default function ResultsPage() {
               </div>
             )}
 
+            {/* ============================================================ */}
+            {/* SUMMARY TAB - FIXED Component Schedule Summary               */}
+            {/* ============================================================ */}
             {activeTab === 'summary' && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-6">📊 Component Schedule Summary</h3>
@@ -645,79 +739,29 @@ export default function ResultsPage() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {['Sitework', 'Building', 'Interior', 'Exterior', 'Electrical', 'Special', 'Mechanical'].map((category) => {
-                          // When PM not required, include all components in reserve
-                          const categoryComponents = schedule.filter(s => {
-                            if (pmRequired) return !s.isPM && s.category === category;
-                            return s.category === category; // all components are reserve
-                          });
-                          const totalCost = categoryComponents.reduce((sum, c) => sum + (c.cost || 0), 0);
-                          
-                          if (categoryComponents.length === 0) return null;
-                          
-                          const categoriesWithComponents = ['Sitework', 'Building', 'Interior', 'Exterior', 'Electrical', 'Special', 'Mechanical']
-                            .filter(cat => {
-                              if (pmRequired) return schedule.filter(s => !s.isPM && s.category === cat).length > 0;
-                              return schedule.filter(s => s.category === cat).length > 0;
-                            });
-                          
-                          if (categoriesWithComponents.length === 1) {
-                            return (
-                              <tr key={category} className="border-b border-gray-300">
-                                <td className="px-4 py-2 text-sm text-gray-900 border-r border-gray-300">{category}</td>
-                                <td className="px-4 py-2 text-center text-sm text-gray-900 border-r border-gray-300">
-                                  {reserveFund.percentFunded?.toFixed(0)}%
-                                </td>
-                                <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
-                                  ${Math.round(reserveFund.totalReplacementCost || 0).toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
-                                  ${Math.round(reserveFund.currentBalance || 0).toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
-                                  ${Math.round(reserveFund.fullyFundedBalance || 0).toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
-                                  ${Math.round(reserveFund.recommendedContribution || 0).toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-sm text-gray-900">
-                                  ${Math.round(reserveFund.fullyFundedBalance || 0).toLocaleString()}
-                                </td>
-                              </tr>
-                            );
-                          }
-                          
-                          const categoryShare = totalCost / (reserveFund.totalReplacementCost || 1);
-                          const categoryFunds = (reserveFund.currentBalance || 0) * categoryShare;
-                          const categoryNeeded = (reserveFund.fullyFundedBalance || 0) * categoryShare;
-                          const categoryAnnual = (reserveFund.recommendedContribution || 0) * categoryShare;
-                          const categoryFullFunded = categoryNeeded;
-                          const categoryPercent = categoryFunds > 0 ? (categoryFunds / categoryFullFunded) * 100 : 0;
-                          
-                          return (
-                            <tr key={category} className="border-b border-gray-300">
-                              <td className="px-4 py-2 text-sm text-gray-900 border-r border-gray-300">{category}</td>
-                              <td className="px-4 py-2 text-center text-sm text-gray-900 border-r border-gray-300">
-                                {categoryPercent > 0 ? `${categoryPercent.toFixed(0)}%` : '-'}
-                              </td>
-                              <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
-                                ${Math.round(totalCost).toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
-                                ${Math.round(categoryFunds).toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
-                                ${Math.round(categoryNeeded).toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
-                                ${Math.round(categoryAnnual).toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-sm text-gray-900">
-                                ${Math.round(categoryFullFunded).toLocaleString()}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {reserveCategorySummary.map((cat) => (
+                          <tr key={cat.category} className="border-b border-gray-300">
+                            <td className="px-4 py-2 text-sm text-gray-900 border-r border-gray-300">{cat.category}</td>
+                            <td className="px-4 py-2 text-center text-sm text-gray-900 border-r border-gray-300">
+                              {cat.percentFunded > 0 ? `${cat.percentFunded.toFixed(0)}%` : '-'}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
+                              ${Math.round(cat.replacementCost).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
+                              ${Math.round(cat.currentReserveFunds).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
+                              ${Math.round(cat.fundsNeeded).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
+                              ${Math.round(cat.annualFunding).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">
+                              ${Math.round(cat.fullFundedBalance).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
                         <tr className="bg-blue-100 font-bold border-t-2 border-blue-900">
                           <td className="px-4 py-3 text-sm text-blue-900">Totals</td>
                           <td className="px-4 py-3 text-center text-sm text-blue-900">
@@ -730,7 +774,7 @@ export default function ResultsPage() {
                             ${Math.round(reserveFund.currentBalance || 0).toLocaleString()}
                           </td>
                           <td className="px-4 py-3 text-right text-sm text-blue-900">
-                            ${Math.round(reserveFund.fullyFundedBalance || 0).toLocaleString()}
+                            ${Math.round(reserveFundsNeeded).toLocaleString()}
                           </td>
                           <td className="px-4 py-3 text-right text-sm text-blue-900">
                             ${Math.round(reserveFund.recommendedContribution || 0).toLocaleString()}
@@ -762,31 +806,33 @@ export default function ResultsPage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          <tr className="bg-white">
-                            <td className="px-4 py-2 text-sm text-gray-900 font-medium">Preventive Maintenance</td>
-                            <td className="px-4 py-2 text-center text-sm text-gray-900">
-                              {pmFund.componentCount > 0 ? `${pmFund.percentFunded?.toFixed(0)}%` : '#DIV/0!'}
-                            </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-900">
-                              ${Math.round(pmFund.totalReplacementCost || 0).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-900">
-                              ${Math.round(pmFund.currentBalance || 0).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-900">
-                              ${Math.round(pmFund.fullyFundedBalance || 0).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-900">
-                              ${Math.round(pmFund.recommendedContribution || 0).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-900">
-                              ${Math.round(pmFund.fullyFundedBalance || 0).toLocaleString()}
-                            </td>
-                          </tr>
+                          {pmCategorySummary.map((cat) => (
+                            <tr key={cat.category} className="bg-white">
+                              <td className="px-4 py-2 text-sm text-gray-900 font-medium">{cat.category}</td>
+                              <td className="px-4 py-2 text-center text-sm text-gray-900">
+                                {cat.percentFunded > 0 ? `${cat.percentFunded.toFixed(0)}%` : '-'}
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm text-gray-900">
+                                ${Math.round(cat.replacementCost).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm text-gray-900">
+                                ${Math.round(cat.currentReserveFunds).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm text-gray-900">
+                                ${Math.round(cat.fundsNeeded).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm text-gray-900">
+                                ${Math.round(cat.annualFunding).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm text-gray-900">
+                                ${Math.round(cat.fullFundedBalance).toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
                           <tr className="bg-purple-100 font-bold border-t-2 border-purple-900">
                             <td className="px-4 py-3 text-sm text-purple-900">Totals</td>
                             <td className="px-4 py-3 text-center text-sm text-purple-900">
-                              {pmFund.componentCount > 0 ? `${pmFund.percentFunded?.toFixed(0)}%` : '#DIV/0!'}
+                              {pmFund.percentFunded?.toFixed(0)}%
                             </td>
                             <td className="px-4 py-3 text-right text-sm text-purple-900">
                               ${Math.round(pmFund.totalReplacementCost || 0).toLocaleString()}
@@ -795,7 +841,7 @@ export default function ResultsPage() {
                               ${Math.round(pmFund.currentBalance || 0).toLocaleString()}
                             </td>
                             <td className="px-4 py-3 text-right text-sm text-purple-900">
-                              ${Math.round(pmFund.fullyFundedBalance || 0).toLocaleString()}
+                              ${Math.round(pmFundsNeeded).toLocaleString()}
                             </td>
                             <td className="px-4 py-3 text-right text-sm text-purple-900">
                               ${Math.round(pmFund.recommendedContribution || 0).toLocaleString()}
@@ -833,47 +879,53 @@ export default function ResultsPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {/* Building Category Header */}
-                      <tr className="bg-blue-100 sticky" style={{top: '48px', zIndex: 15}}>
-                        <td colSpan="31" className="px-3 py-2 text-sm font-bold text-blue-900 uppercase sticky left-0 z-20 bg-blue-100 border-r-2 border-gray-300">
-                          Building
-                        </td>
-                      </tr>
-                      
-                      {/* Reserve Fund Components (or all components when PM not required) */}
-                      {schedule
-                        .filter(item => pmRequired ? (!item.isPM && item.category === 'Building') : item.category === 'Building')
-                        .sort((a, b) => a.description.localeCompare(b.description))
-                        .map((item, idx) => (
-                          <tr key={`reserve-${idx}`} className={idx % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
-                            <td className="px-3 py-2 text-sm text-gray-900 font-medium sticky left-0 z-10 bg-inherit border-r-2 border-gray-300 whitespace-nowrap">
-                              {item.description}
-                            </td>
-                            {Array.from({ length: 30 }, (_, i) => (site?.beginningYear || 2026) + i).map(year => {
-                              const isReplacementYear = item.year === year;
-                              const cost = isReplacementYear ? Math.round(item.cost) : null;
-                              return (
-                                <td 
-                                  key={year} 
-                                  className={`px-2 py-2 text-center border-l border-gray-200 ${
-                                    isReplacementYear 
-                                      ? 'bg-blue-300 font-bold text-gray-900' 
-                                      : ''
-                                  }`}
-                                >
-                                  {cost ? `$${cost.toLocaleString()}` : ''}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
+                      {/* Category Headers and Components */}
+                      {['Sitework', 'Building', 'Interior', 'Exterior', 'Electrical', 'Special', 'Mechanical'].map(category => {
+                        const categoryItems = schedule.filter(item => 
+                          pmRequired ? (!item.isPM && item.category === category) : item.category === category
+                        );
+                        if (categoryItems.length === 0) return null;
+                        
+                        return (
+                          <React.Fragment key={category}>
+                            <tr className="bg-blue-100 sticky" style={{top: '48px', zIndex: 15}}>
+                              <td colSpan="31" className="px-3 py-2 text-sm font-bold text-blue-900 uppercase sticky left-0 z-20 bg-blue-100 border-r-2 border-gray-300">
+                                {category}
+                              </td>
+                            </tr>
+                            {categoryItems
+                              .sort((a, b) => a.description.localeCompare(b.description))
+                              .map((item, idx) => (
+                                <tr key={`${category}-${idx}`} className={idx % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
+                                  <td className="px-3 py-2 text-sm text-gray-900 font-medium sticky left-0 z-10 bg-inherit border-r-2 border-gray-300 whitespace-nowrap">
+                                    {item.description}
+                                  </td>
+                                  {Array.from({ length: 30 }, (_, i) => (site?.beginningYear || 2026) + i).map(year => {
+                                    const isReplacementYear = item.year === year;
+                                    const cost = isReplacementYear ? Math.round(item.cost) : null;
+                                    return (
+                                      <td 
+                                        key={year} 
+                                        className={`px-2 py-2 text-center border-l border-gray-200 ${
+                                          isReplacementYear ? 'bg-blue-300 font-bold text-gray-900' : ''
+                                        }`}
+                                      >
+                                        {cost ? `$${cost.toLocaleString()}` : ''}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                          </React.Fragment>
+                        );
+                      })}
                       
                       {/* PM Fund Components - Only show when PM required and has PM items */}
                       {pmRequired && schedule.some(item => item.isPM) && (
                         <>
                           <tr className="bg-purple-100 sticky" style={{top: '48px', zIndex: 15}}>
                             <td colSpan="31" className="px-3 py-2 text-sm font-bold text-purple-900 uppercase sticky left-0 z-20 bg-purple-100 border-r-2 border-gray-300">
-                              Building Exterior (Preventive Maintenance)
+                              Preventive Maintenance
                             </td>
                           </tr>
                           
@@ -892,9 +944,7 @@ export default function ResultsPage() {
                                     <td 
                                       key={year} 
                                       className={`px-2 py-2 text-center border-l border-gray-200 ${
-                                        isReplacementYear 
-                                          ? 'bg-purple-300 font-bold text-gray-900' 
-                                          : ''
+                                        isReplacementYear ? 'bg-purple-300 font-bold text-gray-900' : ''
                                       }`}
                                     >
                                       {cost ? `$${cost.toLocaleString()}` : ''}
