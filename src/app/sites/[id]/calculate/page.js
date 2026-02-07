@@ -46,23 +46,47 @@ export default function CalculatePage() {
         // ========================================
         let isPMRequired = true; // default true
         try {
-          const orgId = siteData?.organizationId || currentUser.uid;
-          const orgDoc = await getDoc(doc(db, 'organizations', orgId));
-          if (orgDoc.exists()) {
-            const orgData = orgDoc.data();
-            const stateCompliance = orgData?.settings?.stateCompliance || [];
-            const siteState = siteData?.companyState || '';
-            
-            // Find matching state in compliance settings
-            const stateConfig = stateCompliance.find(
-              s => s.abbreviation === siteState || s.name === siteState
-            );
-            
-            if (stateConfig) {
-              isPMRequired = stateConfig.pmRequired === true || stateConfig.pmFundRequired === true;
+          // Find org ID: check site doc first, then user doc
+          let orgId = siteData?.organizationId;
+          if (!orgId) {
+            // Look up from user doc
+            const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+            if (userDoc.exists()) {
+              orgId = userDoc.data()?.organizationId;
             }
-            
-            console.log(`🏛️ State: ${siteState}, PM Required: ${isPMRequired}`);
+          }
+          
+          console.log('🔍 Org ID:', orgId);
+          
+          if (orgId) {
+            const orgDoc = await getDoc(doc(db, 'organizations', orgId));
+            if (orgDoc.exists()) {
+              const orgData = orgDoc.data();
+              const stateCompliance = orgData?.settings?.stateCompliance || [];
+              const siteState = siteData?.companyState || '';
+              
+              console.log('🔍 Site state:', siteState);
+              console.log('🔍 State compliance entries:', stateCompliance.length);
+              
+              // Find matching state - check code, abbreviation, and name
+              const stateConfig = stateCompliance.find(
+                s => s.code === siteState || s.name === siteState || 
+                     s.abbreviation === siteState || s.code === siteState.toUpperCase()
+              );
+              
+              if (stateConfig) {
+                isPMRequired = stateConfig.pmRequired === true;
+                console.log(`🏛️ Found state config:`, stateConfig);
+              } else {
+                console.log(`⚠️ No state config found for "${siteState}", defaulting PM to true`);
+              }
+              
+              console.log(`🏛️ State: ${siteState}, PM Required: ${isPMRequired}`);
+            } else {
+              console.log('⚠️ Org document not found:', orgId);
+            }
+          } else {
+            console.log('⚠️ No organizationId found on site or user doc');
           }
         } catch (err) {
           console.warn('Could not load org compliance settings, defaulting PM to true:', err);
