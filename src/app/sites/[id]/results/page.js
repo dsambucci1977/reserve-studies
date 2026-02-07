@@ -175,8 +175,8 @@ export default function ResultsPage() {
   const pmCategorySummary = pmRequired ? buildCategorySummary(pmFund, schedule, true) : [];
 
   // Calculate totals for Funds Needed (FFB - beginning balance)
-  const reserveFundsNeeded = (reserveFund.fullyFundedBalance || 0) - (reserveFund.currentBalance || 0);
-  const pmFundsNeeded = pmRequired ? ((pmFund.fullyFundedBalance || 0) - (pmFund.currentBalance || 0)) : 0;
+  const reserveFundsNeeded = (reserveFund.totalReplacementCost || 0) - (reserveFund.currentBalance || 0);
+  const pmFundsNeeded = pmRequired ? ((pmFund.totalReplacementCost || 0) - (pmFund.currentBalance || 0)) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
