@@ -1,9 +1,19 @@
-// Professional Report Template - Beahm Consulting Format v8
-// Fixes from v7:
-// 1. PM sections now use GREEN headers (not teal) to match PM Fund branding
-// 2. Added table header variants for green tables (.table-green th)
-// 3. Added page break before COMPONENTS NOTES section
-// 4. Fixed table header contrast issues
+// Professional Report Template - Beahm Consulting Format v9
+// Changes from v8:
+// 1. Conditional PM sections wrapped in <!--PM_START--> / <!--PM_END--> markers
+// 2. Non-PM alternatives wrapped in <!--NOPM_START--> / <!--NOPM_END--> markers
+// 3. Update-only sections wrapped in <!--UPDATE_START--> / <!--UPDATE_END--> markers
+// 4. NJ-specific compliance wrapped in <!--NJ_START--> / <!--NJ_END--> markers
+// 5. Report generator strips blocks based on studyType + state compliance settings
+// 6. Non-PM reports: cover page has no PM title, single Reserve Fund card, no PM info/tables/sections
+// 7. PM sections still use GREEN headers
+// 8. Added REVIEW OF DRAFT REPORTS section for Update studies
+//
+// Marker reference:
+//   <!--PM_START-->...<!--PM_END-->       = PM-only (removed when PM not required)
+//   <!--NOPM_START-->...<!--NOPM_END-->   = Reserve-only (removed when PM IS required)
+//   <!--UPDATE_START-->...<!--UPDATE_END-->= Update study only (removed for Full studies)
+//   <!--NJ_START-->...<!--NJ_END-->       = NJ compliance text (removed for non-NJ)
 
 export const DEFAULT_REPORT_TEMPLATE = `
 <!DOCTYPE html>
@@ -269,6 +279,14 @@ export const DEFAULT_REPORT_TEMPLATE = `
       margin: 0.1in 0;
     }
     
+    .summary-cards-single {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.12in;
+      margin: 0.1in 0;
+      max-width: 50%;
+    }
+    
     .summary-card {
       border: 2px solid #e0e0e0;
       border-radius: 5px;
@@ -473,9 +491,11 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <div class="cover-title-box">
     <div class="cover-title">{coverTitle}</div>
     {coverSubtitle}
+<!--PM_START-->
     <div class="cover-and">&amp;</div>
     <div class="cover-title">PREVENTIVE MAINTENANCE</div>
     <div class="cover-title">SCHEDULE</div>
+<!--PM_END-->
   </div>
   
   <div class="cover-prepared">
@@ -483,9 +503,11 @@ export const DEFAULT_REPORT_TEMPLATE = `
     <p><strong>SUBMITTED:</strong> {currentDate}</p>
   </div>
   
+<!--NJ_START-->
   <div class="cover-compliance">
     Complies with New Jersey Residential Housing Bill S2760/A4384
   </div>
+<!--NJ_END-->
   
   <div class="cover-footer">
     <div class="company-name">{companyName}</div>
@@ -496,7 +518,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== INTRODUCTION (no TOC page - saves space) ==================== -->
+<!-- ==================== INTRODUCTION ==================== -->
 <div id="introduction" class="section-header">INTRODUCTION</div>
 
 <div class="content-section">
@@ -534,6 +556,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div id="reserve-chart" class="section-header">RESERVE STUDY CHART</div>
 
 <div class="content-section">
+<!--PM_START-->
   <div class="summary-cards">
     <div class="summary-card">
       <div class="summary-card-header reserve">💰 Reserve Fund</div>
@@ -578,6 +601,32 @@ export const DEFAULT_REPORT_TEMPLATE = `
       </div>
     </div>
   </div>
+<!--PM_END-->
+<!--NOPM_START-->
+  <div class="summary-cards-single">
+    <div class="summary-card">
+      <div class="summary-card-header reserve">💰 Reserve Fund</div>
+      <div class="summary-card-body">
+        <div class="summary-item">
+          <div class="summary-label">Percent Funded</div>
+          <div class="summary-value">{percentFunded}</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Current Balance</div>
+          <div class="summary-value">{beginningReserveBalance}</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Current Contribution</div>
+          <div class="summary-value">{currentAnnualContribution}</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Recommended</div>
+          <div class="summary-value highlight">{recommendedAnnualFunding}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+<!--NOPM_END-->
 </div>
 
 <!-- ==================== RESERVE FUND INFO ==================== -->
@@ -593,7 +642,8 @@ export const DEFAULT_REPORT_TEMPLATE = `
   </table>
 </div>
 
-<!-- ==================== PM FUND INFO ==================== -->
+<!-- ==================== PM FUND INFO (PM only) ==================== -->
+<!--PM_START-->
 <div id="pm-fund-info" class="section-header section-header-green">PREVENTIVE MAINTENANCE FUND INFORMATION</div>
 
 <div class="content-section">
@@ -605,6 +655,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
     <tr><td><strong>Averaging Length in Years:</strong></td><td class="text-right text-bold" style="font-size:10pt;">30</td></tr>
   </table>
 </div>
+<!--PM_END-->
 
 <!-- ==================== TERMS ==================== -->
 <div id="terms" class="section-header">TERMS AND DEFINITIONS</div>
@@ -628,7 +679,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
     
     <p><strong>Component Method</strong> - A funding method where the total reserve contribution is calculated based on the individual funding needs of each component.</p>
     
-    <p><strong>Condition Assessment</strong> - The evaluation of a component's current condition, based on either visual inspection or reported data.</p>
+    <p><strong>Condition Assessment</strong> - The evaluation of a component's current condition, based on either visual observation or reported data.</p>
     
     <p><strong>Effective Age</strong> - The difference between a component's useful life and its remaining useful life. This figure may differ from chronological age due to irregular patterns of wear or usage and is often used in reserve calculations.</p>
     
@@ -705,6 +756,17 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <p><strong>Useful Life (UL)</strong> - Useful Life refers to the estimated number of years a reserve component is expected to remain functional and perform its intended purpose—assuming it has been properly constructed and maintained in its current application or installation.</p>
 </div>
 
+<!-- ==================== REVIEW OF DRAFT REPORTS (Update studies only) ==================== -->
+<!--UPDATE_START-->
+<div id="review-draft" class="section-header">REVIEW OF DRAFT REPORTS</div>
+<div class="content-section">
+  <div class="editable-section">
+    <p>As part of this update, a draft reserve study was submitted to the Association's Board of Directors and/or Property Manager for review. The draft included preliminary component schedules, cost estimates, and funding projections. Any comments, corrections, or additional information provided by the Association have been incorporated into this final report.</p>
+    <p>The Board and/or management representative confirmed that the component inventory and associated costs accurately reflect the current condition of the community's common elements. This collaborative review process ensures the reserve study reflects the most current and accurate information available.</p>
+  </div>
+</div>
+<!--UPDATE_END-->
+
 <!-- ==================== PHYSICAL ANALYSIS ==================== -->
 <div id="physical-analysis" class="section-header">PHYSICAL ANALYSIS</div>
 <div class="content-section">
@@ -743,7 +805,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== COMPONENT NOTES (NOW ON OWN PAGE) ==================== -->
+<!-- ==================== COMPONENT NOTES ==================== -->
 <div id="component-notes" class="section-header">COMPONENTS NOTES</div>
 
 <div class="content-section">
@@ -783,6 +845,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
     </div>
   </div>
   
+<!--PM_START-->
   <div class="recommendation-box green">
     <div class="recommendation-header">🟢 Preventive Maintenance Funding</div>
     <div class="recommendation-body">
@@ -792,6 +855,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
       </ul>
     </div>
   </div>
+<!--PM_END-->
 </div>
 
 <div class="page-break"></div>
@@ -827,7 +891,8 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== PM SECTION (own page) - NOW GREEN ==================== -->
+<!-- ==================== PM SECTION (own page) - PM only ==================== -->
+<!--PM_START-->
 <div id="pm-section" class="section-header section-header-green">PREVENTIVE MAINTENANCE</div>
 
 <div class="content-section">
@@ -838,7 +903,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== PM EXPENDITURES (before cash flow) - NOW GREEN ==================== -->
+<!-- ==================== PM EXPENDITURES - PM only ==================== -->
 <div id="pm-expenditures" class="section-header section-header-green">PM EXPENDITURES</div>
 
 <div class="content-section">
@@ -848,7 +913,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
-<!-- ==================== PM CASH FLOW - NOW GREEN ==================== -->
+<!-- ==================== PM CASH FLOW - PM only ==================== -->
 <div id="pm-cash-flow" class="section-header section-header-green">PM THIRTY YEAR CASH FLOW</div>
 
 <div class="content-section">
@@ -857,6 +922,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
+<!--PM_END-->
 
 <!-- ==================== RECOMMENDATIONS ==================== -->
 <div id="recommendations" class="section-header section-header-orange">RECOMMENDATIONS</div>
@@ -872,6 +938,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
     </div>
   </div>
   
+<!--PM_START-->
   <div class="recommendation-box green">
     <div class="recommendation-header">🟢 Preventive Maintenance Funding</div>
     <div class="recommendation-body">
@@ -879,12 +946,15 @@ export const DEFAULT_REPORT_TEMPLATE = `
       Recommended: <strong>{pmRecommendedFunding}</strong></p>
     </div>
   </div>
+<!--PM_END-->
   
   <div class="recommendation-box blue">
     <div class="recommendation-header">📅 Updating the Reserve Study</div>
     <div class="recommendation-body">
       <p>{companyName} recommends updating the reserve study <strong>Every Three (3) Years</strong>.</p>
+<!--NJ_START-->
       <p>New Jersey Law requires updates at a Maximum of <strong>Every Five (5) Years</strong>.</p>
+<!--NJ_END-->
       <p>Regular updates will help avoid the necessity of large increases in the future.</p>
     </div>
   </div>
@@ -944,8 +1014,10 @@ export const DEFAULT_REPORT_TEMPLATE = `
     By the American Institute of Certified Public Accountants<br>
     Dated 2021</li>
     
+<!--NJ_START-->
     <li><strong>New Jersey Reserve Study Law</strong> (referred to as NJ Senate Bill S2760 and NJ Assembly Bill A4384)<br>
     Dated 2024</li>
+<!--NJ_END-->
   </ol>
 </div>
 
