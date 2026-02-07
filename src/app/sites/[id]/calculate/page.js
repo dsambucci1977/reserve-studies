@@ -327,8 +327,9 @@ export default function CalculatePage() {
         reserveCashFlow: reserveCashFlowWithExpend,
         pmCashFlow: pmCashFlowWithExpend,
         // Full Funding cash flow from calculations engine (for results page Full Funding Analysis columns)
-        fullFundingCashFlow: reserveResults.thresholdScenarios.fullFunding.years.map(y => ({
+        fullFundingCashFlow: reserveResults.thresholdScenarios.fullFunding.years.map((y, i) => ({
           year: y.fiscalYear,
+          annualContribution: Math.round(reserveResults.thresholdScenarios.fullFunding.yearlyAnnualFunding[i]),
           contributions: Math.round(y.reserveBalance.contributions),
           expenditures: Math.round(y.reserveBalance.expenditures),
           endingBalance: Math.round(y.reserveBalance.endingBalance),
