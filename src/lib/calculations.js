@@ -470,27 +470,156 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
   let averageAnnualContribution;
   
   if (thresholdRate === null) {
-    // Binary search for the constant contribution that keeps the fund fully funded
-    // Target: ending balance in year 31 should equal the FFB (fully funded balance)
-    // This ensures the fund maintains adequate reserves throughout
+    // Binary search for the constant contribution where:
+    // candidate = average of all 30 year-specific annualFundings
+    // Each year's annualFunding depends on the running balance (which uses the candidate)
+    // This matches the old program's circular reference: H = SUM(G)/30, I uses H
+    
     let low = 0;
     let high = yearlyAnnualFunding[0] * 3; // generous upper bound
     
     for (let i = 0; i < 100; i++) {
       const mid = (low + high) / 2;
+      
+      // Run cash flow with this candidate contribution
       const testFlow = runCashFlow(mid);
       
-      // Check if the final year ending balance >= final year FFB
-      const lastYear = testFlow[testFlow.length - 1];
+      // For each year, distribute the balance to components by FFB ratio
+      // and compute annualFunding = (cost - reserve) / remainingLife
+      const testCompStates = components.map(comp => ({
+        ...comp,
+        currentRemainingLife: comp.estimatedRemainingLife,
+      }));
       
-      if (lastYear.endingBalance >= lastYear.totalFFB) {
-        high = mid; // Can go lower
+      let totalAF = 0;
+      
+      for (let year = 1; year <= 31; year++) {
+        const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year - 1);
+        const yearBalance = year === 1 
+          ? projectInfo.beginningReserveBalance 
+          : testFlow[year - 2].endingBalance;
+        
+        // Calculate FFB for each component first (for distribution ratio)
+        let totalFFBThisYear = 0;
+        const compFFBs = testCompStates.map(comp => {
+          const costPerUnit = (comp.costPerUnit || 0) * inflationMultiplier;
+          const compTotalCost = (comp.quantity || 0) * costPerUnit;
+          const remainingLife = Math.max(0, comp.currentRemainingLife);
+          
+          let ffb = 0;
+          if (comp.typicalUsefulLife > 0) {
+            const effectiveAge = comp.typicalUsefulLife - remainingLife;
+            ffb = (compTotalCost / comp.typicalUsefulLife) * effectiveAge;
+          } else {
+            ffb = compTotalCost;
+          }
+          totalFFBThisYear += ffb;
+          return { compTotalCost, remainingLife, ffb };
+        });
+        
+        // Distribute balance by FFB ratio and compute annualFunding
+        // Only count years 2-31 (year 1 is starting snapshot, but Year 1 annual 
+        // funding goes into the average per the formula =SUM(G$11:G$40)/30)
+        // G11 = Year 1 (first contributing year, 2026), G40 = Year 30 (2055)
+        if (year >= 2) {
+          let yearAF = 0;
+          testCompStates.forEach((comp, idx) => {
+            const { compTotalCost, remainingLife } = compFFBs[idx];
+            const ffbShare = totalFFBThisYear > 0 ? compFFBs[idx].ffb / totalFFBThisYear : 0;
+            const compReserve = yearBalance * ffbShare;
+            const fundsNeeded = compTotalCost - compReserve;
+            
+            if (remainingLife > 0) {
+              yearAF += fundsNeeded / remainingLife;
+            } else if (comp.typicalUsefulLife > 0) {
+              yearAF += fundsNeeded / comp.typicalUsefulLife;
+            }
+          });
+          totalAF += yearAF;
+        }
+        
+        // Cycle components
+        testCompStates.forEach(comp => {
+          if (comp.currentRemainingLife <= 0) {
+            comp.currentRemainingLife = comp.typicalUsefulLife;
+          } else {
+            comp.currentRemainingLife -= 1;
+          }
+        });
+      }
+      
+      const computedAverage = totalAF / 30;
+      
+      if (mid > computedAverage) {
+        high = mid;
       } else {
-        low = mid; // Need more
+        low = mid;
       }
     }
     
-    averageAnnualContribution = high;
+    averageAnnualContribution = (low + high) / 2;
+    
+    // Recalculate yearlyAnnualFunding using the converged average
+    // (the initial yearlyAnnualFunding was computed without balance distribution)
+    const finalFlow = runCashFlow(averageAnnualContribution);
+    const finalCompStates = components.map(comp => ({
+      ...comp,
+      currentRemainingLife: comp.estimatedRemainingLife,
+    }));
+    
+    // Clear and recalculate
+    yearlyAnnualFunding.length = 0;
+    yearlyAnnualFunding.push(0); // Year 1 placeholder
+    
+    for (let year = 1; year <= 31; year++) {
+      const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year - 1);
+      const yearBalance = year === 1 
+        ? projectInfo.beginningReserveBalance 
+        : finalFlow[year - 2].endingBalance;
+      
+      let totalFFBThisYear = 0;
+      const compData = finalCompStates.map(comp => {
+        const costPerUnit = (comp.costPerUnit || 0) * inflationMultiplier;
+        const compTotalCost = (comp.quantity || 0) * costPerUnit;
+        const remainingLife = Math.max(0, comp.currentRemainingLife);
+        let ffb = 0;
+        if (comp.typicalUsefulLife > 0) {
+          const effectiveAge = comp.typicalUsefulLife - remainingLife;
+          ffb = (compTotalCost / comp.typicalUsefulLife) * effectiveAge;
+        } else {
+          ffb = compTotalCost;
+        }
+        totalFFBThisYear += ffb;
+        return { compTotalCost, remainingLife, ffb };
+      });
+      
+      let yearAF = 0;
+      finalCompStates.forEach((comp, idx) => {
+        const { compTotalCost, remainingLife } = compData[idx];
+        const ffbShare = totalFFBThisYear > 0 ? compData[idx].ffb / totalFFBThisYear : 0;
+        const compReserve = yearBalance * ffbShare;
+        const fundsNeeded = compTotalCost - compReserve;
+        
+        if (remainingLife > 0) {
+          yearAF += fundsNeeded / remainingLife;
+        } else if (comp.typicalUsefulLife > 0) {
+          yearAF += fundsNeeded / comp.typicalUsefulLife;
+        }
+      });
+      
+      if (year >= 2) {
+        yearlyAnnualFunding.push(yearAF);
+      }
+      
+      // Cycle components
+      finalCompStates.forEach(comp => {
+        if (comp.currentRemainingLife <= 0) {
+          comp.currentRemainingLife = comp.typicalUsefulLife;
+        } else {
+          comp.currentRemainingLife -= 1;
+        }
+      });
+    }
   } else {
     // For threshold scenarios, contribution = currentAnnualContribution * (1 + rate)
     // (This branch isn't used for Full Funding)
