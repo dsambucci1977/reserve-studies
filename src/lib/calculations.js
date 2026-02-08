@@ -1,9 +1,9 @@
 // src/lib/calculations.js
-// Reserve Study Calculation Engine v7
+// Reserve Study Calculation Engine v8
 // Fixes:
-// 1. "Full Funding Analysis" (Annual Contribution) column now correctly accounts for 
-//    existing reserve balances. This fixes the Year 1 inflation ($199k -> $139k).
-// 2. Ensures the component method calculation tracks accurately with the cash flow.
+// 1. TIMING FIX: Items with RUL 1 now trigger in Year 1 (not Year 2).
+//    (replacementYear = beginningYear + estimatedRemainingLife - 1)
+// 2. This aligns the Expenditure Schedule with the Excel "YearOne" RULs.
 
 /**
  * Calculate complete 30-year reserve study projections
@@ -126,20 +126,24 @@ function calculateComponent(component, year, fiscalYear, projectInfo, inflationM
   
   const currentReserve = componentCurrentReserve || 0;
   
-  // FIX: Calculate Annual Funding Requirement based on (Cost - Reserves) / Life
+  // Annual Funding Requirement = (Cost - Reserves) / Life
   const fundsNeeded = Math.max(0, totalCost - currentReserve);
   
   let annualFunding = 0;
   if (remainingLife > 0) {
     annualFunding = fundsNeeded / remainingLife;
   } else if (component.typicalUsefulLife > 0) {
-    // If remaining life is 0 (replacement year), and we still need funds, 
-    // it implies we are underfunded for this specific item.
-    // Standard practice for the "Annual Contribution" column is to ask for the deficit.
     annualFunding = fundsNeeded; 
   }
   
-  const replacementYear = projectInfo.beginningYear + component.estimatedRemainingLife;
+  // FIX: Replacement Year Logic
+  // If RUL is 1, replace in Year 1. (Start + 1 - 1)
+  // If RUL is 0, replace in Year 1 (Start + 0 - 0) ? No, typically implies overdue/immediate.
+  // Standard: Year = Start + RUL - 1 (if RUL >= 1)
+  // We use Math.max(1, RUL) to ensure 0 maps to Year 1 too.
+  const effectiveRUL = Math.max(1, component.estimatedRemainingLife);
+  const replacementYear = projectInfo.beginningYear + effectiveRUL - 1;
+  
   const isReplaced = (fiscalYear === replacementYear);
   
   return {
@@ -206,9 +210,7 @@ function calculateReserveFundBalance(year, totals, projectInfo, components, prev
     beginningBalance = previousYears[year - 2].reserveBalance.endingBalance;
   }
   
-  // FIX: Use current contribution for all years in the "Projection" view
   const contributions = projectInfo.currentAnnualContribution;
-  
   const interest = beginningBalance * projectInfo.interestRate;
   const expenditures = totals.overall.expenditures;
   const endingBalance = beginningBalance + contributions + interest - expenditures;
@@ -265,7 +267,7 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
   function runCashFlow(constantContribution) {
     const compStates = components.map(comp => ({
       ...comp,
-      currentRemainingLife: comp.estimatedRemainingLife,
+      currentRemainingLife: Math.max(1, comp.estimatedRemainingLife), // Ensure >= 1
     }));
     
     const result = [];
@@ -294,12 +296,18 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
         totalFFB += ffb;
         totalCostThisYear += compTotalCost;
         
-        if (remainingLife === 0) {
+        // FIX: Expenditure Trigger
+        // RUL 1 means replace in Year 1.
+        // In loop:
+        // Year 1: RUL=1. Match?
+        // We decrement RUL AFTER checking/expensing.
+        // So if currentRemainingLife === 1, we replace THIS year.
+        
+        if (comp.currentRemainingLife === 1) {
           totalExpenditures += compTotalCost;
         }
       });
       
-      // FIX: Apply contribution to ALL years (1-31)
       const contributions = constantContribution;
       
       const beginningBalance = year === 1
@@ -323,11 +331,15 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
       
       // Cycle components
       compStates.forEach(comp => {
-        if (comp.currentRemainingLife <= 0) {
+        // If we just replaced it (life was 1), reset to UL
+        if (comp.currentRemainingLife === 1) {
           comp.currentRemainingLife = comp.typicalUsefulLife;
         } else {
           comp.currentRemainingLife -= 1;
         }
+        
+        // Safety for 0
+        if (comp.currentRemainingLife <= 0) comp.currentRemainingLife = comp.typicalUsefulLife;
       });
     }
     
@@ -339,9 +351,7 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
   let cashFlowData = [];
   
   if (thresholdRate === null) {
-    // Binary Search for Baseline Funding (Balance > 0)
     let low = 0;
-    // Upper bound: Total replacement cost / 2 is usually safe for annual
     let high = components.reduce((acc, c) => acc + (c.quantity * c.costPerUnit), 0) / 2;
     
     for (let i = 0; i < 100; i++) {
@@ -363,12 +373,11 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
   cashFlowData = runCashFlow(averageAnnualContribution);
 
   // 2. Calculate "Annual Funding" (Component Method) for the Projection Table
-  // This must account for the projected reserve balance (allocated by FFB)
   const yearlyAnnualFunding = [];
   
   const compStatesForAF = components.map(comp => ({
     ...comp,
-    currentRemainingLife: comp.estimatedRemainingLife,
+    currentRemainingLife: Math.max(1, comp.estimatedRemainingLife),
   }));
 
   for (let year = 1; year <= 31; year++) {
@@ -400,7 +409,6 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
       const ffbShare = totalFFBThisYear > 0 ? (calc.ffb / totalFFBThisYear) : 0;
       const componentReserve = yearBeginningBalance * ffbShare;
       
-      // VITAL FIX: (Cost - Reserves) / Life
       const fundsNeeded = Math.max(0, calc.compTotalCost - componentReserve);
       
       if (calc.remainingLife > 0) {
@@ -414,11 +422,12 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
     
     // Cycle components
     compStatesForAF.forEach(comp => {
-      if (comp.currentRemainingLife <= 0) {
+      if (comp.currentRemainingLife === 1) {
         comp.currentRemainingLife = comp.typicalUsefulLife;
       } else {
         comp.currentRemainingLife -= 1;
       }
+      if (comp.currentRemainingLife <= 0) comp.currentRemainingLife = comp.typicalUsefulLife;
     });
   }
   
@@ -431,7 +440,7 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
         overall: {
           totalCost: yearData.totalCost,
           fullFundingBalance: yearData.totalFFB,
-          annualFunding: yearlyAnnualFunding[i], // Corrected Component Method Value
+          annualFunding: yearlyAnnualFunding[i],
           expenditures: yearData.expenditures
         }
       },
