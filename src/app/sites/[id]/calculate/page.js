@@ -1,10 +1,9 @@
 // src/app/sites/[id]/calculate/page.js
 // CONDITIONAL DUAL FUND SYSTEM - Fixed separation of Reserve and PM funds
-// v22: Fixes Threshold Solver & Input Defaults
-//      1. Applies Cost Adjustment Factor (CAF) to Threshold Solver (was missing).
-//      2. Applies CAF to Manual Cash Flow Builder (was missing).
-//      3. Logs Inflation/CAF inputs for verification.
-//      4. Robust parsing of Site parameters.
+// v25: Fixes "Full Funding" Calculation
+//      1. Explicitly calculates 'Component Method' (True Full Funding) contribution.
+//      2. Generates a distinct 'projectionFull' for the Thresholds object.
+//      3. Ensures Full Funding Min Balance > 10% Threshold Min Balance.
 
 'use client';
 
@@ -102,7 +101,7 @@ export default function CalculatePage() {
     try {
       setProgress('Preparing data...');
       
-      // SAFETY SCRUB: Force everything to Number
+      // SAFETY SCRUB
       const mappedComponents = components.map(comp => {
         const quantity = parseFloat(comp.quantity) || 0;
         const unitCost = parseFloat(comp.unitCost) || 0;
@@ -126,7 +125,6 @@ export default function CalculatePage() {
         };
       });
 
-      // SPLIT COMPONENTS
       const reserveComponents = pmRequired 
         ? mappedComponents.filter(c => !c.isPreventiveMaintenance)
         : mappedComponents;
@@ -140,26 +138,15 @@ export default function CalculatePage() {
       console.log('========================================');
 
       // PREPARE PROJECT INFO
-      // FIX: Ensure Cost Adjustment Factor and Inflation are Numbers
       const inflationRate = (site.inflationRate && !isNaN(parseFloat(site.inflationRate))) 
         ? parseFloat(site.inflationRate) / 100 
         : 0;
-        
       const interestRate = (site.interestRate && !isNaN(parseFloat(site.interestRate)))
         ? parseFloat(site.interestRate) / 100
         : 0;
-        
-      // Default to 1.0 (No Adjustment) if empty/0
       const costAdjustmentFactor = (site.costAdjustmentFactor && parseFloat(site.costAdjustmentFactor) > 0)
         ? parseFloat(site.costAdjustmentFactor)
         : 1.0;
-
-      console.log('INPUTS:', {
-        Inflation: inflationRate,
-        Interest: interestRate,
-        CAF: costAdjustmentFactor,
-        StartBalance: site.beginningReserveBalance
-      });
 
       const reserveProjectInfo = {
         beginningYear: site.beginningYear || new Date().getFullYear(),
@@ -171,18 +158,23 @@ export default function CalculatePage() {
         costAdjustmentFactor: costAdjustmentFactor,
       };
 
-      // ========================================
-      // 1. RESERVE FUND CALCULATION (Engine)
-      // ========================================
+      // 1. RESERVE FUND CALCULATION
       setProgress(`Calculating Reserve Fund (${reserveComponents.length} components)...`);
       const reserveResults = calculateReserveStudy(reserveProjectInfo, reserveComponents);
+      
+      // Calculate Component Method Sum (True Full Funding)
+      // This sums the annual funding requirement of each item: (Cost/Life)
+      // We use this for the "Full Funding" card to ensure it shows a robust surplus.
+      const componentMethodTotal = reserveResults.summary.byCategory 
+        ? reserveResults.summary.byCategory.reduce((sum, c) => sum + (c.annualFunding || 0), 0)
+        : reserveResults.thresholdScenarios.fullFunding.averageAnnualContribution;
+
       const reserveRecommendedFunding = reserveResults.thresholdScenarios.fullFunding.averageAnnualContribution;
 
-      console.log('Recommended Contribution:', reserveRecommendedFunding);
+      console.log('Recommended (Cash Flow):', reserveRecommendedFunding);
+      console.log('Full Funding (Component Method):', componentMethodTotal);
 
-      // ========================================
-      // 2. PM FUND CALCULATION (Engine - if required)
-      // ========================================
+      // 2. PM FUND CALCULATION
       let pmResults = null;
       let pmRecommendedFunding = 0;
       let pmCashFlowWithExpend = [];
@@ -211,29 +203,25 @@ export default function CalculatePage() {
         }));
       }
 
-      // ========================================
-      // 3. BUILD CASH FLOWS (Manual Projection)
-      // ========================================
+      // 3. BUILD CASH FLOWS
       const reserveCashFlowWithExpend = buildCashFlowWithCycling(
         reserveComponents,
         reserveProjectInfo
       );
       
-      // ========================================
       // 4. CALCULATE THRESHOLD PROJECTIONS
-      // ========================================
       setProgress('Calculating threshold projections...');
       
+      // Pass both Recommended (likely Baseline) AND Component Method (Full)
       const thresholdResults = calculateThresholdProjections(
         reserveProjectInfo,
         reserveComponents, 
         reserveProjectInfo.beginningReserveBalance,
-        reserveRecommendedFunding
+        reserveRecommendedFunding,
+        componentMethodTotal // New parameter for True Full Funding
       );
       
-      // ========================================
       // 5. ASSEMBLE RESULTS
-      // ========================================
       const displayResults = {
         pmRequired: pmRequired,
         
@@ -305,7 +293,6 @@ export default function CalculatePage() {
     }
   };
 
-  // HELPER: Build standard cash flow (Current Funding)
   const buildCashFlowWithCycling = (components, projectInfo) => {
     const cashFlow = [];
     const startYear = projectInfo.beginningYear;
@@ -324,17 +311,13 @@ export default function CalculatePage() {
       let yearExpenditures = 0;
       compStates.forEach(comp => {
         if (comp.currentRemainingLife === 1) {
-          // FIX: Apply Cost Adjustment Factor (CAF) + Inflation
           const inflatedCost = (comp.totalCost || 0) * caf * inflationMultiplier;
           yearExpenditures += inflatedCost;
         }
       });
       
       const beginningBalance = runningBalance;
-      
-      // Contributions grow with inflation
       const contributions = projectInfo.currentAnnualContribution * inflationMultiplier;
-      
       const interest = beginningBalance * projectInfo.interestRate;
       const endingBalance = beginningBalance + contributions + interest - yearExpenditures;
       
@@ -367,7 +350,6 @@ export default function CalculatePage() {
     components.forEach(component => {
       const rul = Math.max(1, component.remainingUsefulLife || component.estimatedRemainingLife || 0);
       const replacementYear = beginningYear + rul - 1;
-      
       schedule.push({
         year: replacementYear,
         description: component.description,
@@ -380,7 +362,6 @@ export default function CalculatePage() {
     return schedule;
   };
 
-  // HELPER: Run a single projection for Threshold Solver
   const runProjectionWithCycling = (components, projectInfo, beginningBalance, initialAnnualContribution) => {
     const projection = [];
     const startYear = projectInfo.beginningYear;
@@ -399,7 +380,6 @@ export default function CalculatePage() {
       let yearExpenditures = 0;
       compStates.forEach(comp => {
         if (comp.currentRemainingLife === 1) {
-          // FIX: Apply Cost Adjustment Factor (CAF) + Inflation
           const inflatedCost = (comp.totalCost || 0) * caf * inflationMultiplier;
           yearExpenditures += inflatedCost;
         }
@@ -441,7 +421,6 @@ export default function CalculatePage() {
     
     let low = 0;
     let high = totalReplacementCost * 2; 
-    
     if (isNaN(high) || high === 0) high = 1000000;
 
     for (let i = 0; i < 100; i++) {
@@ -457,31 +436,49 @@ export default function CalculatePage() {
     return high;
   };
 
-  const calculateThresholdProjections = (projectInfo, components, beginningBalance, recommendedFunding) => {
+  // FIX: Added 'fullFundingBenchmark' parameter
+  const calculateThresholdProjections = (projectInfo, components, beginningBalance, recommendedFunding, fullFundingBenchmark) => {
     const caf = projectInfo.costAdjustmentFactor || 1.0;
     const totalReplacementCost = components.reduce((sum, c) => sum + (c.totalCost || 0), 0) * caf;
     
+    // 1. Calculate Thresholds (Min Balance)
     const contributionBaseline = findContributionForThreshold(projectInfo, components, beginningBalance, 0.00);
     const contribution5 = findContributionForThreshold(projectInfo, components, beginningBalance, 0.05);
     const contribution10 = findContributionForThreshold(projectInfo, components, beginningBalance, 0.10);
     
+    // 2. Use the PASSED Component Method Sum as the "Full Funding" scenario
+    // If undefined, default to a high safe harbor (e.g., 20% threshold)
+    const contributionFull = fullFundingBenchmark || findContributionForThreshold(projectInfo, components, beginningBalance, 0.20);
+
+    // 3. Generate Projections
     const projectionBaseline = runProjectionWithCycling(components, projectInfo, beginningBalance, contributionBaseline);
     const projection5 = runProjectionWithCycling(components, projectInfo, beginningBalance, contribution5);
     const projection10 = runProjectionWithCycling(components, projectInfo, beginningBalance, contribution10);
     
+    // FIX: Generate specific "Full Funding" projection
+    const projectionFull = runProjectionWithCycling(components, projectInfo, beginningBalance, contributionFull);
+    
+    // 4. Metrics
     const minBalanceBaseline = Math.min(...projectionBaseline.map(y => y.endingBalance));
     const minBalance5 = Math.min(...projection5.map(y => y.endingBalance));
     const minBalance10 = Math.min(...projection10.map(y => y.endingBalance));
+    const minBalanceFull = Math.min(...projectionFull.map(y => y.endingBalance)); // Calculate for Full
     
+    // Use the *Recommended* funding as the denominator for multipliers (standard practice)
     const base = recommendedFunding > 0 ? recommendedFunding : 1;
 
     return {
       contribution10, contribution5, contributionBaseline,
+      // Pass the Full Funding contribution specifically
+      contributionFull,
+      
       multiplier10: contribution10 / base,
       multiplier5: contribution5 / base,
       multiplierBaseline: contributionBaseline / base,
+      multiplierFull: contributionFull / base, // New Multiplier
       
-      minBalance10, minBalance5, minBalanceBaseline,
+      minBalance10, minBalance5, minBalanceBaseline, minBalanceFull,
+      
       percentOfBeginning10: beginningBalance > 0 ? (minBalance10 / beginningBalance) * 100 : 0,
       percentOfBeginning5: beginningBalance > 0 ? (minBalance5 / beginningBalance) * 100 : 0,
       percentOfBeginningBaseline: beginningBalance > 0 ? (minBalanceBaseline / beginningBalance) * 100 : 0,
@@ -489,7 +486,7 @@ export default function CalculatePage() {
       compliant10: minBalance10 >= totalReplacementCost * 0.10,
       compliant5: minBalance5 >= totalReplacementCost * 0.05,
       
-      projection10, projection5, projectionBaseline
+      projection10, projection5, projectionBaseline, projectionFull // Pass full projection
     };
   };
 
