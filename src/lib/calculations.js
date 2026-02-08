@@ -1,9 +1,9 @@
 // src/lib/calculations.js
-// Reserve Study Calculation Engine v5
+// Reserve Study Calculation Engine v6
 // Fixes:
-// 1. Threshold Scenario: Contributions now start in Year 2 (Year 1 is snapshot), 
-//    matching Excel "Projection.csv" logic.
-// 2. Component Cycling: Logic preserved for threshold solver.
+// 1. Reverted Year 1 Contribution restriction. 
+//    Year 1 (e.g., 2026) IS a funding year and must receive contributions.
+//    (Previous v5 fix incorrectly treated it as a 0-contribution snapshot).
 
 /**
  * Calculate complete 30-year reserve study projections
@@ -14,7 +14,7 @@
 export function calculateReserveStudy(projectInfo, components) {
   const years = [];
   
-  // Calculate each year (1-31): year 1 = starting snapshot, years 2-31 = 30 contributing years
+  // Calculate each year (1-31)
   for (let year = 1; year <= 31; year++) {
     const yearProjection = calculateYear(
       year,
@@ -207,7 +207,9 @@ function calculateReserveFundBalance(year, totals, projectInfo, components, prev
     beginningBalance = previousYears[year - 2].reserveBalance.endingBalance;
   }
   
-  const contributions = year === 1 ? 0 : projectInfo.currentAnnualContribution;
+  // FIX: Year 1 IS a funding year. Use current contribution for all years.
+  const contributions = projectInfo.currentAnnualContribution;
+  
   const interest = beginningBalance * projectInfo.interestRate;
   const expenditures = totals.overall.expenditures;
   const endingBalance = beginningBalance + contributions + interest - expenditures;
@@ -307,8 +309,9 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
         }
       });
       
-      // FIX: Contributions start in Year 2 (First Funding Year). Year 1 is Snapshot.
-      const contributions = year === 1 ? 0 : constantContribution;
+      // FIX: Apply contribution to ALL years (1-31). 
+      // Do not skip Year 1.
+      const contributions = constantContribution;
       
       const beginningBalance = year === 1
         ? projectInfo.beginningReserveBalance
@@ -388,7 +391,7 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
   
   if (thresholdRate === null) {
     let low = 0;
-    let high = yearlyAnnualFunding[0] * 3; // generous upper bound
+    let high = yearlyAnnualFunding[0] * 3; 
     
     for (let i = 0; i < 100; i++) {
       const mid = (low + high) / 2;
@@ -443,7 +446,6 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
           totalAF += yearAF;
         }
         
-        // Cycle components
         testCompStates.forEach(comp => {
           if (comp.currentRemainingLife <= 0) {
             comp.currentRemainingLife = comp.typicalUsefulLife;
@@ -464,7 +466,6 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
     
     averageAnnualContribution = (low + high) / 2;
     
-    // Recalculate using the converged average
     const finalFlow = runCashFlow(averageAnnualContribution);
     const finalCompStates = components.map(comp => ({
       ...comp,
@@ -472,7 +473,7 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
     }));
     
     yearlyAnnualFunding.length = 0;
-    yearlyAnnualFunding.push(0); // Year 1 placeholder
+    yearlyAnnualFunding.push(0); 
     
     for (let year = 1; year <= 31; year++) {
       const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year - 1);
@@ -523,8 +524,6 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
       });
     }
   } else {
-    // For threshold scenarios (contribution multipliers), apply to current contribution
-    // Note: If using the solver in page.js, this branch might not be used
     averageAnnualContribution = projectInfo.currentAnnualContribution * (1 + thresholdRate);
   }
   
