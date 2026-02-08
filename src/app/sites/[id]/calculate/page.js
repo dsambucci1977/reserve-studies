@@ -1,470 +1,712 @@
-// src/app/sites/[id]/results/page.js
-// CONDITIONAL DUAL FUND RESULTS PAGE - Shows PM only when required by state
-// v25: Fixes Full Funding Card
-//      1. Uses distinct 'projectionFull' (Component Method) data for the Full Funding card.
-//      2. Shows correct Multiplier, Contribution, Min Balance, and Final Balance.
+// src/app/sites/[id]/calculate/page.js
+// CONDITIONAL DUAL FUND SYSTEM - Fixed separation of Reserve and PM funds
+// v25: Fixes "Full Funding" Calculation
+//      1. Explicitly calculates 'Component Method' (True Full Funding) contribution.
+//      2. Generates a distinct 'projectionFull' for the Thresholds object.
+//      3. Ensures Full Funding Min Balance > 10% Threshold Min Balance.
 
 'use client';
 
-import { useEffect, useState, Fragment } from 'react';
-import { auth } from '@/lib/firebase';
-import { getSite, getProjections } from '@/lib/db';
-import { useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { auth, db } from '@/lib/firebase';
+import { getSite, getComponents, updateSite, saveProjections } from '@/lib/db';
+import { calculateReserveStudy } from '@/lib/calculations';
+import { doc, getDoc } from 'firebase/firestore';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-export default function ResultsPage() {
+export default function CalculatePage() {
   const [site, setSite] = useState(null);
-  const [results, setResults] = useState(null);
+  const [components, setComponents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('summary');
+  const [calculating, setCalculating] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [calculationResults, setCalculationResults] = useState(null);
+  const [pmRequired, setPmRequired] = useState(true);
   const params = useParams();
+  const router = useRouter();
   const siteId = params.id;
 
   useEffect(() => {
     const loadData = async () => {
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        window.location.href = '/';
+        router.push('/');
         return;
       }
       
       try {
-        const [siteData, projectionsData] = await Promise.all([
+        const [siteData, componentsData] = await Promise.all([
           getSite(siteId),
-          getProjections(siteId)
+          getComponents(siteId)
         ]);
         
         setSite(siteData);
-        setResults(projectionsData);
+        setComponents(componentsData);
+        
+        // CHECK STATE COMPLIANCE
+        let isPMRequired = true;
+        try {
+          let orgId = siteData?.organizationId;
+          if (!orgId) {
+            const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+            if (userDoc.exists()) {
+              orgId = userDoc.data()?.organizationId;
+            }
+          }
+          
+          if (orgId) {
+            const orgDoc = await getDoc(doc(db, 'organizations', orgId));
+            if (orgDoc.exists()) {
+              const orgData = orgDoc.data();
+              const stateCompliance = orgData?.settings?.stateCompliance || [];
+              const siteState = siteData?.companyState || '';
+              
+              const stateConfig = stateCompliance.find(
+                s => s.code === siteState || s.name === siteState || 
+                     s.abbreviation === siteState || s.code === siteState.toUpperCase()
+              );
+              
+              if (stateConfig) {
+                isPMRequired = stateConfig.pmRequired === true;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Could not load org compliance settings, defaulting PM to true:', err);
+        }
+        
+        setPmRequired(isPMRequired);
+        
       } catch (error) {
         console.error('Error:', error);
+        alert('Error loading data');
       } finally {
         setLoading(false);
       }
     };
     
     loadData();
-  }, [siteId]);
+  }, [siteId, router]);
+
+  const handleCalculate = async () => {
+    if (!site || components.length === 0) {
+      alert('Missing required data');
+      return;
+    }
+
+    setCalculating(true);
+    setProgress(pmRequired ? 'Starting dual-fund calculations...' : 'Starting reserve fund calculations...');
+
+    try {
+      setProgress('Preparing data...');
+      
+      // SAFETY SCRUB
+      const mappedComponents = components.map(comp => {
+        const quantity = parseFloat(comp.quantity) || 0;
+        const unitCost = parseFloat(comp.unitCost) || 0;
+        let totalCost = parseFloat(comp.totalCost);
+        if (isNaN(totalCost) || totalCost === 0) {
+          totalCost = quantity * unitCost;
+        }
+
+        return {
+          ...comp,
+          costPerUnit: unitCost,
+          estimatedRemainingLife: parseFloat(comp.remainingUsefulLife) || 0,
+          typicalUsefulLife: parseFloat(comp.usefulLife) || 0,
+          quantity: quantity,
+          description: comp.description || '',
+          category: comp.category || '',
+          componentType: comp.isPreventiveMaintenance ? 'Preventive Maintenance' : (comp.category || ''),
+          itemName: comp.description || '',
+          isPreventiveMaintenance: comp.isPreventiveMaintenance || false,
+          totalCost: totalCost, 
+        };
+      });
+
+      const reserveComponents = pmRequired 
+        ? mappedComponents.filter(c => !c.isPreventiveMaintenance)
+        : mappedComponents;
+      
+      const pmComponents = pmRequired 
+        ? mappedComponents.filter(c => c.isPreventiveMaintenance)
+        : [];
+        
+      console.log('========================================');
+      console.log(pmRequired ? '🔵 DUAL FUND CALCULATION' : '🔵 RESERVE FUND ONLY');
+      console.log('========================================');
+
+      // PREPARE PROJECT INFO
+      const inflationRate = (site.inflationRate && !isNaN(parseFloat(site.inflationRate))) 
+        ? parseFloat(site.inflationRate) / 100 
+        : 0;
+      const interestRate = (site.interestRate && !isNaN(parseFloat(site.interestRate)))
+        ? parseFloat(site.interestRate) / 100
+        : 0;
+      const costAdjustmentFactor = (site.costAdjustmentFactor && parseFloat(site.costAdjustmentFactor) > 0)
+        ? parseFloat(site.costAdjustmentFactor)
+        : 1.0;
+
+      const reserveProjectInfo = {
+        beginningYear: site.beginningYear || new Date().getFullYear(),
+        projectionYears: site.projectionYears || 30,
+        beginningReserveBalance: parseFloat(site.beginningReserveBalance) || 0,
+        currentAnnualContribution: parseFloat(site.currentAnnualContribution) || 0,
+        inflationRate: inflationRate,
+        interestRate: interestRate,
+        costAdjustmentFactor: costAdjustmentFactor,
+      };
+
+      // 1. RESERVE FUND CALCULATION
+      setProgress(`Calculating Reserve Fund (${reserveComponents.length} components)...`);
+      const reserveResults = calculateReserveStudy(reserveProjectInfo, reserveComponents);
+      
+      // Calculate Component Method Sum (True Full Funding)
+      // This sums the annual funding requirement of each item: (Cost/Life)
+      // We use this for the "Full Funding" card to ensure it shows a robust surplus.
+      const componentMethodTotal = reserveResults.summary.byCategory 
+        ? reserveResults.summary.byCategory.reduce((sum, c) => sum + (c.annualFunding || 0), 0)
+        : reserveResults.thresholdScenarios.fullFunding.averageAnnualContribution;
+
+      const reserveRecommendedFunding = reserveResults.thresholdScenarios.fullFunding.averageAnnualContribution;
+
+      console.log('Recommended (Cash Flow):', reserveRecommendedFunding);
+      console.log('Full Funding (Component Method):', componentMethodTotal);
+
+      // 2. PM FUND CALCULATION
+      let pmResults = null;
+      let pmRecommendedFunding = 0;
+      let pmCashFlowWithExpend = [];
+      let pmFullFundingCashFlow = [];
+      
+      if (pmRequired && pmComponents.length > 0) {
+        setProgress(`Calculating PM Fund (${pmComponents.length} components)...`);
+        
+        const pmProjectInfo = {
+          ...reserveProjectInfo,
+          beginningReserveBalance: parseFloat(site.pmBeginningBalance) || 0,
+          currentAnnualContribution: parseFloat(site.pmAnnualContribution) || 0,
+        };
+
+        pmResults = calculateReserveStudy(pmProjectInfo, pmComponents);
+        pmRecommendedFunding = pmResults.thresholdScenarios.fullFunding.averageAnnualContribution;
+        
+        pmCashFlowWithExpend = buildCashFlowWithCycling(pmComponents, pmProjectInfo);
+        
+        pmFullFundingCashFlow = pmResults.thresholdScenarios.fullFunding.years.map((y, i) => ({
+          year: y.fiscalYear,
+          annualContribution: Math.round(pmResults.thresholdScenarios.fullFunding.yearlyAnnualFunding[i] || 0),
+          contributions: Math.round(y.reserveBalance.contributions),
+          expenditures: Math.round(y.reserveBalance.expenditures),
+          endingBalance: Math.round(y.reserveBalance.endingBalance),
+        }));
+      }
+
+      // 3. BUILD CASH FLOWS
+      const reserveCashFlowWithExpend = buildCashFlowWithCycling(
+        reserveComponents,
+        reserveProjectInfo
+      );
+      
+      // 4. CALCULATE THRESHOLD PROJECTIONS
+      setProgress('Calculating threshold projections...');
+      
+      // Pass both Recommended (likely Baseline) AND Component Method (Full)
+      const thresholdResults = calculateThresholdProjections(
+        reserveProjectInfo,
+        reserveComponents, 
+        reserveProjectInfo.beginningReserveBalance,
+        reserveRecommendedFunding,
+        componentMethodTotal // New parameter for True Full Funding
+      );
+      
+      // 5. ASSEMBLE RESULTS
+      const displayResults = {
+        pmRequired: pmRequired,
+        
+        reserveFund: {
+          percentFunded: (reserveResults.years[0].reserveBalance?.percentFunded || 0) * 100,
+          fullyFundedBalance: reserveResults.years[0].totals?.overall?.fullFundingBalance || 0,
+          recommendedContribution: reserveRecommendedFunding || 0,
+          currentBalance: reserveProjectInfo.beginningReserveBalance,
+          currentContribution: reserveProjectInfo.currentAnnualContribution,
+          componentCount: reserveComponents.length,
+          totalReplacementCost: reserveResults.summary.totalReplacementCost || 0,
+          byCategory: reserveResults.summary.byCategory || [],
+        },
+        pmFund: pmRequired && pmResults ? {
+          percentFunded: (pmResults.years[0].reserveBalance?.percentFunded || 0) * 100,
+          fullyFundedBalance: pmResults.years[0].totals?.overall?.fullFundingBalance || 0,
+          recommendedContribution: pmRecommendedFunding || 0,
+          currentBalance: parseFloat(site.pmBeginningBalance) || 0,
+          currentContribution: parseFloat(site.pmAnnualContribution) || 0,
+          componentCount: pmComponents.length,
+          totalReplacementCost: pmResults.summary.totalReplacementCost || 0,
+          byCategory: pmResults.summary.byCategory || [],
+        } : {
+          percentFunded: 0, fullyFundedBalance: 0, recommendedContribution: 0,
+          currentBalance: 0, currentContribution: 0, componentCount: 0,
+          totalReplacementCost: 0, byCategory: [],
+        },
+        thresholds: thresholdResults,
+        summary: {
+          percentFunded: (reserveResults.years[0].reserveBalance?.percentFunded || 0) * 100,
+          recommendedContribution: reserveRecommendedFunding || 0,
+          currentReserveBalance: reserveProjectInfo.beginningReserveBalance,
+          fullyFundedBalance: reserveResults.years[0].totals?.overall?.fullFundingBalance || 0,
+          asOfYear: site.beginningYear || new Date().getFullYear(),
+          totalComponents: mappedComponents.length,
+        },
+        reserveCashFlow: reserveCashFlowWithExpend,
+        pmCashFlow: pmCashFlowWithExpend,
+        pmFullFundingCashFlow: pmFullFundingCashFlow,
+        
+        fullFundingCashFlow: reserveResults.thresholdScenarios.fullFunding.years.map((y, i) => ({
+          year: y.fiscalYear,
+          annualContribution: Math.round(reserveResults.thresholdScenarios.fullFunding.yearlyAnnualFunding[i] || 0),
+          contributions: Math.round(y.reserveBalance.contributions),
+          expenditures: Math.round(y.reserveBalance.expenditures),
+          endingBalance: Math.round(y.reserveBalance.endingBalance),
+        })),
+        averageAnnualContribution: Math.round(reserveRecommendedFunding),
+        cashFlow: reserveCashFlowWithExpend,
+        replacementSchedule: buildReplacementSchedule(mappedComponents, site.beginningYear || new Date().getFullYear()),
+      };
+      
+      console.log('✅ Calculations Complete');
+      
+      await saveProjections(siteId, displayResults);
+      await updateSite(siteId, { 
+        status: 'calculated',
+        lastCalculated: new Date().toISOString()
+      });
+      
+      setCalculationResults(displayResults);
+      setCalculating(false);
+      
+    } catch (error) {
+      console.error('ERROR:', error);
+      alert(`Error: ${error.message}`);
+      setCalculating(false);
+      setProgress('');
+    }
+  };
+
+  const buildCashFlowWithCycling = (components, projectInfo) => {
+    const cashFlow = [];
+    const startYear = projectInfo.beginningYear;
+    let runningBalance = projectInfo.beginningReserveBalance;
+    const caf = projectInfo.costAdjustmentFactor || 1.0;
+    
+    const compStates = components.map(comp => ({
+      ...comp,
+      currentRemainingLife: Math.max(1, comp.estimatedRemainingLife || 0),
+    }));
+    
+    for (let year = 0; year < 31; year++) {
+      const fiscalYear = startYear + year;
+      const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year);
+      
+      let yearExpenditures = 0;
+      compStates.forEach(comp => {
+        if (comp.currentRemainingLife === 1) {
+          const inflatedCost = (comp.totalCost || 0) * caf * inflationMultiplier;
+          yearExpenditures += inflatedCost;
+        }
+      });
+      
+      const beginningBalance = runningBalance;
+      const contributions = projectInfo.currentAnnualContribution * inflationMultiplier;
+      const interest = beginningBalance * projectInfo.interestRate;
+      const endingBalance = beginningBalance + contributions + interest - yearExpenditures;
+      
+      cashFlow.push({
+        year: fiscalYear,
+        beginningBalance: Math.round(beginningBalance),
+        contributions: Math.round(contributions),
+        interest: Math.round(interest),
+        expenditures: Math.round(yearExpenditures),
+        endingBalance: Math.round(endingBalance),
+      });
+      
+      runningBalance = endingBalance;
+      
+      compStates.forEach(comp => {
+        if (comp.currentRemainingLife === 1) {
+          comp.currentRemainingLife = comp.typicalUsefulLife || 20;
+        } else {
+          comp.currentRemainingLife -= 1;
+        }
+        if (comp.currentRemainingLife <= 0) comp.currentRemainingLife = comp.typicalUsefulLife || 20;
+      });
+    }
+    
+    return cashFlow;
+  };
+
+  const buildReplacementSchedule = (components, beginningYear) => {
+    const schedule = [];
+    components.forEach(component => {
+      const rul = Math.max(1, component.remainingUsefulLife || component.estimatedRemainingLife || 0);
+      const replacementYear = beginningYear + rul - 1;
+      schedule.push({
+        year: replacementYear,
+        description: component.description,
+        cost: component.totalCost || 0,
+        category: component.category,
+        isPM: component.isPreventiveMaintenance || false,
+      });
+    });
+    schedule.sort((a, b) => a.year - b.year);
+    return schedule;
+  };
+
+  const runProjectionWithCycling = (components, projectInfo, beginningBalance, initialAnnualContribution) => {
+    const projection = [];
+    const startYear = projectInfo.beginningYear;
+    let runningBalance = beginningBalance;
+    const caf = projectInfo.costAdjustmentFactor || 1.0;
+    
+    const compStates = components.map(comp => ({
+      ...comp,
+      currentRemainingLife: Math.max(1, comp.estimatedRemainingLife || 0),
+    }));
+    
+    for (let year = 0; year < 31; year++) {
+      const fiscalYear = startYear + year;
+      const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year);
+      
+      let yearExpenditures = 0;
+      compStates.forEach(comp => {
+        if (comp.currentRemainingLife === 1) {
+          const inflatedCost = (comp.totalCost || 0) * caf * inflationMultiplier;
+          yearExpenditures += inflatedCost;
+        }
+      });
+      
+      const beginningBalanceYear = runningBalance;
+      const contributions = initialAnnualContribution * inflationMultiplier;
+      const interest = beginningBalanceYear * projectInfo.interestRate;
+      const endingBalance = beginningBalanceYear + contributions + interest - yearExpenditures;
+      
+      projection.push({
+        year: fiscalYear,
+        beginningBalance: beginningBalanceYear,
+        contributions,
+        interest,
+        expenditures: yearExpenditures,
+        endingBalance
+      });
+      
+      runningBalance = endingBalance;
+      
+      compStates.forEach(comp => {
+        if (comp.currentRemainingLife === 1) {
+          comp.currentRemainingLife = comp.typicalUsefulLife || 20;
+        } else {
+          comp.currentRemainingLife -= 1;
+        }
+        if (comp.currentRemainingLife <= 0) comp.currentRemainingLife = comp.typicalUsefulLife || 20;
+      });
+    }
+    
+    return projection;
+  };
+
+  const findContributionForThreshold = (projectInfo, components, beginningBalance, thresholdPercent) => {
+    const caf = projectInfo.costAdjustmentFactor || 1.0;
+    const totalReplacementCost = components.reduce((sum, c) => sum + (c.totalCost || 0), 0) * caf;
+    const targetBalance = totalReplacementCost * thresholdPercent;
+    
+    let low = 0;
+    let high = totalReplacementCost * 2; 
+    if (isNaN(high) || high === 0) high = 1000000;
+
+    for (let i = 0; i < 100; i++) {
+      const mid = (low + high) / 2;
+      const projection = runProjectionWithCycling(components, projectInfo, beginningBalance, mid);
+      const minBalance = Math.min(...projection.map(y => y.endingBalance));
+      
+      if (minBalance >= targetBalance) high = mid;
+      else low = mid;
+      
+      if ((high - low) < 1) break;
+    }
+    return high;
+  };
+
+  // FIX: Added 'fullFundingBenchmark' parameter
+  const calculateThresholdProjections = (projectInfo, components, beginningBalance, recommendedFunding, fullFundingBenchmark) => {
+    const caf = projectInfo.costAdjustmentFactor || 1.0;
+    const totalReplacementCost = components.reduce((sum, c) => sum + (c.totalCost || 0), 0) * caf;
+    
+    // 1. Calculate Thresholds (Min Balance)
+    const contributionBaseline = findContributionForThreshold(projectInfo, components, beginningBalance, 0.00);
+    const contribution5 = findContributionForThreshold(projectInfo, components, beginningBalance, 0.05);
+    const contribution10 = findContributionForThreshold(projectInfo, components, beginningBalance, 0.10);
+    
+    // 2. Use the PASSED Component Method Sum as the "Full Funding" scenario
+    // If undefined, default to a high safe harbor (e.g., 20% threshold)
+    const contributionFull = fullFundingBenchmark || findContributionForThreshold(projectInfo, components, beginningBalance, 0.20);
+
+    // 3. Generate Projections
+    const projectionBaseline = runProjectionWithCycling(components, projectInfo, beginningBalance, contributionBaseline);
+    const projection5 = runProjectionWithCycling(components, projectInfo, beginningBalance, contribution5);
+    const projection10 = runProjectionWithCycling(components, projectInfo, beginningBalance, contribution10);
+    
+    // FIX: Generate specific "Full Funding" projection
+    const projectionFull = runProjectionWithCycling(components, projectInfo, beginningBalance, contributionFull);
+    
+    // 4. Metrics
+    const minBalanceBaseline = Math.min(...projectionBaseline.map(y => y.endingBalance));
+    const minBalance5 = Math.min(...projection5.map(y => y.endingBalance));
+    const minBalance10 = Math.min(...projection10.map(y => y.endingBalance));
+    const minBalanceFull = Math.min(...projectionFull.map(y => y.endingBalance)); // Calculate for Full
+    
+    // Use the *Recommended* funding as the denominator for multipliers (standard practice)
+    const base = recommendedFunding > 0 ? recommendedFunding : 1;
+
+    return {
+      contribution10, contribution5, contributionBaseline,
+      // Pass the Full Funding contribution specifically
+      contributionFull,
+      
+      multiplier10: contribution10 / base,
+      multiplier5: contribution5 / base,
+      multiplierBaseline: contributionBaseline / base,
+      multiplierFull: contributionFull / base, // New Multiplier
+      
+      minBalance10, minBalance5, minBalanceBaseline, minBalanceFull,
+      
+      percentOfBeginning10: beginningBalance > 0 ? (minBalance10 / beginningBalance) * 100 : 0,
+      percentOfBeginning5: beginningBalance > 0 ? (minBalance5 / beginningBalance) * 100 : 0,
+      percentOfBeginningBaseline: beginningBalance > 0 ? (minBalanceBaseline / beginningBalance) * 100 : 0,
+      
+      compliant10: minBalance10 >= totalReplacementCost * 0.10,
+      compliant5: minBalance5 >= totalReplacementCost * 0.05,
+      
+      projection10, projection5, projectionBaseline, projectionFull // Pass full projection
+    };
+  };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl text-gray-900">Loading results...</div>
+        <div className="text-xl text-gray-900">Loading...</div>
       </div>
     );
   }
 
-  if (!results) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow p-12 text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">No Results Yet</h2>
-            <p className="text-gray-600 mb-6">Run calculations first to see results.</p>
-            <Link
-              href={`/sites/${siteId}/calculate`}
-              className="inline-block px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
-              Run Calculations
-            </Link>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  const pmRequired = results.pmRequired !== false;
-  
-  const reserveFund = results.reserveFund || {};
-  const pmFund = results.pmFund || {};
-  const reserveCashFlow = results.cashFlow || results.reserveCashFlow || [];
-  const schedule = results.replacementSchedule || [];
-  
-  const thresholds = results.thresholds || {
-    multiplier10: 0, multiplier5: 0, multiplierBaseline: 0, multiplierFull: 0,
-    contribution10: 0, contribution5: 0, contributionBaseline: 0, contributionFull: 0,
-    minBalance10: 0, minBalance5: 0, minBalanceBaseline: 0, minBalanceFull: 0,
-    compliant10: true, compliant5: true,
-    projection10: [], projection5: [], projectionBaseline: [], projectionFull: []
-  };
-
-  const buildCategorySummary = (fund, fundSchedule, isPM) => {
-    const categories = isPM 
-      ? ['Preventive Maintenance'] 
-      : ['Sitework', 'Building', 'Interior', 'Exterior', 'Electrical', 'Special', 'Mechanical'];
-    
-    const totalFFB = fund.fullyFundedBalance || 0;
-    const beginningBalance = fund.currentBalance || 0;
-    const totalAnnualFunding = fund.recommendedContribution || 0;
-    const totalReplacementCost = fund.totalReplacementCost || 0;
-    
-    const calcCategories = fund.byCategory || [];
-    
-    return categories.map(category => {
-      const calcCat = calcCategories.find(c => c.category === category);
-      if (calcCat && calcCat.count > 0) {
-        return {
-          category,
-          count: calcCat.count,
-          replacementCost: calcCat.totalCost,
-          currentReserveFunds: calcCat.currentReserveFunds,
-          fundsNeeded: calcCat.fundsNeeded,
-          annualFunding: calcCat.annualFunding,
-          fullFundedBalance: calcCat.fullFundingBalance,
-          percentFunded: calcCat.percentFunded,
-        };
-      }
-      
-      const categoryItems = fundSchedule.filter(s => {
-        if (isPM) return s.isPM;
-        return s.category === category && (pmRequired ? !s.isPM : true);
-      });
-      
-      if (categoryItems.length === 0) return null;
-      
-      const catReplacementCost = categoryItems.reduce((sum, c) => sum + (c.cost || 0), 0);
-      const costShare = totalReplacementCost > 0 ? catReplacementCost / totalReplacementCost : 0;
-      const catFFB = totalFFB * costShare;
-      const ffbShare = totalFFB > 0 ? catFFB / totalFFB : 0;
-      const catCurrentFunds = beginningBalance * ffbShare;
-      const catFundsNeeded = catFFB - catCurrentFunds;
-      const catAnnualFunding = totalAnnualFunding * costShare;
-      const catPercentFunded = catFFB > 0 ? (catCurrentFunds / catFFB) * 100 : 0;
-      
-      return {
-        category,
-        count: categoryItems.length,
-        replacementCost: catReplacementCost,
-        currentReserveFunds: catCurrentFunds,
-        fundsNeeded: catFundsNeeded,
-        annualFunding: catAnnualFunding,
-        fullFundedBalance: catFFB,
-        percentFunded: catPercentFunded,
-      };
-    }).filter(Boolean);
-  };
-
-  const reserveCategorySummary = buildCategorySummary(reserveFund, schedule, false);
+  const hasRequiredData = site?.beginningReserveBalance !== undefined && components.length > 0;
+  const pmComponentCount = components.filter(c => c.isPreventiveMaintenance).length;
+  const reserveComponentCount = pmRequired ? (components.length - pmComponentCount) : components.length;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-4 py-8">
         <Link href={`/sites/${siteId}`} className="text-red-600 hover:text-red-700 font-medium">
           ← Back to Site
         </Link>
         
-        <div className="mt-6 mb-6 flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Reserve Study Results</h1>
-            <p className="text-gray-700 mt-2">{site?.siteName}</p>
-            <p className="text-sm mt-1" style={{ color: pmRequired ? '#9333ea' : '#2563eb' }}>
-              {pmRequired ? '🔵 Dual Fund System (Reserve + PM)' : '🔵 Reserve Fund Only'}
-              <span className="text-gray-500 ml-2">• State: {site?.companyState || 'Not set'}</span>
-            </p>
-          </div>
-          <Link
-            href={`/sites/${siteId}/calculate`}
-            className={`px-6 py-3 text-white rounded-lg font-medium ${pmRequired ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-          >
-            Recalculate
-          </Link>
+        <div className="mt-6 mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">Run Calculations</h1>
+          <p className="text-gray-700 mt-2">{site?.siteName}</p>
+          <p className="text-sm mt-1" style={{ color: pmRequired ? '#9333ea' : '#2563eb' }}>
+            {pmRequired ? '🔵 Dual Fund System (Reserve + PM)' : '🔵 Reserve Fund Only'}
+            <span className="text-gray-500 ml-2">• State: {site?.companyState || 'Not set'}</span>
+          </p>
         </div>
 
-        {/* ... Summary Cards (Omitted for brevity, same as previous) ... */}
+        {calculationResults && (
+          <div className="mb-6 space-y-6">
+            <div className="bg-blue-50 border-2 border-blue-500 rounded-lg p-6">
+              <h2 className="text-2xl font-bold text-blue-900 mb-4">💰 Reserve Fund Results</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white rounded p-4">
+                  <div className="text-sm text-gray-600">Percent Funded</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {calculationResults.reserveFund.percentFunded?.toFixed(2)}%
+                  </div>
+                </div>
+                <div className="bg-white rounded p-4">
+                  <div className="text-sm text-gray-600">Fully Funded</div>
+                  <div className="text-xl font-bold text-gray-900">
+                    ${Math.round(calculationResults.reserveFund.fullyFundedBalance || 0).toLocaleString()}
+                  </div>
+                </div>
+                <div className="bg-white rounded p-4">
+                  <div className="text-sm text-gray-600">Recommended</div>
+                  <div className="text-xl font-bold text-gray-900">
+                    ${Math.round(calculationResults.reserveFund.recommendedContribution || 0).toLocaleString()}
+                  </div>
+                </div>
+                <div className="bg-white rounded p-4">
+                  <div className="text-sm text-gray-600">Components</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {calculationResults.reserveFund.componentCount}
+                  </div>
+                </div>
+              </div>
+            </div>
 
-        <div className="bg-white rounded-lg shadow mb-6">
-          <div className="border-b">
-            <div className="flex overflow-x-auto">
-              {['summary', 'threshold', 'reserve-cashflow', ...(pmRequired ? ['pm-cashflow'] : []), 'expenditure-schedule', 'schedule'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-6 py-3 font-medium whitespace-nowrap capitalize ${
-                    activeTab === tab
-                      ? 'text-indigo-600 border-b-2 border-indigo-600'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  {tab.replace('-', ' ')}
-                </button>
-              ))}
+            {pmRequired && (
+              <div className="bg-purple-50 border-2 border-purple-500 rounded-lg p-6">
+                <h2 className="text-2xl font-bold text-purple-900 mb-4">🟣 PM Fund Results</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-white rounded p-4">
+                    <div className="text-sm text-gray-600">Percent Funded</div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {calculationResults.pmFund.percentFunded?.toFixed(2)}%
+                    </div>
+                  </div>
+                  <div className="bg-white rounded p-4">
+                    <div className="text-sm text-gray-600">Fully Funded</div>
+                    <div className="text-xl font-bold text-gray-900">
+                      ${Math.round(calculationResults.pmFund.fullyFundedBalance || 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded p-4">
+                    <div className="text-sm text-gray-600">Recommended</div>
+                    <div className="text-xl font-bold text-gray-900">
+                      ${Math.round(calculationResults.pmFund.recommendedContribution || 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded p-4">
+                    <div className="text-sm text-gray-600">Components</div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {calculationResults.pmFund.componentCount}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex gap-4">
+              <Link
+                href={`/sites/${siteId}/results`}
+                className="flex-1 px-6 py-3 bg-green-600 text-white text-center rounded-lg hover:bg-green-700 font-medium"
+              >
+                View Full Results →
+              </Link>
+              <button
+                onClick={() => setCalculationResults(null)}
+                className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+              >
+                Run Again
+              </button>
             </div>
           </div>
+        )}
 
-          <div className="p-6">
-            {activeTab === 'threshold' && (
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">📉 Threshold Projection - Compliance Analysis</h3>
-                <p className="text-sm text-gray-600 mb-6">
-                  Shows 30-year projections under three funding scenarios: 10% Threshold, 5% Threshold, and Baseline (0%)
-                </p>
-
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-                  {/* 10% Threshold */}
-                  <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4">
-                    <h4 className="font-bold text-red-900 mb-2">10% Threshold</h4>
-                    <div className="space-y-2">
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Multiplier</div>
-                        <div className="text-lg font-bold text-gray-900">{thresholds.multiplier10?.toFixed(4)}</div>
-                      </div>
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Annual Contribution (Yr 1)</div>
-                        <div className="text-md font-bold text-gray-900">
-                          ${Math.round(thresholds.contribution10 || 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Min Balance (Low Point)</div>
-                        <div className="text-md font-bold text-gray-900">${Math.round(thresholds.minBalance10 || 0).toLocaleString()}</div>
-                      </div>
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Final Balance (Year 30)</div>
-                        <div className="text-md font-bold text-gray-900">
-                          ${Math.round(thresholds.projection10?.[29]?.endingBalance || 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className={`${thresholds.compliant10 ? 'bg-green-100 border-green-400' : 'bg-red-100 border-red-400'} border rounded p-2 text-center`}>
-                        <div className="text-sm font-bold text-green-900">{thresholds.compliant10 ? '✓ COMPLIANT' : '✗ NON-COMPLIANT'}</div>
-                      </div>
+        {!calculationResults && !calculating && (
+          <>
+            <div className="bg-white rounded-lg shadow p-6 mb-6">
+              <h2 className="text-xl font-bold mb-4 text-gray-900">
+                {pmRequired ? 'Dual Fund Calculation Summary' : 'Reserve Fund Calculation Summary'}
+              </h2>
+              
+              <div className={`grid grid-cols-1 ${pmRequired ? 'md:grid-cols-2' : 'md:grid-cols-1 max-w-lg'} gap-6 mb-6`}>
+                <div className="border-2 border-blue-300 rounded-lg p-4">
+                  <h3 className="font-bold text-blue-900 mb-3">💰 Reserve Fund</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Components:</span>
+                      <span className="font-semibold text-gray-900">{reserveComponentCount}</span>
                     </div>
-                  </div>
-
-                  {/* 5% Threshold */}
-                  <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
-                    <h4 className="font-bold text-yellow-900 mb-2">5% Threshold</h4>
-                    <div className="space-y-2">
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Multiplier</div>
-                        <div className="text-lg font-bold text-gray-900">{thresholds.multiplier5?.toFixed(4)}</div>
-                      </div>
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Annual Contribution (Yr 1)</div>
-                        <div className="text-md font-bold text-gray-900">
-                          ${Math.round(thresholds.contribution5 || 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Min Balance (Low Point)</div>
-                        <div className="text-md font-bold text-gray-900">${Math.round(thresholds.minBalance5 || 0).toLocaleString()}</div>
-                      </div>
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Final Balance (Year 30)</div>
-                        <div className="text-md font-bold text-gray-900">
-                          ${Math.round(thresholds.projection5?.[29]?.endingBalance || 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className={`${thresholds.compliant5 ? 'bg-green-100 border-green-400' : 'bg-red-100 border-red-400'} border rounded p-2 text-center`}>
-                        <div className="text-sm font-bold text-green-900">{thresholds.compliant5 ? '✓ COMPLIANT' : '✗ NON-COMPLIANT'}</div>
-                      </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Beginning Balance:</span>
+                      <span className="font-semibold text-gray-900">${site?.beginningReserveBalance?.toLocaleString() || '0'}</span>
                     </div>
-                  </div>
-
-                  {/* Baseline (0%) */}
-                  <div className="bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
-                    <h4 className="font-bold text-gray-900 mb-2">Baseline (0%)</h4>
-                    <div className="space-y-2">
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Multiplier</div>
-                        <div className="text-lg font-bold text-gray-900">{thresholds.multiplierBaseline?.toFixed(4)}</div>
-                      </div>
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Annual Contribution (Yr 1)</div>
-                        <div className="text-md font-bold text-gray-900">
-                          ${Math.round(thresholds.contributionBaseline || 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Min Balance (Low Point)</div>
-                        <div className="text-md font-bold text-gray-900">${Math.round(thresholds.minBalanceBaseline || 0).toLocaleString()}</div>
-                      </div>
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Final Balance (Year 30)</div>
-                        <div className="text-md font-bold text-gray-900">
-                          ${Math.round(thresholds.projectionBaseline?.[29]?.endingBalance || 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="bg-yellow-100 border border-yellow-400 rounded p-2 text-center">
-                        <div className="text-sm font-bold text-yellow-900">⚠ MINIMUM</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Full Funding */}
-                  <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4">
-                    <h4 className="font-bold text-green-900 mb-2">Full Funding</h4>
-                    <div className="space-y-2">
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Multiplier</div>
-                        {/* FIX: Use distinct multiplierFull */}
-                        <div className="text-lg font-bold text-gray-900">{thresholds.multiplierFull?.toFixed(4) || '1.0000'}</div>
-                      </div>
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Annual Contribution (Yr 1)</div>
-                        <div className="text-md font-bold text-gray-900">
-                          {/* FIX: Use distinct contributionFull */}
-                          ${Math.round(thresholds.contributionFull || 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Min Balance (Low Point)</div>
-                        <div className="text-md font-bold text-gray-900">
-                          {/* FIX: Use distinct minBalanceFull */}
-                          ${Math.round(thresholds.minBalanceFull || 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="bg-white rounded p-2">
-                        <div className="text-xs text-gray-600">Final Balance (Year 30)</div>
-                        <div className="text-md font-bold text-gray-900">
-                          {/* FIX: Use distinct projectionFull */}
-                          ${Math.round(thresholds.projectionFull?.[29]?.endingBalance || 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="bg-blue-100 border border-blue-400 rounded p-2 text-center">
-                        <div className="text-sm font-bold text-blue-900">★ IDEAL</div>
-                      </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Annual Contribution:</span>
+                      <span className="font-semibold text-gray-900">${site?.currentAnnualContribution?.toLocaleString() || '0'}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Detailed Projection Table */}
-                <div className="bg-white border border-gray-300 rounded-lg overflow-hidden">
-                  <div className="bg-gray-700 px-4 py-3">
-                    <h4 className="font-bold text-white text-center">30-Year Threshold Projection Comparison</h4>
+                {pmRequired && (
+                  <div className="border-2 border-purple-300 rounded-lg p-4">
+                    <h3 className="font-bold text-purple-900 mb-3">🟣 PM Fund</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-700">Components:</span>
+                        <span className="font-semibold text-gray-900">{pmComponentCount}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-700">Beginning Balance:</span>
+                        <span className="font-semibold text-gray-900">${site?.pmBeginningBalance?.toLocaleString() || '0'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-700">Annual Contribution:</span>
+                        <span className="font-semibold text-gray-900">${site?.pmAnnualContribution?.toLocaleString() || '0'}</span>
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="px-3 py-2 text-center font-bold text-gray-900 border-r border-gray-300" rowSpan="2">
-                            Fiscal<br/>Year
-                          </th>
-                          <th className="px-4 py-2 text-center font-bold text-white bg-red-500 border-l border-gray-300" colSpan="2">
-                            10% Threshold
-                          </th>
-                          <th className="px-4 py-2 text-center font-bold text-white bg-yellow-500 border-l border-gray-300" colSpan="2">
-                            5% Threshold
-                          </th>
-                          <th className="px-4 py-2 text-center font-bold text-white bg-gray-600 border-l border-gray-300" colSpan="2">
-                            Baseline (0%)
-                          </th>
-                          <th className="px-4 py-2 text-center font-bold text-white bg-green-600 border-l border-gray-300" colSpan="2">
-                            Full Funding
-                          </th>
-                        </tr>
-                        <tr>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-red-50 border-l border-gray-300">Annual<br/>Expenditures</th>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-red-50">Ending<br/>Balance</th>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-yellow-50 border-l border-gray-300">Annual<br/>Expenditures</th>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-yellow-50">Ending<br/>Balance</th>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-gray-50 border-l border-gray-300">Annual<br/>Expenditures</th>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-gray-50">Ending<br/>Balance</th>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-green-50 border-l border-gray-300">Annual<br/>Expenditures</th>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-green-50">Ending<br/>Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {reserveCashFlow.map((row, index) => {
-                          const proj10 = thresholds.projection10?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
-                          const proj5 = thresholds.projection5?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
-                          const projBase = thresholds.projectionBaseline?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
-                          // FIX: Use projectionFull for Full Funding column
-                          const projFull = thresholds.projectionFull?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
-                          
-                          return (
-                            <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-3 py-2 text-center font-bold text-gray-900 border-r border-gray-300">{row.year}</td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-red-50 border-l border-gray-300">${Math.round(proj10.expenditures).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-red-50">${Math.round(proj10.endingBalance).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-yellow-50 border-l border-gray-300">${Math.round(proj5.expenditures).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-yellow-50">${Math.round(proj5.endingBalance).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-gray-50 border-l border-gray-300">${Math.round(projBase.expenditures).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-gray-50">${Math.round(projBase.endingBalance).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-green-50 border-l border-gray-300">${Math.round(projFull.expenditures).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-green-50">${Math.round(projFull.endingBalance).toLocaleString()}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                )}
               </div>
-            )}
 
-            {activeTab === 'summary' && (
-              <div>
-                {/* ... existing summary table code ... */}
-                {/* Omitted for brevity, but same logic as before */}
-                <h3 className="text-lg font-bold text-gray-900 mb-6">📊 Component Schedule Summary</h3>
-                <div className="mb-8">
-                  <h4 className="text-md font-bold text-blue-900 mb-3">💰 Reserve Fund Component Summary</h4>
-                  <div className="overflow-x-auto border border-gray-300 rounded-lg">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-blue-900">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Items</th>
-                          <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">Percent<br/>Funded</th>
-                          <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Replacement Cost<br/>Totals</th>
-                          <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Current Reserve<br/>Funds</th>
-                          <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Funds<br/>Needed</th>
-                          <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Annual<br/>Funding</th>
-                          <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Full Funded<br/>Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {reserveCategorySummary.map((cat) => (
-                          <tr key={cat.category} className="border-b border-gray-300">
-                            <td className="px-4 py-2 text-sm text-gray-900 border-r border-gray-300">{cat.category}</td>
-                            <td className="px-4 py-2 text-center text-sm text-gray-900 border-r border-gray-300">
-                              {cat.percentFunded > 0 ? `${cat.percentFunded.toFixed(0)}%` : '-'}
-                            </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
-                              ${Math.round(cat.replacementCost).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
-                              ${Math.round(cat.currentReserveFunds).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
-                              ${Math.round(cat.fundsNeeded).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-900 border-r border-gray-300">
-                              ${Math.round(cat.annualFunding).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-900">
-                              ${Math.round(cat.fullFundedBalance).toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="bg-blue-100 font-bold border-t-2 border-blue-900">
-                          <td className="px-4 py-3 text-sm text-blue-900">Totals</td>
-                          <td className="px-4 py-3 text-center text-sm text-blue-900">
-                            {reserveFund.percentFunded?.toFixed(0)}%
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-blue-900">
-                            ${Math.round(reserveFund.totalReplacementCost || 0).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-blue-900">
-                            ${Math.round(reserveFund.currentBalance || 0).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-blue-900">
-                            ${Math.round(reserveCategorySummary.reduce((sum, cat) => sum + cat.fundsNeeded, 0)).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-blue-900">
-                            ${Math.round(reserveCategorySummary.reduce((sum, cat) => sum + cat.annualFunding, 0)).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-blue-900">
-                            ${Math.round(reserveFund.fullyFundedBalance || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+              {!pmRequired && pmComponentCount > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                  <p className="text-amber-800 text-sm">
+                    <strong>ℹ️ Note:</strong> This site has {pmComponentCount} PM-flagged component{pmComponentCount !== 1 ? 's' : ''}, 
+                    but PM fund is not required for {site?.companyState || 'this state'}. 
+                    All components will be calculated under the Reserve Fund.
+                  </p>
                 </div>
-              </div>
-            )}
+              )}
+
+              {!hasRequiredData && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <p className="text-orange-800">
+                    <strong>⚠️ Missing Required Data:</strong> Please add project information and components.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-4">
+              <Link
+                href={`/sites/${siteId}`}
+                className="flex-1 px-6 py-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium text-center"
+              >
+                Cancel
+              </Link>
+              <button
+                onClick={handleCalculate}
+                disabled={!hasRequiredData}
+                className={`flex-1 px-6 py-4 text-white rounded-lg font-medium text-lg ${
+                  pmRequired 
+                    ? 'bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400' 
+                    : 'bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400'
+                }`}
+              >
+                {pmRequired ? '🚀 Run Dual Fund Calculations' : '🚀 Run Reserve Fund Calculations'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {calculating && !calculationResults && (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <div className="mb-4">
+              <div className={`inline-block animate-spin rounded-full h-12 w-12 border-b-2 ${pmRequired ? 'border-purple-600' : 'border-blue-600'}`}></div>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Calculating...</h3>
+            <p className="text-gray-600">{progress}</p>
           </div>
+        )}
+
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="font-semibold text-blue-900 mb-2">
+            {pmRequired ? '🔵 Dual Fund System' : '🔵 Reserve Fund System'}
+          </h3>
+          <p className="text-blue-800 text-sm">
+            {pmRequired 
+              ? 'This calculates Reserve Fund and PM Fund separately as required by state regulations.'
+              : `PM fund is not required for ${site?.companyState || 'this state'}. All components are calculated under the Reserve Fund.`
+            }
+          </p>
         </div>
       </main>
     </div>
