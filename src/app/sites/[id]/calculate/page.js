@@ -1,6 +1,6 @@
 // src/app/sites/[id]/calculate/page.js
 // CONDITIONAL DUAL FUND SYSTEM - Fixed separation of Reserve and PM funds
-// v12: Fixes double-counting and recommended funding display
+// v17: Fixed timing logic: RUL 1 triggers expense in Year 1 (not Year 2).
 
 'use client';
 
@@ -41,7 +41,6 @@ export default function CalculatePage() {
         setSite(siteData);
         setComponents(componentsData);
         
-        // CHECK STATE COMPLIANCE FOR PM REQUIREMENT
         let isPMRequired = true;
         try {
           let orgId = siteData?.organizationId;
@@ -113,8 +112,6 @@ export default function CalculatePage() {
         totalCost: comp.totalCost || ((comp.quantity || 0) * (comp.unitCost || 0)),
       }));
 
-      // SPLIT INTO RESERVE AND PM COMPONENTS
-      // FIX: Ensure lists are strictly separated if PM is required
       const reserveComponents = pmRequired 
         ? mappedComponents.filter(c => !c.isPreventiveMaintenance)
         : mappedComponents;
@@ -123,20 +120,10 @@ export default function CalculatePage() {
         ? mappedComponents.filter(c => c.isPreventiveMaintenance)
         : [];
         
-      // Components used for total property projections (Thresholds usually look at the whole picture, 
-      // but in a dual system, Reserve Thresholds should arguably only look at Reserve Items.
-      // We will stick to the separated list for the main Reserve Study Calculation).
-      
       console.log('========================================');
       console.log(pmRequired ? '🔵 DUAL FUND CALCULATION SYSTEM' : '🔵 RESERVE FUND ONLY CALCULATION');
       console.log('========================================');
-      console.log('Total Components:', mappedComponents.length);
-      console.log('Reserve-only Components:', reserveComponents.length);
-      console.log('PM Components:', pmComponents.length);
 
-      // ========================================
-      // RESERVE FUND CALCULATION
-      // ========================================
       setProgress(`Calculating Reserve Fund (${reserveComponents.length} components)...`);
       
       const reserveProjectInfo = {
@@ -149,24 +136,17 @@ export default function CalculatePage() {
         costAdjustmentFactor: site.costAdjustmentFactor || 1.15,
       };
 
-      // FIX: Use ONLY reserveComponents here to prevent double counting PM items
       const reserveResults = calculateReserveStudy(reserveProjectInfo, reserveComponents);
-      
-      // FIX: Use the Cash Flow Average (Full Funding) for the "Recommended" number to match Excel (~$55k)
-      // The reserveResults.summary.recommendedAnnualFunding is the Component Method Sum (~$139k)
       const reserveRecommendedFunding = reserveResults.thresholdScenarios.fullFunding.averageAnnualContribution;
 
       console.log('========================================');
       console.log('💰 RESERVE FUND RESULTS:');
-      console.log('Total Replacement Cost:', reserveResults.summary.totalReplacementCost);
       console.log('Recommended Contribution (Cash Flow):', reserveRecommendedFunding);
 
-      // ========================================
-      // PM FUND CALCULATION (only if PM required)
-      // ========================================
       let pmResults = null;
       let pmRecommendedFunding = 0;
       let pmCashFlowWithExpend = [];
+      let pmFullFundingCashFlow = [];
       
       if (pmRequired && pmComponents.length > 0) {
         setProgress(`Calculating PM Fund (${pmComponents.length} components)...`);
@@ -184,29 +164,29 @@ export default function CalculatePage() {
         pmResults = calculateReserveStudy(pmProjectInfo, pmComponents);
         pmRecommendedFunding = pmResults.thresholdScenarios.fullFunding.averageAnnualContribution;
         
-        console.log('========================================');
-        console.log('🟣 PM FUND RESULTS:');
-        console.log('Recommended Contribution (Cash Flow):', pmRecommendedFunding);
-        
         pmCashFlowWithExpend = buildCashFlowWithCycling(
           pmComponents,
           pmProjectInfo
         );
+        
+        pmFullFundingCashFlow = pmResults.thresholdScenarios.fullFunding.years.map((y, i) => ({
+          year: y.fiscalYear,
+          annualContribution: Math.round(pmResults.thresholdScenarios.fullFunding.yearlyAnnualFunding[i] || 0),
+          contributions: Math.round(y.reserveBalance.contributions),
+          expenditures: Math.round(y.reserveBalance.expenditures),
+          endingBalance: Math.round(y.reserveBalance.endingBalance),
+        }));
+
+        console.log('========================================');
+        console.log('🟣 PM FUND RESULTS:');
+        console.log('Recommended Contribution (Cash Flow):', pmRecommendedFunding);
       }
 
-      // ========================================
-      // BUILD CASH FLOW (Reserve Components Only)
-      // ========================================
-      // This ensures the chart in the Reserve tab only shows Reserve expenditures
       const reserveCashFlowWithExpend = buildCashFlowWithCycling(
         reserveComponents,
         reserveProjectInfo
       );
       
-      // ========================================
-      // CALCULATE THRESHOLD PROJECTIONS
-      // ========================================
-      // FIX: Pass reserveComponents only. Thresholds should calculate based on the fund's specific liabilities.
       setProgress('Calculating threshold projections...');
       
       const thresholdResults = calculateThresholdProjections(
@@ -215,16 +195,12 @@ export default function CalculatePage() {
         site.beginningReserveBalance || 0
       );
       
-      // ========================================
-      // COMBINE RESULTS FOR DISPLAY
-      // ========================================
       const displayResults = {
         pmRequired: pmRequired,
         
         reserveFund: {
           percentFunded: (reserveResults.years[0].reserveBalance?.percentFunded || 0) * 100,
           fullyFundedBalance: reserveResults.years[0].totals?.overall?.fullFundingBalance || 0,
-          // FIX: Use the smoothed Cash Flow recommendation
           recommendedContribution: reserveRecommendedFunding || 0,
           currentBalance: site.beginningReserveBalance || 0,
           currentContribution: site.currentAnnualContribution || 0,
@@ -235,7 +211,6 @@ export default function CalculatePage() {
         pmFund: pmRequired && pmResults ? {
           percentFunded: (pmResults.years[0].reserveBalance?.percentFunded || 0) * 100,
           fullyFundedBalance: pmResults.years[0].totals?.overall?.fullFundingBalance || 0,
-          // FIX: Use the smoothed Cash Flow recommendation
           recommendedContribution: pmRecommendedFunding || 0,
           currentBalance: site.pmBeginningBalance || 0,
           currentContribution: site.pmAnnualContribution || 0,
@@ -268,7 +243,6 @@ export default function CalculatePage() {
         },
         summary: {
           percentFunded: (reserveResults.years[0].reserveBalance?.percentFunded || 0) * 100,
-          // FIX: Use the smoothed Cash Flow recommendation
           recommendedContribution: reserveRecommendedFunding || 0,
           currentReserveBalance: site.beginningReserveBalance || 0,
           fullyFundedBalance: reserveResults.years[0].totals?.overall?.fullFundingBalance || 0,
@@ -277,6 +251,8 @@ export default function CalculatePage() {
         },
         reserveCashFlow: reserveCashFlowWithExpend,
         pmCashFlow: pmCashFlowWithExpend,
+        pmFullFundingCashFlow: pmFullFundingCashFlow,
+        
         fullFundingCashFlow: reserveResults.thresholdScenarios.fullFunding.years.map((y, i) => ({
           year: y.fiscalYear,
           annualContribution: Math.round(reserveResults.thresholdScenarios.fullFunding.yearlyAnnualFunding[i] || 0),
@@ -319,7 +295,7 @@ export default function CalculatePage() {
     
     const compStates = components.map(comp => ({
       ...comp,
-      currentRemainingLife: comp.estimatedRemainingLife || comp.remainingUsefulLife || 0,
+      currentRemainingLife: Math.max(1, comp.estimatedRemainingLife || comp.remainingUsefulLife || 0),
     }));
     
     for (let year = 0; year < 31; year++) {
@@ -328,16 +304,21 @@ export default function CalculatePage() {
       
       let yearExpenditures = 0;
       compStates.forEach(comp => {
-        if (comp.currentRemainingLife === 0 && year > 0) {
+        // FIX: Timing. If RUL starts at 1.
+        // Year 0 (2026): Check RUL. If 1, Expense!
+        if (comp.currentRemainingLife === 1 && year >= 0) {
           const inflatedCost = (comp.totalCost || 0) * inflationMultiplier;
           yearExpenditures += inflatedCost;
         }
       });
       
-      if (year === 0) yearExpenditures = 0;
+      // Expenditures happen in Year 0 (2026) too if RUL=1.
+      // So we don't force yearExpenditures = 0 unless we are purely taking snapshot.
+      // But standard Cash Flow includes Year 1 expenses.
       
       const beginningBalance = runningBalance;
-      const contributions = year === 0 ? 0 : projectInfo.currentAnnualContribution;
+      const contributions = projectInfo.currentAnnualContribution;
+      
       const interest = beginningBalance * projectInfo.interestRate;
       const endingBalance = beginningBalance + contributions + interest - yearExpenditures;
       
@@ -353,10 +334,12 @@ export default function CalculatePage() {
       runningBalance = endingBalance;
       
       compStates.forEach(comp => {
-        if (comp.currentRemainingLife <= 0) {
+        if (comp.currentRemainingLife === 1) {
           comp.currentRemainingLife = comp.typicalUsefulLife || comp.usefulLife || 20;
+        } else {
+          comp.currentRemainingLife -= 1;
         }
-        comp.currentRemainingLife -= 1;
+        if (comp.currentRemainingLife <= 0) comp.currentRemainingLife = comp.typicalUsefulLife || 20;
       });
     }
     
@@ -366,7 +349,10 @@ export default function CalculatePage() {
   const buildReplacementSchedule = (components, beginningYear) => {
     const schedule = [];
     components.forEach(component => {
-      const replacementYear = component.replacementYear || (beginningYear + (component.remainingUsefulLife || 0));
+      // FIX: RUL 1 means StartYear + 1 - 1 = StartYear
+      const rul = Math.max(1, component.remainingUsefulLife || component.estimatedRemainingLife || 0);
+      const replacementYear = beginningYear + rul - 1;
+      
       schedule.push({
         year: replacementYear,
         description: component.description,
@@ -386,7 +372,7 @@ export default function CalculatePage() {
     
     const compStates = components.map(comp => ({
       ...comp,
-      currentRemainingLife: comp.estimatedRemainingLife || comp.remainingUsefulLife || 0,
+      currentRemainingLife: Math.max(1, comp.estimatedRemainingLife || comp.remainingUsefulLife || 0),
     }));
     
     for (let year = 0; year < 31; year++) {
@@ -394,13 +380,12 @@ export default function CalculatePage() {
       const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year);
       
       let yearExpenditures = 0;
-      if (year > 0) {
-        compStates.forEach(comp => {
-          if (comp.currentRemainingLife === 0) {
-            yearExpenditures += (comp.totalCost || 0) * inflationMultiplier;
-          }
-        });
-      }
+      // FIX: Timing
+      compStates.forEach(comp => {
+        if (comp.currentRemainingLife === 1) {
+          yearExpenditures += (comp.totalCost || 0) * inflationMultiplier;
+        }
+      });
       
       const beginningBalanceYear = runningBalance;
       const contributions = constantContribution;
@@ -419,10 +404,12 @@ export default function CalculatePage() {
       runningBalance = endingBalance;
       
       compStates.forEach(comp => {
-        if (comp.currentRemainingLife <= 0) {
+        if (comp.currentRemainingLife === 1) {
           comp.currentRemainingLife = comp.typicalUsefulLife || comp.usefulLife || 20;
+        } else {
+          comp.currentRemainingLife -= 1;
         }
-        comp.currentRemainingLife -= 1;
+        if (comp.currentRemainingLife <= 0) comp.currentRemainingLife = comp.typicalUsefulLife || 20;
       });
     }
     
@@ -434,7 +421,7 @@ export default function CalculatePage() {
     const targetBalance = totalReplacementCost * thresholdPercent;
     
     let low = 0;
-    let high = totalReplacementCost / 5; // adjusted upper bound
+    let high = totalReplacementCost / 5; 
     
     for (let i = 0; i < 100; i++) {
       const mid = (low + high) / 2;
