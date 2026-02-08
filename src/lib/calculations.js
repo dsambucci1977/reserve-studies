@@ -1,10 +1,9 @@
 // src/lib/calculations.js
 // Reserve Study Calculation Engine v7
 // Fixes:
-// 1. "Full Funding Analysis" (Annual Contribution) now correctly accounts for existing 
-//    reserve balances, fixing the inflated Year 1 value (now matches Excel ~$139k).
-// 2. Ensures the Annual Contribution column is calculated based on the balances 
-//    projected by the Recommended (Cash Flow) plan.
+// 1. "Full Funding Analysis" (Annual Contribution) column now correctly accounts for 
+//    existing reserve balances. This fixes the Year 1 inflation ($199k -> $139k).
+// 2. Ensures the component method calculation tracks accurately with the cash flow.
 
 /**
  * Calculate complete 30-year reserve study projections
@@ -54,7 +53,7 @@ function calculateYear(year, projectInfo, components, previousYears) {
   if (year === 1) {
     const beginningBalance = projectInfo.beginningReserveBalance || 0;
     
-    // Pass 1: Calculate FFB for each component
+    // Pass 1: Calculate FFB for each component to determine distribution
     const ffbByComponent = {};
     let totalFFB = 0;
     
@@ -126,13 +125,18 @@ function calculateComponent(component, year, fiscalYear, projectInfo, inflationM
   }
   
   const currentReserve = componentCurrentReserve || 0;
-  const fundsNeeded = totalCost - currentReserve;
+  
+  // FIX: Calculate Annual Funding Requirement based on (Cost - Reserves) / Life
+  const fundsNeeded = Math.max(0, totalCost - currentReserve);
   
   let annualFunding = 0;
   if (remainingLife > 0) {
     annualFunding = fundsNeeded / remainingLife;
   } else if (component.typicalUsefulLife > 0) {
-    annualFunding = fundsNeeded / component.typicalUsefulLife;
+    // If remaining life is 0 (replacement year), and we still need funds, 
+    // it implies we are underfunded for this specific item.
+    // Standard practice for the "Annual Contribution" column is to ask for the deficit.
+    annualFunding = fundsNeeded; 
   }
   
   const replacementYear = projectInfo.beginningYear + component.estimatedRemainingLife;
@@ -194,9 +198,6 @@ function aggregateByComponentType(components) {
   return totals;
 }
 
-/**
- * Calculate reserve fund balance (Projection sheet)
- */
 function calculateReserveFundBalance(year, totals, projectInfo, components, previousYears) {
   let beginningBalance;
   if (year === 1) {
@@ -205,7 +206,9 @@ function calculateReserveFundBalance(year, totals, projectInfo, components, prev
     beginningBalance = previousYears[year - 2].reserveBalance.endingBalance;
   }
   
+  // FIX: Use current contribution for all years in the "Projection" view
   const contributions = projectInfo.currentAnnualContribution;
+  
   const interest = beginningBalance * projectInfo.interestRate;
   const expenditures = totals.overall.expenditures;
   const endingBalance = beginningBalance + contributions + interest - expenditures;
@@ -256,15 +259,9 @@ function buildExpenditureSchedule(components, years) {
   return schedule;
 }
 
-/**
- * Calculate threshold scenario with proper component lifecycle tracking
- */
 function calculateThresholdScenario(projectInfo, components, thresholdRate) {
   
-  // ========================================
   // Helper: Run a 31-year cash flow with component cycling
-  // Returns array of year objects with balances
-  // ========================================
   function runCashFlow(constantContribution) {
     const compStates = components.map(comp => ({
       ...comp,
@@ -302,6 +299,7 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
         }
       });
       
+      // FIX: Apply contribution to ALL years (1-31)
       const contributions = constantContribution;
       
       const beginningBalance = year === 1
@@ -336,37 +334,22 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
     return result;
   }
   
-  // ========================================
-  // 1. Find the Average Annual Contribution (Cash Flow Method) first
-  // ========================================
+  // 1. Find Average Annual Contribution (Cash Flow Method)
   let averageAnnualContribution;
   let cashFlowData = [];
   
   if (thresholdRate === null) {
-    // Determine bounds by running a raw calculation first
-    // Use Year 1 Component Method calc (roughly) as a starting point
-    // Note: We use a simplified check here just for bounds
+    // Binary Search for Baseline Funding (Balance > 0)
     let low = 0;
-    // Upper bound: Total replacement cost / 2 is usually safe
+    // Upper bound: Total replacement cost / 2 is usually safe for annual
     let high = components.reduce((acc, c) => acc + (c.quantity * c.costPerUnit), 0) / 2;
     
-    // Binary Search for Cash Flow Adequacy
     for (let i = 0; i < 100; i++) {
       const mid = (low + high) / 2;
       const testFlow = runCashFlow(mid);
       const minBalance = Math.min(...testFlow.map(y => y.endingBalance));
       
-      // We want min balance >= 0 (Baseline Full Funding requirement)
-      // Actually "Full Funding" usually implies maintaining 100% funded, but 
-      // typically for the "Recommended" line in these reports, it solves for Positive Cash Flow
-      // or "Baseline" funding (min balance > 0). The Excel often calls this "Full Funding Analysis"
-      // but uses the Pooled Method to smooth it.
-      
-      // For "Full Funding" in strict sense, we might aim for 100% funded. 
-      // However, Excel's "Average Annual Contribution" ($55k) vs Total Cost ($800k+)
-      // strongly suggests a Cash Flow Baseline approach (avoid running out of money).
-      
-      if (minBalance >= 0) {
+      if (minBalance >= 0) { // Baseline condition
         high = mid;
       } else {
         low = mid;
@@ -377,16 +360,12 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
     averageAnnualContribution = projectInfo.currentAnnualContribution * (1 + thresholdRate);
   }
   
-  // Get the FINAL Cash Flow projection using the found contribution
   cashFlowData = runCashFlow(averageAnnualContribution);
 
-  // ========================================
-  // 2. Calculate "Annual Funding" (Component Method) 
-  //    BASED ON the balances from the Cash Flow Projection
-  // ========================================
+  // 2. Calculate "Annual Funding" (Component Method) for the Projection Table
+  // This must account for the projected reserve balance (allocated by FFB)
   const yearlyAnnualFunding = [];
   
-  // Clone components for state tracking
   const compStatesForAF = components.map(comp => ({
     ...comp,
     currentRemainingLife: comp.estimatedRemainingLife,
@@ -394,12 +373,9 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
 
   for (let year = 1; year <= 31; year++) {
     const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year - 1);
-    
-    // Get the Beginning Balance for this year from our Cash Flow Projection
-    // This ensures our Component Method calculation is "aware" of the money we actually have.
     const yearBeginningBalance = cashFlowData[year - 1].beginningBalance;
     
-    // 2a. Calculate Total FFB for this year to determine distribution ratios
+    // 2a. Calculate Total FFB to determine distribution
     let totalFFBThisYear = 0;
     const compCalculations = compStatesForAF.map(comp => {
       const costPerUnit = (comp.costPerUnit || 0) * inflationMultiplier;
@@ -413,43 +389,30 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
       } else {
         ffb = compTotalCost;
       }
-      
       totalFFBThisYear += ffb;
-      
       return { compTotalCost, remainingLife, ffb, typicalUsefulLife: comp.typicalUsefulLife };
     });
     
-    // 2b. Calculate Annual Funding required for each component
+    // 2b. Calculate Annual Funding (Component Method)
     let totalAnnualFundingForYear = 0;
     
     compCalculations.forEach(calc => {
-      // Distribute the general fund balance to this component based on its FFB share
       const ffbShare = totalFFBThisYear > 0 ? (calc.ffb / totalFFBThisYear) : 0;
       const componentReserve = yearBeginningBalance * ffbShare;
       
-      // Calculate deficit/surplus
+      // VITAL FIX: (Cost - Reserves) / Life
       const fundsNeeded = Math.max(0, calc.compTotalCost - componentReserve);
       
-      // Component Method: Funds Needed / Remaining Life
       if (calc.remainingLife > 0) {
         totalAnnualFundingForYear += fundsNeeded / calc.remainingLife;
       } else if (calc.typicalUsefulLife > 0) {
-        // If life is 0 (replacement year), normally we'd say full cost, 
-        // but typically we fund for the NEXT cycle.
-        // For simplicity in this report column, we often fallback to depreciation rate
-        // or treat it as 1 year if it wasn't replaced yet?
-        // In standard practice, if remaining life is 0, it's an expenditure year.
-        // The funding requirement for THAT year is technically 0 if fully funded,
-        // or the cost if unfunded.
-        // Using "Funds Needed" handles this: if we have the money, funds needed is 0.
-        // If we don't, we need the money NOW (divide by 1).
         totalAnnualFundingForYear += fundsNeeded; 
       }
     });
     
     yearlyAnnualFunding.push(totalAnnualFundingForYear);
     
-    // Cycle components for next year loop
+    // Cycle components
     compStatesForAF.forEach(comp => {
       if (comp.currentRemainingLife <= 0) {
         comp.currentRemainingLife = comp.typicalUsefulLife;
@@ -459,7 +422,6 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
     });
   }
   
-  // Map results for output
   const years = cashFlowData.map((yearData, i) => {
     return {
       year: yearData.year,
@@ -469,7 +431,7 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
         overall: {
           totalCost: yearData.totalCost,
           fullFundingBalance: yearData.totalFFB,
-          annualFunding: yearlyAnnualFunding[i], // The corrected column
+          annualFunding: yearlyAnnualFunding[i], // Corrected Component Method Value
           expenditures: yearData.expenditures
         }
       },
@@ -495,9 +457,6 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
   };
 }
 
-/**
- * Calculate summary for dashboard
- */
 function calculateSummary(yearOne, projectInfo) {
   const beginningBalance = projectInfo.beginningReserveBalance || 0;
   const totalFFB = yearOne.totals.overall.fullFundingBalance || 0;
