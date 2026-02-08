@@ -1,9 +1,10 @@
 // src/app/sites/[id]/calculate/page.js
 // CONDITIONAL DUAL FUND SYSTEM - Fixed separation of Reserve and PM funds
-// v21: Fixes "Billions" Bug & Respects Project Info Defaults
-//      1. Removes hardcoded '1.15' cost adjustment default. Uses 1.0 (no adjustment) if 0/empty.
-//      2. Safety Scrub: Explicitly converts all costs/qtys to Numbers at the start.
-//      3. Threshold Solver: Uses inflated contributions (Cash Flow Method) to match Recommended.
+// v22: Fixes Threshold Solver & Input Defaults
+//      1. Applies Cost Adjustment Factor (CAF) to Threshold Solver (was missing).
+//      2. Applies CAF to Manual Cash Flow Builder (was missing).
+//      3. Logs Inflation/CAF inputs for verification.
+//      4. Robust parsing of Site parameters.
 
 'use client';
 
@@ -101,14 +102,10 @@ export default function CalculatePage() {
     try {
       setProgress('Preparing data...');
       
-      // CRITICAL FIX: SAFETY SCRUB
-      // 1. Force everything to Number.
-      // 2. Handle 'NaN' gracefully (default to 0).
+      // SAFETY SCRUB: Force everything to Number
       const mappedComponents = components.map(comp => {
         const quantity = parseFloat(comp.quantity) || 0;
         const unitCost = parseFloat(comp.unitCost) || 0;
-        
-        // Calculate Total Cost if missing or invalid
         let totalCost = parseFloat(comp.totalCost);
         if (isNaN(totalCost) || totalCost === 0) {
           totalCost = quantity * unitCost;
@@ -125,7 +122,7 @@ export default function CalculatePage() {
           componentType: comp.isPreventiveMaintenance ? 'Preventive Maintenance' : (comp.category || ''),
           itemName: comp.description || '',
           isPreventiveMaintenance: comp.isPreventiveMaintenance || false,
-          totalCost: totalCost, // Now guaranteed to be a Number
+          totalCost: totalCost, 
         };
       });
 
@@ -142,11 +139,27 @@ export default function CalculatePage() {
       console.log(pmRequired ? '🔵 DUAL FUND CALCULATION' : '🔵 RESERVE FUND ONLY');
       console.log('========================================');
 
-      // PREPARE PROJECT INFO (Strictly from Site Data)
-      // FIX: Default Cost Adjustment to 1.0 (No adjustment) instead of 1.15
-      const inflationRate = site.inflationRate ? parseFloat(site.inflationRate) / 100 : 0;
-      const interestRate = site.interestRate ? parseFloat(site.interestRate) / 100 : 0;
-      const costAdjustmentFactor = site.costAdjustmentFactor ? parseFloat(site.costAdjustmentFactor) : 1.0;
+      // PREPARE PROJECT INFO
+      // FIX: Ensure Cost Adjustment Factor and Inflation are Numbers
+      const inflationRate = (site.inflationRate && !isNaN(parseFloat(site.inflationRate))) 
+        ? parseFloat(site.inflationRate) / 100 
+        : 0;
+        
+      const interestRate = (site.interestRate && !isNaN(parseFloat(site.interestRate)))
+        ? parseFloat(site.interestRate) / 100
+        : 0;
+        
+      // Default to 1.0 (No Adjustment) if empty/0
+      const costAdjustmentFactor = (site.costAdjustmentFactor && parseFloat(site.costAdjustmentFactor) > 0)
+        ? parseFloat(site.costAdjustmentFactor)
+        : 1.0;
+
+      console.log('INPUTS:', {
+        Inflation: inflationRate,
+        Interest: interestRate,
+        CAF: costAdjustmentFactor,
+        StartBalance: site.beginningReserveBalance
+      });
 
       const reserveProjectInfo = {
         beginningYear: site.beginningYear || new Date().getFullYear(),
@@ -201,7 +214,6 @@ export default function CalculatePage() {
       // ========================================
       // 3. BUILD CASH FLOWS (Manual Projection)
       // ========================================
-      // This builds the "Current Funding" table rows
       const reserveCashFlowWithExpend = buildCashFlowWithCycling(
         reserveComponents,
         reserveProjectInfo
@@ -298,8 +310,8 @@ export default function CalculatePage() {
     const cashFlow = [];
     const startYear = projectInfo.beginningYear;
     let runningBalance = projectInfo.beginningReserveBalance;
+    const caf = projectInfo.costAdjustmentFactor || 1.0;
     
-    // Copy components to avoid mutating state
     const compStates = components.map(comp => ({
       ...comp,
       currentRemainingLife: Math.max(1, comp.estimatedRemainingLife || 0),
@@ -309,19 +321,18 @@ export default function CalculatePage() {
       const fiscalYear = startYear + year;
       const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year);
       
-      // Calculate Expenditures
       let yearExpenditures = 0;
       compStates.forEach(comp => {
         if (comp.currentRemainingLife === 1) {
-          // Cost increases by inflation
-          const inflatedCost = (comp.totalCost || 0) * inflationMultiplier;
+          // FIX: Apply Cost Adjustment Factor (CAF) + Inflation
+          const inflatedCost = (comp.totalCost || 0) * caf * inflationMultiplier;
           yearExpenditures += inflatedCost;
         }
       });
       
       const beginningBalance = runningBalance;
       
-      // Calculate Contributions (Inflated annually in standard Cash Flow model)
+      // Contributions grow with inflation
       const contributions = projectInfo.currentAnnualContribution * inflationMultiplier;
       
       const interest = beginningBalance * projectInfo.interestRate;
@@ -338,7 +349,6 @@ export default function CalculatePage() {
       
       runningBalance = endingBalance;
       
-      // Cycle Components
       compStates.forEach(comp => {
         if (comp.currentRemainingLife === 1) {
           comp.currentRemainingLife = comp.typicalUsefulLife || 20;
@@ -352,7 +362,6 @@ export default function CalculatePage() {
     return cashFlow;
   };
 
-  // HELPER: Build Replacement Schedule
   const buildReplacementSchedule = (components, beginningYear) => {
     const schedule = [];
     components.forEach(component => {
@@ -376,6 +385,7 @@ export default function CalculatePage() {
     const projection = [];
     const startYear = projectInfo.beginningYear;
     let runningBalance = beginningBalance;
+    const caf = projectInfo.costAdjustmentFactor || 1.0;
     
     const compStates = components.map(comp => ({
       ...comp,
@@ -389,15 +399,14 @@ export default function CalculatePage() {
       let yearExpenditures = 0;
       compStates.forEach(comp => {
         if (comp.currentRemainingLife === 1) {
-          yearExpenditures += (comp.totalCost || 0) * inflationMultiplier;
+          // FIX: Apply Cost Adjustment Factor (CAF) + Inflation
+          const inflatedCost = (comp.totalCost || 0) * caf * inflationMultiplier;
+          yearExpenditures += inflatedCost;
         }
       });
       
       const beginningBalanceYear = runningBalance;
-      
-      // IMPORTANT: Contribution grows with inflation
       const contributions = initialAnnualContribution * inflationMultiplier;
-      
       const interest = beginningBalanceYear * projectInfo.interestRate;
       const endingBalance = beginningBalanceYear + contributions + interest - yearExpenditures;
       
@@ -425,17 +434,14 @@ export default function CalculatePage() {
     return projection;
   };
 
-  // HELPER: Binary Search for Threshold
   const findContributionForThreshold = (projectInfo, components, beginningBalance, thresholdPercent) => {
-    // Determine the ceiling for binary search based on total possible cost
-    const totalReplacementCost = components.reduce((sum, c) => sum + (c.totalCost || 0), 0);
+    const caf = projectInfo.costAdjustmentFactor || 1.0;
+    const totalReplacementCost = components.reduce((sum, c) => sum + (c.totalCost || 0), 0) * caf;
     const targetBalance = totalReplacementCost * thresholdPercent;
     
     let low = 0;
-    // Set a reasonable high bound (e.g., paying for EVERYTHING in 1 year is the max possible need)
     let high = totalReplacementCost * 2; 
     
-    // Safety check for invalid high (NaN or 0)
     if (isNaN(high) || high === 0) high = 1000000;
 
     for (let i = 0; i < 100; i++) {
@@ -443,9 +449,8 @@ export default function CalculatePage() {
       const projection = runProjectionWithCycling(components, projectInfo, beginningBalance, mid);
       const minBalance = Math.min(...projection.map(y => y.endingBalance));
       
-      // If our minimum balance is higher than required, we can pay less (lower the high bound)
       if (minBalance >= targetBalance) high = mid;
-      else low = mid; // If too low, pay more
+      else low = mid;
       
       if ((high - low) < 1) break;
     }
@@ -453,24 +458,22 @@ export default function CalculatePage() {
   };
 
   const calculateThresholdProjections = (projectInfo, components, beginningBalance, recommendedFunding) => {
-    // 1. Calculate Required Starting Contributions for each threshold
+    const caf = projectInfo.costAdjustmentFactor || 1.0;
+    const totalReplacementCost = components.reduce((sum, c) => sum + (c.totalCost || 0), 0) * caf;
+    
     const contributionBaseline = findContributionForThreshold(projectInfo, components, beginningBalance, 0.00);
     const contribution5 = findContributionForThreshold(projectInfo, components, beginningBalance, 0.05);
     const contribution10 = findContributionForThreshold(projectInfo, components, beginningBalance, 0.10);
     
-    // 2. Generate Projections based on those contributions
     const projectionBaseline = runProjectionWithCycling(components, projectInfo, beginningBalance, contributionBaseline);
     const projection5 = runProjectionWithCycling(components, projectInfo, beginningBalance, contribution5);
     const projection10 = runProjectionWithCycling(components, projectInfo, beginningBalance, contribution10);
     
-    // 3. Find Minimum Balances
     const minBalanceBaseline = Math.min(...projectionBaseline.map(y => y.endingBalance));
     const minBalance5 = Math.min(...projection5.map(y => y.endingBalance));
     const minBalance10 = Math.min(...projection10.map(y => y.endingBalance));
     
-    // 4. Calculate Multipliers vs Recommended
     const base = recommendedFunding > 0 ? recommendedFunding : 1;
-    const totalReplacementCost = components.reduce((sum, c) => sum + (c.totalCost || 0), 0);
 
     return {
       contribution10, contribution5, contributionBaseline,
