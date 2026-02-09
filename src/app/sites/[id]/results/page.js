@@ -1,9 +1,9 @@
 // src/app/sites/[id]/results/page.js
 // CONDITIONAL DUAL FUND RESULTS PAGE
-// v28: Separates Expenditure Schedule
-//      1. Removes combined 'Expenditure Schedule'.
-//      2. Adds distinct 'Reserve Expenditures' and 'PM Expenditures' tabs.
-//      3. Filters schedule data based on PM requirement.
+// v30: Restores Separate Cash Flow Tabs
+//      1. Reverts consolidation.
+//      2. Provides distinct 'Reserve Cash Flow' and 'PM Cash Flow' tabs.
+//      3. Maintains distinct 'Reserve Expenditures' and 'PM Expenditures' tabs.
 
 'use client';
 
@@ -78,13 +78,14 @@ export default function ResultsPage() {
   
   const reserveFund = results.reserveFund || {};
   const pmFund = results.pmFund || {};
+  
+  // Raw Data
   const reserveCashFlow = results.cashFlow || results.reserveCashFlow || [];
   const pmCashFlow = results.pmCashFlow || [];
   const schedule = results.replacementSchedule || [];
-  
-  // SEPARATE SCHEDULES
-  // If PM is required: Split by isPM flag.
-  // If PM is NOT required: Put EVERYTHING in Reserve (ignore flag).
+  const fullFundingCashFlow = results.fullFundingCashFlow || [];
+
+  // SEPARATE EXPENDITURE SCHEDULES
   const reserveExpenditures = pmRequired 
     ? schedule.filter(item => !item.isPM) 
     : schedule;
@@ -93,22 +94,12 @@ export default function ResultsPage() {
     ? schedule.filter(item => item.isPM)
     : [];
 
-  // Full Funding cash flow data
-  const fullFundingCashFlow = results.fullFundingCashFlow || [];
-  
   const thresholds = results.thresholds || {
     multiplier10: 0, multiplier5: 0, multiplierBaseline: 0, multiplierFull: 0,
     contribution10: 0, contribution5: 0, contributionBaseline: 0, contributionFull: 0,
     minBalance10: 0, minBalance5: 0, minBalanceBaseline: 0, minBalanceFull: 0,
     compliant10: true, compliant5: true,
     projection10: [], projection5: [], projectionBaseline: [], projectionFull: []
-  };
-
-  const getMinBalance = (projectionArray) => {
-    if (!projectionArray || projectionArray.length === 0) return 0;
-    const balances = projectionArray.map(r => r.endingBalance).filter(b => b !== undefined && b !== null);
-    if (balances.length === 0) return 0;
-    return Math.min(...balances);
   };
 
   const buildCategorySummary = (fund, fundSchedule, isPM) => {
@@ -263,15 +254,14 @@ export default function ResultsPage() {
         <div className="bg-white rounded-lg shadow mb-6">
           <div className="border-b">
             <div className="flex overflow-x-auto">
-              {/* UPDATED TABS LIST */}
               {[
                 'summary', 
                 'threshold', 
                 'reserve-cashflow', 
                 ...(pmRequired ? ['pm-cashflow'] : []), 
-                'reserve-expenditures', // Split Reserve Exp
-                ...(pmRequired ? ['pm-expenditures'] : []), // Split PM Exp
-                'schedule' // Master Replacement Schedule (optional, but good to keep)
+                'reserve-expenditures', 
+                ...(pmRequired ? ['pm-expenditures'] : []), 
+                'schedule'
               ].map(tab => (
                 <button
                   key={tab}
@@ -292,9 +282,12 @@ export default function ResultsPage() {
             {activeTab === 'threshold' && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">📉 Threshold Projection - Compliance Analysis</h3>
-                {/* ... Threshold Cards Content (Preserved) ... */}
+                <p className="text-sm text-gray-600 mb-6">
+                  Shows 30-year projections under three funding scenarios: 10% Threshold, 5% Threshold, and Baseline (0%)
+                </p>
+
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-                  {/* Cards reused from previous logic for 10%, 5%, Baseline, Full */}
+                  {/* 10% Threshold */}
                   <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4">
                     <h4 className="font-bold text-red-900 mb-2">10% Threshold</h4>
                     <div className="space-y-2">
@@ -304,6 +297,7 @@ export default function ResultsPage() {
                       <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Final Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.projection10?.[29]?.endingBalance || 0).toLocaleString()}</div></div>
                     </div>
                   </div>
+                  {/* 5% Threshold */}
                   <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
                     <h4 className="font-bold text-yellow-900 mb-2">5% Threshold</h4>
                     <div className="space-y-2">
@@ -313,6 +307,7 @@ export default function ResultsPage() {
                       <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Final Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.projection5?.[29]?.endingBalance || 0).toLocaleString()}</div></div>
                     </div>
                   </div>
+                  {/* Baseline */}
                   <div className="bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
                     <h4 className="font-bold text-gray-900 mb-2">Baseline (0%)</h4>
                     <div className="space-y-2">
@@ -322,6 +317,7 @@ export default function ResultsPage() {
                       <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Final Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.projectionBaseline?.[29]?.endingBalance || 0).toLocaleString()}</div></div>
                     </div>
                   </div>
+                  {/* Full Funding */}
                   <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4">
                     <h4 className="font-bold text-green-900 mb-2">Full Funding</h4>
                     <div className="space-y-2">
@@ -332,7 +328,7 @@ export default function ResultsPage() {
                     </div>
                   </div>
                 </div>
-                {/* ... Table logic (Preserved) ... */}
+                {/* Comparison Table */}
                 <div className="bg-white border border-gray-300 rounded-lg overflow-hidden">
                   <div className="bg-gray-700 px-4 py-3"><h4 className="font-bold text-white text-center">30-Year Threshold Projection Comparison</h4></div>
                   <div className="overflow-x-auto">
@@ -471,7 +467,7 @@ export default function ResultsPage() {
             {activeTab === 'reserve-cashflow' && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">💰 Reserve Fund Cash Flow (30-Year)</h3>
-                <p className="text-sm text-gray-600 mb-6">Projected ending balances based on current funding plan.</p>
+                <p className="text-sm text-gray-600 mb-6">Projected ending balances based on current funding plan (Reserve Items Only).</p>
                 <div className="overflow-x-auto border border-gray-300 rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-blue-900 text-white">
@@ -504,7 +500,7 @@ export default function ResultsPage() {
             {activeTab === 'pm-cashflow' && pmRequired && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">🟣 PM Fund Cash Flow (30-Year)</h3>
-                <p className="text-sm text-gray-600 mb-6">Projected ending balances based on current funding plan.</p>
+                <p className="text-sm text-gray-600 mb-6">Projected ending balances based on current funding plan (PM Items Only).</p>
                 <div className="overflow-x-auto border border-gray-300 rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-purple-900 text-white">
