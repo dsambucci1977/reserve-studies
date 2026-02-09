@@ -1,9 +1,9 @@
 // src/app/sites/[id]/results/page.js
 // CONDITIONAL DUAL FUND RESULTS PAGE
-// v32: Implements Side-by-Side Cash Flow Tables (Current vs Recommended)
-//      1. 'Reserve Cash Flow' tab now shows Current vs Recommended columns side-by-side.
-//      2. 'PM Cash Flow' tab (if active) shows Current vs Recommended columns side-by-side.
-//      3. Columns: Contribution, Expenditures, Ending Balance.
+// v33: Fixed Reserve Cash Flow table to match original design
+//      1. Restored "Current Funding" (green) and "Full Funding Analysis" (red) headers
+//      2. Restored correct columns: Annual Contribution, Average Annual Contribution, Ending Balance
+//      3. Fixed color scheme to match original design
 
 'use client';
 
@@ -82,6 +82,7 @@ export default function ResultsPage() {
   // Data Sources
   const reserveCashFlow = results.cashFlow || results.reserveCashFlow || [];
   const reserveFullFundingCashFlow = results.fullFundingCashFlow || [];
+  const averageAnnualContribution = results.averageAnnualContribution || reserveFund.recommendedContribution || 0;
   
   const pmCashFlow = results.pmCashFlow || [];
   const pmFullFundingCashFlow = results.pmFullFundingCashFlow || [];
@@ -271,120 +272,27 @@ export default function ResultsPage() {
                   onClick={() => setActiveTab(tab)}
                   className={`px-6 py-3 font-medium whitespace-nowrap capitalize ${
                     activeTab === tab
-                      ? 'text-indigo-600 border-b-2 border-indigo-600'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                      : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  {tab.replace('-', ' ')}
+                  {tab.replace(/-/g, ' ')}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="p-6">
-            {/* THRESHOLD PROJECTION TAB */}
-            {activeTab === 'threshold' && (
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">📉 Threshold Projection - Compliance Analysis</h3>
-                
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-                  {/* Threshold Cards... (Same as previous versions) */}
-                  <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4">
-                    <h4 className="font-bold text-red-900 mb-2">10% Threshold</h4>
-                    <div className="space-y-2">
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Multiplier</div><div className="text-lg font-bold text-gray-900">{thresholds.multiplier10?.toFixed(4)}</div></div>
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Annual Contribution (Yr 1)</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.contribution10 || 0).toLocaleString()}</div></div>
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Min Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.minBalance10 || 0).toLocaleString()}</div></div>
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Final Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.projection10?.[29]?.endingBalance || 0).toLocaleString()}</div></div>
-                    </div>
-                  </div>
-                  <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
-                    <h4 className="font-bold text-yellow-900 mb-2">5% Threshold</h4>
-                    <div className="space-y-2">
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Multiplier</div><div className="text-lg font-bold text-gray-900">{thresholds.multiplier5?.toFixed(4)}</div></div>
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Annual Contribution (Yr 1)</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.contribution5 || 0).toLocaleString()}</div></div>
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Min Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.minBalance5 || 0).toLocaleString()}</div></div>
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Final Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.projection5?.[29]?.endingBalance || 0).toLocaleString()}</div></div>
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
-                    <h4 className="font-bold text-gray-900 mb-2">Baseline (0%)</h4>
-                    <div className="space-y-2">
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Multiplier</div><div className="text-lg font-bold text-gray-900">{thresholds.multiplierBaseline?.toFixed(4)}</div></div>
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Annual Contribution (Yr 1)</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.contributionBaseline || 0).toLocaleString()}</div></div>
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Min Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.minBalanceBaseline || 0).toLocaleString()}</div></div>
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Final Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.projectionBaseline?.[29]?.endingBalance || 0).toLocaleString()}</div></div>
-                    </div>
-                  </div>
-                  <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4">
-                    <h4 className="font-bold text-green-900 mb-2">Full Funding</h4>
-                    <div className="space-y-2">
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Multiplier</div><div className="text-lg font-bold text-gray-900">{thresholds.multiplierFull?.toFixed(4) || '1.0000'}</div></div>
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Annual Contribution (Yr 1)</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.contributionFull || 0).toLocaleString()}</div></div>
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Min Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.minBalanceFull || 0).toLocaleString()}</div></div>
-                      <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Final Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.projectionFull?.[29]?.endingBalance || 0).toLocaleString()}</div></div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Projection Table */}
-                <div className="bg-white border border-gray-300 rounded-lg overflow-hidden">
-                  <div className="bg-gray-700 px-4 py-3"><h4 className="font-bold text-white text-center">30-Year Threshold Projection Comparison</h4></div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="px-3 py-2 text-center font-bold text-gray-900 border-r border-gray-300" rowSpan="2">Fiscal<br/>Year</th>
-                          <th className="px-4 py-2 text-center font-bold text-white bg-red-500 border-l border-gray-300" colSpan="2">10% Threshold</th>
-                          <th className="px-4 py-2 text-center font-bold text-white bg-yellow-500 border-l border-gray-300" colSpan="2">5% Threshold</th>
-                          <th className="px-4 py-2 text-center font-bold text-white bg-gray-600 border-l border-gray-300" colSpan="2">Baseline (0%)</th>
-                          <th className="px-4 py-2 text-center font-bold text-white bg-green-600 border-l border-gray-300" colSpan="2">Full Funding</th>
-                        </tr>
-                        <tr>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-red-50 border-l border-gray-300">Annual<br/>Expenditures</th><th className="px-3 py-2 text-xs text-gray-700 bg-red-50">Ending<br/>Balance</th>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-yellow-50 border-l border-gray-300">Annual<br/>Expenditures</th><th className="px-3 py-2 text-xs text-gray-700 bg-yellow-50">Ending<br/>Balance</th>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-gray-50 border-l border-gray-300">Annual<br/>Expenditures</th><th className="px-3 py-2 text-xs text-gray-700 bg-gray-50">Ending<br/>Balance</th>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-green-50 border-l border-gray-300">Annual<br/>Expenditures</th><th className="px-3 py-2 text-xs text-gray-700 bg-green-50">Ending<br/>Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {reserveCashFlow.map((row, index) => {
-                          const proj10 = thresholds.projection10?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
-                          const proj5 = thresholds.projection5?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
-                          const projBase = thresholds.projectionBaseline?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
-                          const projFull = thresholds.projectionFull?.[index] || { expenditures: row.expenditures, endingBalance: 0 };
-                          return (
-                            <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-3 py-2 text-center font-bold text-gray-900 border-r border-gray-300">{row.year}</td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-red-50 border-l border-gray-300">${Math.round(proj10.expenditures).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-red-50">${Math.round(proj10.endingBalance).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-yellow-50 border-l border-gray-300">${Math.round(proj5.expenditures).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-yellow-50">${Math.round(proj5.endingBalance).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-gray-50 border-l border-gray-300">${Math.round(projBase.expenditures).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-gray-50">${Math.round(projBase.endingBalance).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right text-gray-900 bg-green-50 border-l border-gray-300">${Math.round(projFull.expenditures).toLocaleString()}</td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 bg-green-50">${Math.round(projFull.endingBalance).toLocaleString()}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* SUMMARY TAB */}
             {activeTab === 'summary' && (
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-6">📊 Component Schedule Summary</h3>
                 <div className="mb-8">
                   <h4 className="text-md font-bold text-blue-900 mb-3">💰 Reserve Fund Component Summary</h4>
                   <div className="overflow-x-auto border border-gray-300 rounded-lg">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-blue-900">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Items</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Category</th>
                           <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">Percent<br/>Funded</th>
                           <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Replacement Cost<br/>Totals</th>
                           <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase">Current Reserve<br/>Funds</th>
@@ -464,45 +372,194 @@ export default function ResultsPage() {
               </div>
             )}
 
-            {/* RESERVE CASH FLOW TAB - SIDE BY SIDE */}
-            {activeTab === 'reserve-cashflow' && (
+            {/* THRESHOLD TAB */}
+            {activeTab === 'threshold' && (
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">💰 Reserve Fund Cash Flow (30-Year)</h3>
-                <p className="text-sm text-gray-600 mb-6">Comparison: Current Funding vs. Recommended Funding</p>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">📊 Threshold Funding Analysis</h3>
+                <p className="text-sm text-gray-600 mb-6">Comparison of funding scenarios over 30 years.</p>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-green-50 border border-green-300 rounded-lg p-4 text-center">
+                    <div className="text-xs text-green-700 font-medium">Full Funding</div>
+                    <div className="text-xl font-bold text-green-900">${Math.round(thresholds.contributionFull || reserveFund.recommendedContribution || 0).toLocaleString()}</div>
+                    <div className="text-xs text-green-600">Annual Contribution</div>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 text-center">
+                    <div className="text-xs text-blue-700 font-medium">+10% Threshold</div>
+                    <div className="text-xl font-bold text-blue-900">${Math.round(thresholds.contribution10 || 0).toLocaleString()}</div>
+                    <div className="text-xs text-blue-600">Min Balance: ${Math.round(thresholds.minBalance10 || 0).toLocaleString()}</div>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 text-center">
+                    <div className="text-xs text-yellow-700 font-medium">+5% Threshold</div>
+                    <div className="text-xl font-bold text-yellow-900">${Math.round(thresholds.contribution5 || 0).toLocaleString()}</div>
+                    <div className="text-xs text-yellow-600">Min Balance: ${Math.round(thresholds.minBalance5 || 0).toLocaleString()}</div>
+                  </div>
+                  <div className="bg-gray-50 border border-gray-300 rounded-lg p-4 text-center">
+                    <div className="text-xs text-gray-700 font-medium">Baseline</div>
+                    <div className="text-xl font-bold text-gray-900">${Math.round(thresholds.contributionBaseline || 0).toLocaleString()}</div>
+                    <div className="text-xs text-gray-600">Min Balance: ${Math.round(thresholds.minBalanceBaseline || 0).toLocaleString()}</div>
+                  </div>
+                </div>
+
                 <div className="overflow-x-auto border border-gray-300 rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-blue-900 text-white">
+                    <thead className="bg-gray-800 text-white">
                       <tr>
-                        <th className="px-4 py-3 text-center text-xs font-bold uppercase border-r border-blue-700" rowSpan="2">Fiscal Year</th>
-                        <th className="px-4 py-2 text-center text-xs font-bold uppercase border-r border-blue-700" colSpan="3" style={{ backgroundColor: '#2563eb' }}>Current Funding Plan</th>
-                        <th className="px-4 py-2 text-center text-xs font-bold uppercase" colSpan="3" style={{ backgroundColor: '#1e40af' }}>Recommended Funding Plan</th>
+                        <th className="px-3 py-3 text-center text-xs font-bold uppercase">Year</th>
+                        <th className="px-3 py-3 text-right text-xs font-bold uppercase bg-green-700" colSpan="2">Full Funding</th>
+                        <th className="px-3 py-3 text-right text-xs font-bold uppercase bg-blue-700" colSpan="2">+10% Threshold</th>
+                        <th className="px-3 py-3 text-right text-xs font-bold uppercase bg-yellow-600" colSpan="2">+5% Threshold</th>
+                        <th className="px-3 py-3 text-right text-xs font-bold uppercase bg-gray-600" colSpan="2">Baseline</th>
+                      </tr>
+                      <tr className="text-xs">
+                        <th className="px-3 py-2 bg-gray-700"></th>
+                        <th className="px-3 py-2 bg-green-600 text-right">Expend</th>
+                        <th className="px-3 py-2 bg-green-600 text-right">Balance</th>
+                        <th className="px-3 py-2 bg-blue-600 text-right">Expend</th>
+                        <th className="px-3 py-2 bg-blue-600 text-right">Balance</th>
+                        <th className="px-3 py-2 bg-yellow-500 text-right">Expend</th>
+                        <th className="px-3 py-2 bg-yellow-500 text-right">Balance</th>
+                        <th className="px-3 py-2 bg-gray-500 text-right">Expend</th>
+                        <th className="px-3 py-2 bg-gray-500 text-right">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {(thresholds.projectionFull || []).slice(0, 30).map((row, index) => {
+                        const row10 = thresholds.projection10?.[index] || {};
+                        const row5 = thresholds.projection5?.[index] || {};
+                        const rowBase = thresholds.projectionBaseline?.[index] || {};
+                        return (
+                          <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-3 py-2 text-center text-sm font-bold">{row.year || (2025 + index)}</td>
+                            <td className="px-3 py-2 text-right text-sm">${Math.round(row.expenditures || 0).toLocaleString()}</td>
+                            <td className={`px-3 py-2 text-right text-sm font-medium ${(row.endingBalance || 0) < 0 ? 'text-red-600' : ''}`}>${Math.round(row.endingBalance || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right text-sm">${Math.round(row10.expenditures || 0).toLocaleString()}</td>
+                            <td className={`px-3 py-2 text-right text-sm font-medium ${(row10.endingBalance || 0) < 0 ? 'text-red-600' : ''}`}>${Math.round(row10.endingBalance || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right text-sm">${Math.round(row5.expenditures || 0).toLocaleString()}</td>
+                            <td className={`px-3 py-2 text-right text-sm font-medium ${(row5.endingBalance || 0) < 0 ? 'text-red-600' : ''}`}>${Math.round(row5.endingBalance || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right text-sm">${Math.round(rowBase.expenditures || 0).toLocaleString()}</td>
+                            <td className={`px-3 py-2 text-right text-sm font-medium ${(rowBase.endingBalance || 0) < 0 ? 'text-red-600' : ''}`}>${Math.round(rowBase.endingBalance || 0).toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* RESERVE CASH FLOW TAB - RESTORED ORIGINAL DESIGN */}
+            {activeTab === 'reserve-cashflow' && (
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">💰 Reserve Fund - 30-Year Cash Flow Projection</h3>
+                <div className="overflow-x-auto border border-gray-300 rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        {/* Fiscal Year header */}
+                        <th 
+                          className="px-4 py-3 text-center text-xs font-bold uppercase text-gray-700 border-r border-gray-300" 
+                          rowSpan="2"
+                          style={{ backgroundColor: '#f3f4f6' }}
+                        >
+                          Fiscal<br/>Year
+                        </th>
+                        {/* Current Funding - GREEN */}
+                        <th 
+                          className="px-4 py-2 text-center text-xs font-bold uppercase border-r" 
+                          colSpan="3" 
+                          style={{ backgroundColor: '#22c55e', color: 'white', borderColor: '#16a34a' }}
+                        >
+                          Current Funding
+                        </th>
+                        {/* Full Funding Analysis - RED */}
+                        <th 
+                          className="px-4 py-2 text-center text-xs font-bold uppercase" 
+                          colSpan="3" 
+                          style={{ backgroundColor: '#dc2626', color: 'white' }}
+                        >
+                          Full Funding Analysis
+                        </th>
                       </tr>
                       <tr>
-                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-blue-700">Contribution</th>
-                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-blue-700">Expenditures</th>
-                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-blue-700 border-r border-blue-500">Ending Balance</th>
+                        {/* Current Funding sub-headers - GREEN */}
+                        <th 
+                          className="px-4 py-2 text-right text-xs font-bold uppercase text-white" 
+                          style={{ backgroundColor: '#22c55e' }}
+                        >
+                          Current<br/>Contribution
+                        </th>
+                        <th 
+                          className="px-4 py-2 text-right text-xs font-bold uppercase text-white" 
+                          style={{ backgroundColor: '#22c55e' }}
+                        >
+                          Annual<br/>Expenditures
+                        </th>
+                        <th 
+                          className="px-4 py-2 text-right text-xs font-bold uppercase text-white border-r border-gray-300" 
+                          style={{ backgroundColor: '#22c55e' }}
+                        >
+                          Ending<br/>Balance
+                        </th>
                         
-                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-blue-800">Contribution</th>
-                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-blue-800">Expenditures</th>
-                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-blue-800">Ending Balance</th>
+                        {/* Full Funding Analysis sub-headers - RED */}
+                        <th 
+                          className="px-4 py-2 text-right text-xs font-bold uppercase text-white" 
+                          style={{ backgroundColor: '#dc2626' }}
+                        >
+                          Annual<br/>Contribution
+                        </th>
+                        <th 
+                          className="px-4 py-2 text-right text-xs font-bold uppercase text-white" 
+                          style={{ backgroundColor: '#dc2626' }}
+                        >
+                          Average Annual<br/>Contribution
+                        </th>
+                        <th 
+                          className="px-4 py-2 text-right text-xs font-bold uppercase text-white" 
+                          style={{ backgroundColor: '#dc2626' }}
+                        >
+                          Ending<br/>Balance
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {reserveCashFlow.map((row, index) => {
-                        const recRow = reserveFullFundingCashFlow[index] || { annualContribution: 0, expenditures: 0, endingBalance: 0 };
+                        // Get Full Funding data
+                        const ffRow = reserveFullFundingCashFlow[index] || {};
+                        
                         return (
-                          <tr key={row.year} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 text-center text-sm font-bold text-gray-900 border-r border-gray-200">{row.year}</td>
+                          <tr key={row.year} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            {/* Fiscal Year */}
+                            <td className="px-4 py-2 text-center text-sm font-bold text-gray-900 border-r border-gray-200">
+                              {row.year}
+                            </td>
                             
-                            {/* Current Funding Data */}
-                            <td className="px-4 py-2 text-right text-sm text-gray-900">${Math.round(row.contributions).toLocaleString()}</td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-900">${Math.round(row.expenditures).toLocaleString()}</td>
-                            <td className={`px-4 py-2 text-right text-sm font-medium border-r border-gray-200 ${row.endingBalance < 0 ? 'text-red-600' : 'text-gray-900'}`}>${Math.round(row.endingBalance).toLocaleString()}</td>
+                            {/* Current Funding columns */}
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">
+                              ${Math.round(row.contributions || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">
+                              ${Math.round(row.expenditures || 0).toLocaleString()}
+                            </td>
+                            <td className={`px-4 py-2 text-right text-sm font-medium border-r border-gray-200 ${
+                              (row.endingBalance || 0) < 0 ? 'text-red-600 font-bold' : 'text-gray-900'
+                            }`}>
+                              ${Math.round(row.endingBalance || 0).toLocaleString()}
+                            </td>
                             
-                            {/* Recommended Funding Data */}
-                            <td className="px-4 py-2 text-right text-sm text-gray-900 bg-blue-50">${Math.round(recRow.annualContribution).toLocaleString()}</td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-900 bg-blue-50">${Math.round(recRow.expenditures).toLocaleString()}</td>
-                            <td className={`px-4 py-2 text-right text-sm font-medium bg-blue-50 ${recRow.endingBalance < 0 ? 'text-red-600' : 'text-gray-900'}`}>${Math.round(recRow.endingBalance).toLocaleString()}</td>
+                            {/* Full Funding Analysis columns */}
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">
+                              ${Math.round(ffRow.annualContribution || averageAnnualContribution).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">
+                              ${Math.round(averageAnnualContribution).toLocaleString()}
+                            </td>
+                            <td className={`px-4 py-2 text-right text-sm font-medium ${
+                              (ffRow.endingBalance || 0) < 0 ? 'text-red-600 font-bold' : 'text-gray-900'
+                            }`}>
+                              ${Math.round(ffRow.endingBalance || 0).toLocaleString()}
+                            </td>
                           </tr>
                         );
                       })}
