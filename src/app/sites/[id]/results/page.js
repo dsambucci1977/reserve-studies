@@ -410,118 +410,102 @@ export default function ResultsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                   
                   {/* 10% Threshold Card */}
-                  <div className="border-2 border-yellow-400 rounded-lg overflow-hidden bg-white">
-                    <div className="bg-yellow-50 px-4 py-3 border-b-2 border-yellow-400">
-                      <h4 className="font-bold text-yellow-900 text-sm">10% Threshold</h4>
-                      <p className="text-xs text-yellow-700">Reduced contributions maintaining 10% minimum</p>
+                  <div className="border-2 border-red-400 rounded-lg overflow-hidden bg-white">
+                    <div className="px-4 py-3" style={{ backgroundColor: '#dc2626' }}>
+                      <h4 className="font-bold text-white text-sm">10% Threshold</h4>
                     </div>
                     <div className="p-4 space-y-3">
                       <div>
                         <div className="text-xs text-gray-500">Multiplier</div>
-                        <div className="text-lg font-bold text-gray-900">{(thresholds.multiplier10 || 0).toFixed(4)}</div>
+                        <div className="text-2xl font-bold text-gray-900">{(thresholds.multiplier10 || 0).toFixed(4)}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">Annual Contribution</div>
-                        <div className="text-md font-bold text-gray-900">${Math.round(thresholds.contribution10 || 0).toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">Annual Contribution (Yr 1)</div>
+                        <div className="text-lg font-bold text-gray-900">${Math.round(thresholds.contribution10 || 0).toLocaleString()}</div>
                       </div>
                       <div>
                         <div className="text-xs text-gray-500">Min Balance</div>
-                        <div className="text-md font-bold text-gray-900">${Math.round(thresholds.minBalance10 || 0).toLocaleString()}</div>
+                        <div className="text-lg font-bold text-gray-900">${Math.round(thresholds.minBalance10 || 0).toLocaleString()}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">% of Beginning</div>
-                        <div className="text-md font-bold text-green-600">{((thresholds.percentOfBeginning10 || 0) * 100).toFixed(2)}%</div>
+                        <div className="text-xs text-gray-500">Final Balance</div>
+                        <div className="text-lg font-bold text-gray-900">${Math.round(thresholds.projection10?.[29]?.endingBalance || 0).toLocaleString()}</div>
                       </div>
-                    </div>
-                    <div className="bg-green-500 text-white text-center py-2 font-bold text-sm">
-                      ✓ COMPLIANT
                     </div>
                   </div>
 
                   {/* 5% Threshold Card */}
                   <div className="border-2 border-yellow-400 rounded-lg overflow-hidden bg-white">
-                    <div className="bg-yellow-50 px-4 py-3 border-b-2 border-yellow-400">
-                      <h4 className="font-bold text-yellow-900 text-sm">5% Threshold</h4>
-                      <p className="text-xs text-yellow-700">Reduced contributions maintaining 5% minimum</p>
+                    <div className="px-4 py-3" style={{ backgroundColor: '#eab308' }}>
+                      <h4 className="font-bold text-white text-sm">5% Threshold</h4>
                     </div>
                     <div className="p-4 space-y-3">
                       <div>
                         <div className="text-xs text-gray-500">Multiplier</div>
-                        <div className="text-lg font-bold text-gray-900">{(thresholds.multiplier5 || 0).toFixed(4)}</div>
+                        <div className="text-2xl font-bold text-gray-900">{(thresholds.multiplier5 || 0).toFixed(4)}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">Annual Contribution</div>
-                        <div className="text-md font-bold text-gray-900">${Math.round(thresholds.contribution5 || 0).toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">Annual Contribution (Yr 1)</div>
+                        <div className="text-lg font-bold text-gray-900">${Math.round(thresholds.contribution5 || 0).toLocaleString()}</div>
                       </div>
                       <div>
                         <div className="text-xs text-gray-500">Min Balance</div>
-                        <div className="text-md font-bold text-gray-900">${Math.round(thresholds.minBalance5 || 0).toLocaleString()}</div>
+                        <div className="text-lg font-bold text-gray-900">${Math.round(thresholds.minBalance5 || 0).toLocaleString()}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">% of Beginning</div>
-                        <div className="text-md font-bold text-green-600">{((thresholds.percentOfBeginning5 || 0) * 100).toFixed(2)}%</div>
+                        <div className="text-xs text-gray-500">Final Balance</div>
+                        <div className="text-lg font-bold text-gray-900">${Math.round(thresholds.projection5?.[29]?.endingBalance || 0).toLocaleString()}</div>
                       </div>
-                    </div>
-                    <div className="bg-green-500 text-white text-center py-2 font-bold text-sm">
-                      ✓ COMPLIANT
                     </div>
                   </div>
 
                   {/* Baseline (0%) Card */}
-                  <div className="border-2 border-yellow-400 rounded-lg overflow-hidden bg-white">
-                    <div className="bg-yellow-50 px-4 py-3 border-b-2 border-yellow-400">
+                  <div className="border-2 border-gray-400 rounded-lg overflow-hidden bg-white">
+                    <div className="bg-gray-100 px-4 py-3">
                       <h4 className="font-bold text-gray-900 text-sm">Baseline (0%)</h4>
-                      <p className="text-xs text-gray-600">Minimum to avoid negatives</p>
                     </div>
                     <div className="p-4 space-y-3">
                       <div>
                         <div className="text-xs text-gray-500">Multiplier</div>
-                        <div className="text-lg font-bold text-gray-900">{(thresholds.multiplierBaseline || 0).toFixed(4)}</div>
+                        <div className="text-2xl font-bold text-gray-900">{(thresholds.multiplierBaseline || 0).toFixed(4)}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">Annual Contribution</div>
-                        <div className="text-md font-bold text-gray-900">${Math.round(thresholds.contributionBaseline || 0).toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">Annual Contribution (Yr 1)</div>
+                        <div className="text-lg font-bold text-gray-900">${Math.round(thresholds.contributionBaseline || 0).toLocaleString()}</div>
                       </div>
                       <div>
                         <div className="text-xs text-gray-500">Min Balance</div>
-                        <div className="text-md font-bold text-gray-900">${Math.round(thresholds.minBalanceBaseline || 0).toLocaleString()}</div>
+                        <div className="text-lg font-bold text-gray-900">${Math.round(thresholds.minBalanceBaseline || 0).toLocaleString()}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">% of Beginning</div>
-                        <div className="text-md font-bold text-red-600">{((thresholds.percentOfBeginningBaseline || 0) * 100).toFixed(2)}%</div>
+                        <div className="text-xs text-gray-500">Final Balance</div>
+                        <div className="text-lg font-bold text-gray-900">${Math.round(thresholds.projectionBaseline?.[29]?.endingBalance || 0).toLocaleString()}</div>
                       </div>
-                    </div>
-                    <div className="bg-yellow-400 text-yellow-900 text-center py-2 font-bold text-sm">
-                      ⚠ MINIMUM
                     </div>
                   </div>
 
                   {/* Full Funding Card */}
-                  <div className="border-2 border-blue-400 rounded-lg overflow-hidden bg-white">
-                    <div className="bg-blue-50 px-4 py-3 border-b-2 border-blue-400">
-                      <h4 className="font-bold text-blue-900 text-sm">Full Funding</h4>
-                      <p className="text-xs text-blue-700">Recommended contribution (100%)</p>
+                  <div className="border-2 border-green-500 rounded-lg overflow-hidden bg-white">
+                    <div className="px-4 py-3" style={{ backgroundColor: '#16a34a' }}>
+                      <h4 className="font-bold text-white text-sm">Full Funding</h4>
                     </div>
                     <div className="p-4 space-y-3">
                       <div>
                         <div className="text-xs text-gray-500">Multiplier</div>
-                        <div className="text-lg font-bold text-gray-900">{(thresholds.multiplierFull || 1).toFixed(4)}</div>
+                        <div className="text-2xl font-bold text-gray-900">{(thresholds.multiplierFull || 1).toFixed(4)}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">Annual Contribution</div>
-                        <div className="text-md font-bold text-gray-900">${Math.round(thresholds.contributionFull || reserveFund.recommendedContribution || 0).toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">Annual Contribution (Yr 1)</div>
+                        <div className="text-lg font-bold text-gray-900">${Math.round(thresholds.contributionFull || reserveFund.recommendedContribution || 0).toLocaleString()}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">Final Balance (Year 30)</div>
-                        <div className="text-md font-bold text-gray-900">${Math.round(fullFundingFinalBalance).toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">Min Balance</div>
+                        <div className="text-lg font-bold text-gray-900">${Math.round(thresholds.minBalanceFull || 0).toLocaleString()}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">Percent Funded</div>
-                        <div className="text-md font-bold text-blue-600">{percentFundedFull}%</div>
+                        <div className="text-xs text-gray-500">Final Balance</div>
+                        <div className="text-lg font-bold text-gray-900">${Math.round(fullFundingFinalBalance).toLocaleString()}</div>
                       </div>
-                    </div>
-                    <div className="bg-blue-500 text-white text-center py-2 font-bold text-sm">
-                      ★ RECOMMENDED
                     </div>
                   </div>
                 </div>
