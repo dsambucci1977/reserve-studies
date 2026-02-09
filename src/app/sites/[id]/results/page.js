@@ -1,9 +1,9 @@
 // src/app/sites/[id]/results/page.js
 // CONDITIONAL DUAL FUND RESULTS PAGE
-// v30: Restores Separate Cash Flow Tabs
-//      1. Reverts consolidation.
-//      2. Provides distinct 'Reserve Cash Flow' and 'PM Cash Flow' tabs.
-//      3. Maintains distinct 'Reserve Expenditures' and 'PM Expenditures' tabs.
+// v32: Implements Side-by-Side Cash Flow Tables (Current vs Recommended)
+//      1. 'Reserve Cash Flow' tab now shows Current vs Recommended columns side-by-side.
+//      2. 'PM Cash Flow' tab (if active) shows Current vs Recommended columns side-by-side.
+//      3. Columns: Contribution, Expenditures, Ending Balance.
 
 'use client';
 
@@ -79,11 +79,14 @@ export default function ResultsPage() {
   const reserveFund = results.reserveFund || {};
   const pmFund = results.pmFund || {};
   
-  // Raw Data
+  // Data Sources
   const reserveCashFlow = results.cashFlow || results.reserveCashFlow || [];
+  const reserveFullFundingCashFlow = results.fullFundingCashFlow || [];
+  
   const pmCashFlow = results.pmCashFlow || [];
+  const pmFullFundingCashFlow = results.pmFullFundingCashFlow || [];
+  
   const schedule = results.replacementSchedule || [];
-  const fullFundingCashFlow = results.fullFundingCashFlow || [];
 
   // SEPARATE EXPENDITURE SCHEDULES
   const reserveExpenditures = pmRequired 
@@ -279,15 +282,13 @@ export default function ResultsPage() {
           </div>
 
           <div className="p-6">
+            {/* THRESHOLD PROJECTION TAB */}
             {activeTab === 'threshold' && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">📉 Threshold Projection - Compliance Analysis</h3>
-                <p className="text-sm text-gray-600 mb-6">
-                  Shows 30-year projections under three funding scenarios: 10% Threshold, 5% Threshold, and Baseline (0%)
-                </p>
-
+                
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-                  {/* 10% Threshold */}
+                  {/* Threshold Cards... (Same as previous versions) */}
                   <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4">
                     <h4 className="font-bold text-red-900 mb-2">10% Threshold</h4>
                     <div className="space-y-2">
@@ -297,7 +298,6 @@ export default function ResultsPage() {
                       <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Final Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.projection10?.[29]?.endingBalance || 0).toLocaleString()}</div></div>
                     </div>
                   </div>
-                  {/* 5% Threshold */}
                   <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
                     <h4 className="font-bold text-yellow-900 mb-2">5% Threshold</h4>
                     <div className="space-y-2">
@@ -307,7 +307,6 @@ export default function ResultsPage() {
                       <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Final Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.projection5?.[29]?.endingBalance || 0).toLocaleString()}</div></div>
                     </div>
                   </div>
-                  {/* Baseline */}
                   <div className="bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
                     <h4 className="font-bold text-gray-900 mb-2">Baseline (0%)</h4>
                     <div className="space-y-2">
@@ -317,7 +316,6 @@ export default function ResultsPage() {
                       <div className="bg-white rounded p-2"><div className="text-xs text-gray-600">Final Balance</div><div className="text-md font-bold text-gray-900">${Math.round(thresholds.projectionBaseline?.[29]?.endingBalance || 0).toLocaleString()}</div></div>
                     </div>
                   </div>
-                  {/* Full Funding */}
                   <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4">
                     <h4 className="font-bold text-green-900 mb-2">Full Funding</h4>
                     <div className="space-y-2">
@@ -328,7 +326,8 @@ export default function ResultsPage() {
                     </div>
                   </div>
                 </div>
-                {/* Comparison Table */}
+
+                {/* Projection Table */}
                 <div className="bg-white border border-gray-300 rounded-lg overflow-hidden">
                   <div className="bg-gray-700 px-4 py-3"><h4 className="font-bold text-white text-center">30-Year Threshold Projection Comparison</h4></div>
                   <div className="overflow-x-auto">
@@ -375,6 +374,7 @@ export default function ResultsPage() {
               </div>
             )}
 
+            {/* SUMMARY TAB */}
             {activeTab === 'summary' && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-6">📊 Component Schedule Summary</h3>
@@ -464,66 +464,96 @@ export default function ResultsPage() {
               </div>
             )}
 
+            {/* RESERVE CASH FLOW TAB - SIDE BY SIDE */}
             {activeTab === 'reserve-cashflow' && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">💰 Reserve Fund Cash Flow (30-Year)</h3>
-                <p className="text-sm text-gray-600 mb-6">Projected ending balances based on current funding plan (Reserve Items Only).</p>
+                <p className="text-sm text-gray-600 mb-6">Comparison: Current Funding vs. Recommended Funding</p>
                 <div className="overflow-x-auto border border-gray-300 rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-blue-900 text-white">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-bold uppercase">Year</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">Start Balance</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">Contribution</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">Interest</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">Expenditures</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">End Balance</th>
+                        <th className="px-4 py-3 text-center text-xs font-bold uppercase border-r border-blue-700" rowSpan="2">Fiscal Year</th>
+                        <th className="px-4 py-2 text-center text-xs font-bold uppercase border-r border-blue-700" colSpan="3" style={{ backgroundColor: '#2563eb' }}>Current Funding Plan</th>
+                        <th className="px-4 py-2 text-center text-xs font-bold uppercase" colSpan="3" style={{ backgroundColor: '#1e40af' }}>Recommended Funding Plan</th>
+                      </tr>
+                      <tr>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-blue-700">Contribution</th>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-blue-700">Expenditures</th>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-blue-700 border-r border-blue-500">Ending Balance</th>
+                        
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-blue-800">Contribution</th>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-blue-800">Expenditures</th>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-blue-800">Ending Balance</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {reserveCashFlow.map((row) => (
-                        <tr key={row.year} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-sm text-gray-900">{row.year}</td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-900">${row.beginningBalance.toLocaleString()}</td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-900">${row.contributions.toLocaleString()}</td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-900">${row.interest.toLocaleString()}</td>
-                          <td className="px-4 py-2 text-right text-sm text-red-600">{row.expenditures > 0 ? `($${row.expenditures.toLocaleString()})` : '-'}</td>
-                          <td className={`px-4 py-2 text-right text-sm font-medium ${row.endingBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>${row.endingBalance.toLocaleString()}</td>
-                        </tr>
-                      ))}
+                      {reserveCashFlow.map((row, index) => {
+                        const recRow = reserveFullFundingCashFlow[index] || { annualContribution: 0, expenditures: 0, endingBalance: 0 };
+                        return (
+                          <tr key={row.year} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-center text-sm font-bold text-gray-900 border-r border-gray-200">{row.year}</td>
+                            
+                            {/* Current Funding Data */}
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">${Math.round(row.contributions).toLocaleString()}</td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">${Math.round(row.expenditures).toLocaleString()}</td>
+                            <td className={`px-4 py-2 text-right text-sm font-medium border-r border-gray-200 ${row.endingBalance < 0 ? 'text-red-600' : 'text-gray-900'}`}>${Math.round(row.endingBalance).toLocaleString()}</td>
+                            
+                            {/* Recommended Funding Data */}
+                            <td className="px-4 py-2 text-right text-sm text-gray-900 bg-blue-50">${Math.round(recRow.annualContribution).toLocaleString()}</td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900 bg-blue-50">${Math.round(recRow.expenditures).toLocaleString()}</td>
+                            <td className={`px-4 py-2 text-right text-sm font-medium bg-blue-50 ${recRow.endingBalance < 0 ? 'text-red-600' : 'text-gray-900'}`}>${Math.round(recRow.endingBalance).toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
             )}
 
+            {/* PM CASH FLOW TAB - SIDE BY SIDE */}
             {activeTab === 'pm-cashflow' && pmRequired && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">🟣 PM Fund Cash Flow (30-Year)</h3>
-                <p className="text-sm text-gray-600 mb-6">Projected ending balances based on current funding plan (PM Items Only).</p>
+                <p className="text-sm text-gray-600 mb-6">Comparison: Current Funding vs. Recommended Funding</p>
                 <div className="overflow-x-auto border border-gray-300 rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-purple-900 text-white">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-bold uppercase">Year</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">Start Balance</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">Contribution</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">Interest</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">Expenditures</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">End Balance</th>
+                        <th className="px-4 py-3 text-center text-xs font-bold uppercase border-r border-purple-700" rowSpan="2">Fiscal Year</th>
+                        <th className="px-4 py-2 text-center text-xs font-bold uppercase border-r border-purple-700" colSpan="3" style={{ backgroundColor: '#9333ea' }}>Current Funding Plan</th>
+                        <th className="px-4 py-2 text-center text-xs font-bold uppercase" colSpan="3" style={{ backgroundColor: '#7e22ce' }}>Recommended Funding Plan</th>
+                      </tr>
+                      <tr>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-purple-700">Contribution</th>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-purple-700">Expenditures</th>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-purple-700 border-r border-purple-500">Ending Balance</th>
+                        
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-purple-800">Contribution</th>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-purple-800">Expenditures</th>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase bg-purple-800">Ending Balance</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {pmCashFlow.map((row) => (
-                        <tr key={row.year} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-sm text-gray-900">{row.year}</td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-900">${row.beginningBalance.toLocaleString()}</td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-900">${row.contributions.toLocaleString()}</td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-900">${row.interest.toLocaleString()}</td>
-                          <td className="px-4 py-2 text-right text-sm text-red-600">{row.expenditures > 0 ? `($${row.expenditures.toLocaleString()})` : '-'}</td>
-                          <td className={`px-4 py-2 text-right text-sm font-medium ${row.endingBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>${row.endingBalance.toLocaleString()}</td>
-                        </tr>
-                      ))}
+                      {pmCashFlow.map((row, index) => {
+                        const recRow = pmFullFundingCashFlow[index] || { annualContribution: 0, expenditures: 0, endingBalance: 0 };
+                        return (
+                          <tr key={row.year} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-center text-sm font-bold text-gray-900 border-r border-gray-200">{row.year}</td>
+                            
+                            {/* Current Funding Data */}
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">${Math.round(row.contributions).toLocaleString()}</td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">${Math.round(row.expenditures).toLocaleString()}</td>
+                            <td className={`px-4 py-2 text-right text-sm font-medium border-r border-gray-200 ${row.endingBalance < 0 ? 'text-red-600' : 'text-gray-900'}`}>${Math.round(row.endingBalance).toLocaleString()}</td>
+                            
+                            {/* Recommended Funding Data */}
+                            <td className="px-4 py-2 text-right text-sm text-gray-900 bg-purple-50">${Math.round(recRow.annualContribution).toLocaleString()}</td>
+                            <td className="px-4 py-2 text-right text-sm text-gray-900 bg-purple-50">${Math.round(recRow.expenditures).toLocaleString()}</td>
+                            <td className={`px-4 py-2 text-right text-sm font-medium bg-purple-50 ${recRow.endingBalance < 0 ? 'text-red-600' : 'text-gray-900'}`}>${Math.round(recRow.endingBalance).toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
