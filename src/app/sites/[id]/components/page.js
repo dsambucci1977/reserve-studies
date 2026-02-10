@@ -1,3 +1,5 @@
+// src/app/sites/[id]/components/page.js
+// Components List Page - v2: Added Useful Life & Remaining Life columns
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -211,6 +213,8 @@ export default function ComponentsListPage() {
                   <th className="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-700 uppercase w-20">Unit</th>
                   <th className="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-700 uppercase w-28">Unit Cost</th>
                   <th className="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-700 uppercase w-28">Total Cost</th>
+                  <th className="px-3 py-3 bg-gray-50 text-center text-xs font-medium text-gray-700 uppercase w-20">Useful Life</th>
+                  <th className="px-3 py-3 bg-gray-50 text-center text-xs font-medium text-gray-700 uppercase w-20">Remaining Life</th>
                   <th className="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-700 uppercase w-16 text-center" title="Preventive Maintenance">PM</th>
                   <th className="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-700 uppercase w-24">Note #</th>
                   <th className="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-700 uppercase">Note Description</th>
@@ -340,6 +344,48 @@ export default function ComponentsListPage() {
                         ${parseFloat(component.totalCost || 0).toFixed(2)}
                       </td>
 
+                      {/* Useful Life */}
+                      <td className="px-3 py-2">
+                        {editingCell === `${component.id}-usefulLife` ? (
+                          <input
+                            type="number"
+                            defaultValue={component.usefulLife}
+                            onBlur={(e) => handleCellEdit(component.id, 'usefulLife', e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+                            className="w-full px-2 py-1 border rounded text-gray-900 text-sm"
+                            autoFocus
+                          />
+                        ) : (
+                          <div
+                            onClick={() => setEditingCell(`${component.id}-usefulLife`)}
+                            className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded text-gray-900 text-center"
+                          >
+                            {component.usefulLife || '-'}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Remaining Useful Life */}
+                      <td className="px-3 py-2">
+                        {editingCell === `${component.id}-remainingUsefulLife` ? (
+                          <input
+                            type="number"
+                            defaultValue={component.remainingUsefulLife}
+                            onBlur={(e) => handleCellEdit(component.id, 'remainingUsefulLife', e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+                            className="w-full px-2 py-1 border rounded text-gray-900 text-sm"
+                            autoFocus
+                          />
+                        ) : (
+                          <div
+                            onClick={() => setEditingCell(`${component.id}-remainingUsefulLife`)}
+                            className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded text-gray-900 text-center"
+                          >
+                            {component.remainingUsefulLife || '-'}
+                          </div>
+                        )}
+                      </td>
+
                       {/* Preventive Maintenance */}
                       <td className="px-3 py-2 text-center">
                         <input
@@ -417,7 +463,7 @@ export default function ComponentsListPage() {
                     <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded font-mono font-bold">
                       #{previewNote.componentId}
                     </span>
-                    <h3 className="text-2xl font-bold text-gray-900">{previewNote.componentName}</h3>
+                    <h3 className="text-xl font-bold text-gray-900">{previewNote.componentName}</h3>
                   </div>
                   {previewNote.componentGroup && (
                     <p className="text-sm text-gray-600">Group: {previewNote.componentGroup}</p>
@@ -444,7 +490,6 @@ export default function ComponentsListPage() {
             </div>
           </div>
         )}
-
       </div>
     </div>
   );
