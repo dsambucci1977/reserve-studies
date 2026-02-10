@@ -512,22 +512,45 @@ export default function ResultsPage() {
 
                 {/* 30-Year Threshold Projection Comparison Table */}
                 <div className="bg-white border border-gray-300 rounded-lg overflow-hidden">
-                  <div className="bg-gray-700 px-4 py-3">
+                  <div className="bg-gray-700 px-4 py-3 flex items-center justify-between">
+                    <div></div>
                     <h4 className="font-bold text-white text-center">30-Year Threshold Projection Comparison</h4>
+                    <button
+                      onClick={() => {
+                        let csv = 'Fiscal Year,10% Expenditures,10% Ending Balance,5% Expenditures,5% Ending Balance,Baseline Expenditures,Baseline Ending Balance,Full Funding Expenditures,Full Funding Ending Balance\n';
+                        reserveCashFlow.forEach((row, index) => {
+                          const p10 = thresholds.projection10?.[index] || {};
+                          const p5 = thresholds.projection5?.[index] || {};
+                          const pB = thresholds.projectionBaseline?.[index] || {};
+                          const pF = thresholds.projectionFull?.[index] || reserveFullFundingCashFlow[index] || {};
+                          csv += `${row.year},${Math.round(p10.expenditures||0)},${Math.round(p10.endingBalance||0)},${Math.round(p5.expenditures||0)},${Math.round(p5.endingBalance||0)},${Math.round(pB.expenditures||0)},${Math.round(pB.endingBalance||0)},${Math.round(pF.expenditures||0)},${Math.round(pF.endingBalance||0)}\n`;
+                        });
+                        const blob = new Blob([csv], { type: 'text/csv' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'threshold_projection_comparison.csv';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="px-3 py-1 bg-white text-gray-700 text-xs font-medium rounded hover:bg-gray-100 border border-gray-300"
+                    >
+                      ⬇ Download CSV
+                    </button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
                       <thead className="bg-gray-100">
                         <tr>
                           <th className="px-3 py-2 text-center font-bold text-gray-900 border-r border-gray-300" rowSpan="2">Fiscal<br/>Year</th>
-                          <th className="px-4 py-2 text-center font-bold text-white border-l border-gray-300" colSpan="2" style={{ backgroundColor: '#f59e0b' }}>10% Threshold</th>
+                          <th className="px-4 py-2 text-center font-bold text-white border-l border-gray-300" colSpan="2" style={{ backgroundColor: '#dc2626' }}>10% Threshold</th>
                           <th className="px-4 py-2 text-center font-bold text-white border-l border-gray-300" colSpan="2" style={{ backgroundColor: '#eab308' }}>5% Threshold</th>
                           <th className="px-4 py-2 text-center font-bold text-white border-l border-gray-300" colSpan="2" style={{ backgroundColor: '#6b7280' }}>Baseline (0%)</th>
                           <th className="px-4 py-2 text-center font-bold text-white border-l border-gray-300" colSpan="2" style={{ backgroundColor: '#22c55e' }}>Full Funding</th>
                         </tr>
                         <tr>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-amber-50 border-l border-gray-300">Annual<br/>Expenditures</th>
-                          <th className="px-3 py-2 text-xs text-gray-700 bg-amber-50">Ending<br/>Balance</th>
+                          <th className="px-3 py-2 text-xs text-gray-700 bg-red-50 border-l border-gray-300">Annual<br/>Expenditures</th>
+                          <th className="px-3 py-2 text-xs text-gray-700 bg-red-50">Ending<br/>Balance</th>
                           <th className="px-3 py-2 text-xs text-gray-700 bg-yellow-50 border-l border-gray-300">Annual<br/>Expenditures</th>
                           <th className="px-3 py-2 text-xs text-gray-700 bg-yellow-50">Ending<br/>Balance</th>
                           <th className="px-3 py-2 text-xs text-gray-700 bg-gray-50 border-l border-gray-300">Annual<br/>Expenditures</th>
@@ -546,8 +569,8 @@ export default function ResultsPage() {
                             <tr key={row.year} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                               <td className="px-3 py-2 text-center font-bold text-gray-900 border-r border-gray-300">{row.year}</td>
                               {/* 10% */}
-                              <td className="px-3 py-2 text-right text-gray-900 bg-amber-50/50 border-l border-gray-300">${Math.round(proj10.expenditures || 0).toLocaleString()}</td>
-                              <td className={`px-3 py-2 text-right font-medium bg-amber-50/50 ${(proj10.endingBalance || 0) < 0 ? 'text-red-600 font-bold' : 'text-gray-900'}`}>${Math.round(proj10.endingBalance || 0).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right text-gray-900 bg-red-50/50 border-l border-gray-300">${Math.round(proj10.expenditures || 0).toLocaleString()}</td>
+                              <td className={`px-3 py-2 text-right font-medium bg-red-50/50 ${(proj10.endingBalance || 0) < 0 ? 'text-red-600 font-bold' : 'text-gray-900'}`}>${Math.round(proj10.endingBalance || 0).toLocaleString()}</td>
                               {/* 5% */}
                               <td className="px-3 py-2 text-right text-gray-900 bg-yellow-50/50 border-l border-gray-300">${Math.round(proj5.expenditures || 0).toLocaleString()}</td>
                               <td className={`px-3 py-2 text-right font-medium bg-yellow-50/50 ${(proj5.endingBalance || 0) < 0 ? 'text-red-600 font-bold' : 'text-gray-900'}`}>${Math.round(proj5.endingBalance || 0).toLocaleString()}</td>
@@ -573,6 +596,27 @@ export default function ResultsPage() {
             {activeTab === 'reserve-cashflow' && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">💰 Reserve Fund - 30-Year Cash Flow Projection</h3>
+                <div className="flex justify-end mb-2">
+                  <button
+                    onClick={() => {
+                      let csv = 'Fiscal Year,Current Contribution,Annual Expenditures,Current Ending Balance,FF Annual Contribution,FF Average Annual Contribution,FF Ending Balance\n';
+                      reserveCashFlow.forEach((row, index) => {
+                        const ffRow = reserveFullFundingCashFlow[index] || {};
+                        csv += `${row.year},${Math.round(row.contributions||0)},${Math.round(row.expenditures||0)},${Math.round(row.endingBalance||0)},${Math.round(ffRow.annualContribution||averageAnnualContribution)},${Math.round(averageAnnualContribution)},${Math.round(ffRow.endingBalance||0)}\n`;
+                      });
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'reserve_fund_cash_flow.csv';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded hover:bg-gray-200 border border-gray-300"
+                  >
+                    ⬇ Download CSV
+                  </button>
+                </div>
                 <div className="overflow-x-auto border border-gray-300 rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead>
