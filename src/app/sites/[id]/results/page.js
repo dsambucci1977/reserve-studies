@@ -601,8 +601,14 @@ export default function ResultsPage() {
                     onClick={() => {
                       let csv = 'Fiscal Year,Current Contribution,Annual Expenditures,Current Ending Balance,FF Annual Contribution,FF Average Annual Contribution,FF Ending Balance\n';
                       reserveCashFlow.forEach((row, index) => {
-                        const ffRow = reserveFullFundingCashFlow[index] || {};
-                        csv += `${row.year},${Math.round(row.contributions||0)},${Math.round(row.expenditures||0)},${Math.round(row.endingBalance||0)},${Math.round(ffRow.annualContribution||averageAnnualContribution)},${Math.round(averageAnnualContribution)},${Math.round(ffRow.endingBalance||0)}\n`;
+                        const ffT = thresholds.projectionFull?.[index];
+                        const ffRow = ffT || reserveFullFundingCashFlow[index] || {};
+                        const ffAnnual = ffT 
+                          ? (index === 0 
+                            ? (ffT.endingBalance || 0) - (reserveFund.currentBalance || 0) + (ffT.expenditures || 0)
+                            : (ffT.endingBalance || 0) - (thresholds.projectionFull?.[index - 1]?.endingBalance || 0) + (ffT.expenditures || 0))
+                          : (ffRow.annualContribution || averageAnnualContribution);
+                        csv += `${row.year},${Math.round(row.contributions||0)},${Math.round(row.expenditures||0)},${Math.round(row.endingBalance||0)},${Math.round(ffAnnual)},${Math.round(averageAnnualContribution)},${Math.round(ffRow.endingBalance||0)}\n`;
                       });
                       const blob = new Blob([csv], { type: 'text/csv' });
                       const url = URL.createObjectURL(blob);
@@ -671,7 +677,16 @@ export default function ResultsPage() {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {reserveCashFlow.map((row, index) => {
-                        const ffRow = reserveFullFundingCashFlow[index] || {};
+                        // Use threshold projectionFull as source of truth for Full Funding
+                        const ffThreshold = thresholds.projectionFull?.[index];
+                        const ffRow = ffThreshold || reserveFullFundingCashFlow[index] || {};
+                        // Annual contribution: derive from threshold data (ending - prev_ending + expenditures)
+                        const ffAnnualContribution = ffThreshold 
+                          ? (index === 0 
+                            ? (ffThreshold.endingBalance || 0) - (reserveFund.currentBalance || 0) + (ffThreshold.expenditures || 0)
+                            : (ffThreshold.endingBalance || 0) - (thresholds.projectionFull?.[index - 1]?.endingBalance || 0) + (ffThreshold.expenditures || 0))
+                          : (ffRow.annualContribution || averageAnnualContribution);
+                        
                         return (
                           <tr key={row.year} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                             <td className="px-4 py-2 text-center text-sm font-bold text-gray-900 border-r border-gray-200">{row.year}</td>
@@ -681,8 +696,8 @@ export default function ResultsPage() {
                             <td className={`px-4 py-2 text-right text-sm font-medium border-r border-gray-200 ${(row.endingBalance || 0) < 0 ? 'text-red-600 font-bold' : 'text-gray-900'}`}>
                               ${Math.round(row.endingBalance || 0).toLocaleString()}
                             </td>
-                            {/* Full Funding Analysis columns */}
-                            <td className="px-4 py-2 text-right text-sm text-gray-900">${Math.round(ffRow.annualContribution || averageAnnualContribution).toLocaleString()}</td>
+                            {/* Full Funding Analysis columns - from threshold data */}
+                            <td className="px-4 py-2 text-right text-sm text-gray-900">${Math.round(ffAnnualContribution).toLocaleString()}</td>
                             <td className="px-4 py-2 text-right text-sm text-gray-900">${Math.round(averageAnnualContribution).toLocaleString()}</td>
                             <td className={`px-4 py-2 text-right text-sm font-medium ${(ffRow.endingBalance || 0) < 0 ? 'text-red-600 font-bold' : 'text-gray-900'}`}>
                               ${Math.round(ffRow.endingBalance || 0).toLocaleString()}
