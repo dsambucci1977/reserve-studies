@@ -635,42 +635,42 @@ export default function ResultsPage() {
                         >
                           Fiscal<br/>Year
                         </th>
-                        {/* Current Funding - GREEN */}
+                        {/* Current Funding - STEEL BLUE */}
                         <th 
                           className="px-4 py-2 text-center text-xs font-bold uppercase border-r" 
                           colSpan="3" 
-                          style={{ backgroundColor: '#22c55e', color: 'white', borderColor: '#16a34a' }}
+                          style={{ backgroundColor: '#4a6fa5', color: 'white', borderColor: '#3d5f8f' }}
                         >
                           Current Funding
                         </th>
-                        {/* Full Funding Analysis - RED */}
+                        {/* Full Funding Analysis - WARM SLATE */}
                         <th 
                           className="px-4 py-2 text-center text-xs font-bold uppercase" 
                           colSpan="3" 
-                          style={{ backgroundColor: '#dc2626', color: 'white' }}
+                          style={{ backgroundColor: '#7a6855', color: 'white' }}
                         >
                           Full Funding Analysis
                         </th>
                       </tr>
                       <tr>
-                        {/* Current Funding sub-headers - GREEN */}
-                        <th className="px-4 py-2 text-right text-xs font-bold uppercase text-white" style={{ backgroundColor: '#22c55e' }}>
+                        {/* Current Funding sub-headers - STEEL BLUE */}
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase text-white" style={{ backgroundColor: '#4a6fa5' }}>
                           Current<br/>Contribution
                         </th>
-                        <th className="px-4 py-2 text-right text-xs font-bold uppercase text-white" style={{ backgroundColor: '#22c55e' }}>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase text-white" style={{ backgroundColor: '#4a6fa5' }}>
                           Annual<br/>Expenditures
                         </th>
-                        <th className="px-4 py-2 text-right text-xs font-bold uppercase text-white border-r border-gray-300" style={{ backgroundColor: '#22c55e' }}>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase text-white border-r border-gray-300" style={{ backgroundColor: '#4a6fa5' }}>
                           Ending<br/>Balance
                         </th>
-                        {/* Full Funding Analysis sub-headers - RED */}
-                        <th className="px-4 py-2 text-right text-xs font-bold uppercase text-white" style={{ backgroundColor: '#dc2626' }}>
+                        {/* Full Funding Analysis sub-headers - WARM SLATE */}
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase text-white" style={{ backgroundColor: '#7a6855' }}>
                           Annual<br/>Contribution
                         </th>
-                        <th className="px-4 py-2 text-right text-xs font-bold uppercase text-white" style={{ backgroundColor: '#dc2626' }}>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase text-white" style={{ backgroundColor: '#7a6855' }}>
                           Average Annual<br/>Contribution
                         </th>
-                        <th className="px-4 py-2 text-right text-xs font-bold uppercase text-white" style={{ backgroundColor: '#dc2626' }}>
+                        <th className="px-4 py-2 text-right text-xs font-bold uppercase text-white" style={{ backgroundColor: '#7a6855' }}>
                           Ending<br/>Balance
                         </th>
                       </tr>
