@@ -36,25 +36,14 @@ export default function Home() {
             setOrganization(orgDoc.data());
           }
           
-          // Load study stats - load all sites (consistent with sites/page.js)
           try {
             const allSitesSnapshot = await getDocs(collection(db, 'sites'));
             let studiesList = allSitesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
             
-            // Debug: log what we're working with
-            console.log('Dashboard stats - all studies:', studiesList.map(s => ({
-              siteName: s.siteName,
-              projectNumber: s.projectNumber,
-              status: s.status,
-              organizationId: s.organizationId
-            })));
-            
-            // Count unique site names (actual properties/communities)
             const uniqueSiteNames = new Set(
               studiesList.map(s => s.siteName || 'Unknown').filter(name => name !== 'Unknown')
             );
             
-            // Count studies by status (case-insensitive)
             const calculatedCount = studiesList.filter(s => {
               const status = (s.status || '').toLowerCase();
               return status === 'calculated' || status === 'completed' || status === 'sent' || status === 'sent to client';
@@ -85,10 +74,10 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-600 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-3"></div>
+          <p className="text-sm text-gray-500">Loading your dashboard...</p>
         </div>
       </div>
     );
@@ -96,185 +85,177 @@ export default function Home() {
 
   const isSuperAdmin = userProfile?.role === 'super_admin';
   const isAdmin = userProfile?.role === 'admin' || isSuperAdmin;
+  const firstName = (userProfile?.displayName || user?.email?.split('@')[0] || 'there').split(' ')[0];
+  const initials = (userProfile?.displayName || user?.email || '?')[0].toUpperCase();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gray-50">
       
-      {/* Header with Logo */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+      {/* Hero Header */}
+      <div style={{ backgroundColor: '#1d398f' }} className="relative overflow-hidden">
+        {/* Subtle pattern */}
+        <div className="absolute inset-0 opacity-[0.06]" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h2v22H20v-1.5z' fill='%23ffffff' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E")`,
+        }}></div>
+        
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
+          {/* Top bar: logo + welcome */}
+          <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <img 
                 src="/pronoia.png" 
                 alt="Pronoia Solutions" 
-                className="h-14 w-auto"
+                className="h-10 w-auto rounded-lg bg-white/10 p-1"
               />
               {organization && (
-                <div className="hidden md:block border-l border-gray-300 pl-4">
-                  <p className="text-xs text-gray-500">Organization</p>
-                  <p className="font-semibold text-gray-900">{organization.name}</p>
+                <div className="border-l border-white/20 pl-4">
+                  <p className="text-[10px] text-blue-200 uppercase tracking-wider font-medium">Organization</p>
+                  <p className="text-sm font-semibold text-white">{organization.name}</p>
                 </div>
               )}
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-xs text-gray-500">Welcome back</p>
-                <p className="font-medium text-gray-900">{userProfile?.displayName || user?.email?.split('@')[0]}</p>
+                <p className="text-[10px] text-blue-200 uppercase tracking-wider font-medium">Welcome back</p>
+                <p className="text-sm font-semibold text-white">{userProfile?.displayName || user?.email?.split('@')[0]}</p>
               </div>
-              <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">
-                {(userProfile?.displayName || user?.email || '?')[0].toUpperCase()}
+              <div className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold" style={{ backgroundColor: '#dbebff', color: '#1d398f' }}>
+                {initials}
               </div>
             </div>
+          </div>
+
+          {/* Greeting */}
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, {firstName}
+            </h1>
+            <p className="text-blue-200 mt-1 text-sm">Here's an overview of your reserve studies</p>
           </div>
         </div>
       </div>
 
-      {/* Hero Banner */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <h1 className="text-3xl font-bold">Reserve Study Management</h1>
-          <p className="mt-2 text-blue-100">Professional reserve study tools for community associations</p>
-        </div>
-      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Sites</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.sites}</p>
-              </div>
-              <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center">
-                <span className="text-2xl">🏢</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Studies</p>
-                <p className="text-3xl font-bold text-blue-600 mt-1">{stats.studies}</p>
-              </div>
-              <div className="h-12 w-12 rounded-lg bg-indigo-100 flex items-center justify-center">
-                <span className="text-2xl">📊</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Calculated</p>
-                <p className="text-3xl font-bold text-green-500 mt-1">{stats.calculated}</p>
-              </div>
-              <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center">
-                <span className="text-2xl">✅</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Pending</p>
-                <p className="text-3xl font-bold text-orange-500 mt-1">{stats.pending}</p>
-              </div>
-              <div className="h-12 w-12 rounded-lg bg-orange-100 flex items-center justify-center">
-                <span className="text-2xl">⏳</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          
-          {/* Sites Card */}
-          <Link href="/sites" className="group">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-lg hover:border-blue-200 transition-all h-full">
-              <div className="flex items-start justify-between mb-4">
-                <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
-                  <span className="text-3xl">📊</span>
+        {/* Stats Cards - overlapping hero */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+          {[
+            { label: 'Total Projects', value: stats.sites, icon: '🏢', accent: '#1d398f' },
+            { label: 'Total Studies', value: stats.studies, icon: '📊', accent: '#3b82f6' },
+            { label: 'Calculated', value: stats.calculated, icon: '✅', accent: '#22c55e' },
+            { label: 'Pending', value: stats.pending, icon: '⏳', accent: '#f59e0b' },
+          ].map(stat => (
+            <div key={stat.label} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{stat.label}</p>
+                  <p className="text-2xl font-bold mt-1" style={{ color: stat.accent }}>{stat.value}</p>
                 </div>
-                <span className="text-gray-400 group-hover:text-blue-500 transition-colors text-2xl">→</span>
+                <div className="h-10 w-10 rounded-lg flex items-center justify-center text-xl" style={{ backgroundColor: stat.accent + '15' }}>
+                  {stat.icon}
+                </div>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Manage Sites</h3>
-              <p className="text-gray-600 text-sm">
+            </div>
+          ))}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          
+          {/* Manage Sites */}
+          <Link href="/sites" className="group">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg hover:border-blue-300 transition-all h-full flex flex-col">
+              <div className="flex items-start justify-between mb-4">
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#1d398f' }}>
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <span className="text-gray-300 group-hover:text-blue-500 transition-colors text-lg">→</span>
+              </div>
+              <h3 className="text-base font-bold text-gray-900 mb-1.5">Manage Sites</h3>
+              <p className="text-xs text-gray-500 leading-relaxed flex-1">
                 Create, edit, and manage reserve study sites. Add components, run calculations, and generate reports.
               </p>
-              <p className="mt-4 text-blue-600 text-sm font-medium">View All Sites →</p>
+              <p className="mt-3 text-xs font-semibold" style={{ color: '#1d398f' }}>View All Sites →</p>
             </div>
           </Link>
 
-          {/* Notes Card */}
+          {/* Component Notes */}
           <Link href="/notes" className="group">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-lg hover:border-green-200 transition-all h-full">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg hover:border-green-300 transition-all h-full flex flex-col">
               <div className="flex items-start justify-between mb-4">
-                <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-200">
-                  <span className="text-3xl">📋</span>
+                <div className="h-11 w-11 rounded-xl bg-green-600 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
                 </div>
-                <span className="text-gray-400 group-hover:text-green-500 transition-colors text-2xl">→</span>
+                <span className="text-gray-300 group-hover:text-green-500 transition-colors text-lg">→</span>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Component Notes</h3>
-              <p className="text-gray-600 text-sm">
+              <h3 className="text-base font-bold text-gray-900 mb-1.5">Component Notes</h3>
+              <p className="text-xs text-gray-500 leading-relaxed flex-1">
                 Manage your organization's library of component descriptions and notes for consistent reporting.
               </p>
-              <p className="mt-4 text-green-600 text-sm font-medium">Manage Notes →</p>
+              <p className="mt-3 text-xs text-green-600 font-semibold">Manage Notes →</p>
             </div>
           </Link>
 
-          {/* Profile Card */}
+          {/* Your Profile */}
           <Link href="/profile" className="group">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-lg hover:border-purple-200 transition-all h-full">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg hover:border-purple-300 transition-all h-full flex flex-col">
               <div className="flex items-start justify-between mb-4">
-                <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-200">
-                  <span className="text-3xl">👤</span>
+                <div className="h-11 w-11 rounded-xl bg-purple-600 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
                 </div>
-                <span className="text-gray-400 group-hover:text-purple-500 transition-colors text-2xl">→</span>
+                <span className="text-gray-300 group-hover:text-purple-500 transition-colors text-lg">→</span>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Your Profile</h3>
-              <p className="text-gray-600 text-sm">
+              <h3 className="text-base font-bold text-gray-900 mb-1.5">Your Profile</h3>
+              <p className="text-xs text-gray-500 leading-relaxed flex-1">
                 Update your personal information, change password, and manage account settings.
               </p>
-              <p className="mt-4 text-purple-600 text-sm font-medium">View Profile →</p>
+              <p className="mt-3 text-xs text-purple-600 font-semibold">View Profile →</p>
             </div>
           </Link>
         </div>
 
         {/* Bottom Row: Organization + Quick Tips */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
           
           {/* Organization Card */}
           {organization && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  🏛️ Organization
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-5 py-3" style={{ backgroundColor: '#1d398f' }}>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  Organization
                 </h3>
               </div>
-              <div className="p-6">
-                <div className="flex items-center gap-4">
+              <div className="p-5">
+                <div className="flex items-center gap-3">
                   <img 
                     src="/pronoia.png" 
                     alt={organization.name} 
-                    className="h-12 w-12 rounded-lg object-contain bg-gray-50 p-1"
+                    className="h-10 w-10 rounded-lg object-contain bg-gray-50 p-1 border border-gray-100"
                   />
                   <div>
-                    <p className="font-bold text-gray-900">{organization.name}</p>
-                    <p className="text-sm text-gray-500">Reserve Study Organization</p>
+                    <p className="text-sm font-bold text-gray-900">{organization.name}</p>
+                    <p className="text-xs text-gray-500">Reserve Study Organization</p>
                   </div>
                 </div>
                 {isAdmin && (
                   <Link
                     href="/admin"
-                    className="mt-4 inline-block px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
+                    className="mt-4 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                    style={{ backgroundColor: '#dbebff', color: '#1d398f' }}
                   >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
                     Admin Settings →
                   </Link>
                 )}
@@ -283,64 +264,69 @@ export default function Home() {
           )}
 
           {/* Quick Tips */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                💡 Quick Tips
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-3 bg-gradient-to-r from-purple-700 to-indigo-700">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                Quick Tips
               </h3>
             </div>
-            <div className="p-6">
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <span className="bg-blue-100 text-blue-700 text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-                  <p className="text-sm text-gray-700">Create a new site and fill in the project information form with financial parameters.</p>
+            <div className="p-5 space-y-3">
+              {[
+                'Create a new site and fill in the project information form with financial parameters.',
+                'Add components manually or import from CSV. Assign notes from your library.',
+                'Run calculations to generate 30-year projections and funding recommendations.',
+                'Generate professional reports for your clients.',
+              ].map((tip, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold" style={{ backgroundColor: '#dbebff', color: '#1d398f' }}>
+                    {i + 1}
+                  </span>
+                  <p className="text-xs text-gray-600 leading-relaxed">{tip}</p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <span className="bg-blue-100 text-blue-700 text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-                  <p className="text-sm text-gray-700">Add components manually or import from CSV. Assign notes from your library.</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="bg-blue-100 text-blue-700 text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-                  <p className="text-sm text-gray-700">Run calculations to generate 30-year projections and funding recommendations.</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="bg-blue-100 text-blue-700 text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
-                  <p className="text-sm text-gray-700">Generate professional reports for your clients.</p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Admin Tools (if admin) */}
+        {/* Admin Tools */}
         {isAdmin && (
           <div className="mb-8">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Admin Tools</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Admin Tools</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Link href="/admin" className="group">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-blue-200 transition-all">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <span className="text-xl">⚙️</span>
+                <div className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md hover:border-blue-300 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#dbebff' }}>
+                      <svg className="w-4.5 h-4.5" style={{ color: '#1d398f' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900">Organization Admin</h3>
-                      <p className="text-sm text-gray-600">Manage users, invitations, and branding</p>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-bold text-gray-900">Organization Admin</h3>
+                      <p className="text-xs text-gray-500">Manage users, invitations, and branding</p>
                     </div>
+                    <span className="text-gray-300 group-hover:text-blue-500 transition-colors">→</span>
                   </div>
                 </div>
               </Link>
               {isSuperAdmin && (
                 <Link href="/super-admin" className="group">
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-red-200 transition-all">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center">
-                        <span className="text-xl">🛡️</span>
+                  <div className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md hover:border-red-300 transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-lg bg-red-100 flex items-center justify-center">
+                        <svg className="w-4.5 h-4.5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
                       </div>
-                      <div>
-                        <h3 className="font-bold text-gray-900">Super Admin</h3>
-                        <p className="text-sm text-gray-600">Manage all organizations and system settings</p>
+                      <div className="flex-1">
+                        <h3 className="text-sm font-bold text-gray-900">Super Admin</h3>
+                        <p className="text-xs text-gray-500">Manage all organizations and system settings</p>
                       </div>
+                      <span className="text-gray-300 group-hover:text-red-500 transition-colors">→</span>
                     </div>
                   </div>
                 </Link>
@@ -350,9 +336,9 @@ export default function Home() {
         )}
 
         {/* Footer */}
-        <div className="mt-12 text-center text-sm text-gray-500">
-          <p>Reserve Study Management Platform</p>
-          <p className="mt-1">© 2026 Pronoia Solutions. All rights reserved.</p>
+        <div className="py-8 text-center">
+          <p className="text-[11px] text-gray-400">Reserve Study Management Platform</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">© 2026 Pronoia Solutions. All rights reserved.</p>
         </div>
 
       </div>
