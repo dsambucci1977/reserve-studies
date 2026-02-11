@@ -82,6 +82,25 @@ export default function ResultsPage() {
   const reserveFund = results.reserveFund || {};
   const pmFund = results.pmFund || {};
   
+  // Project Settings (saved from calculate page)
+  const projectSettings = results.projectSettings || {};
+  const inflationRate = projectSettings.inflationRate || 0;
+  const interestRate = projectSettings.interestRate || 0;
+  const costAdjustmentFactor = projectSettings.costAdjustmentFactor || 1.0;
+  const beginningYear = projectSettings.beginningYear || site?.beginningYear || new Date().getFullYear();
+  
+  // Build cost adjustment note based on what's actually set
+  const hasCAF = costAdjustmentFactor !== 1.0;
+  const hasInflation = inflationRate > 0;
+  const hasCostAdjustments = hasCAF || hasInflation;
+  const costNoteText = hasCAF && hasInflation
+    ? `Cost Adjustment Factor of ${costAdjustmentFactor.toFixed(2)} applied + ${(inflationRate * 100).toFixed(2)}% annual inflation`
+    : hasCAF
+    ? `Cost Adjustment Factor (GF) of ${costAdjustmentFactor.toFixed(2)} applied to all replacement costs`
+    : hasInflation
+    ? `${(inflationRate * 100).toFixed(2)}% annual inflation applied`
+    : '';
+  
   // Data Sources
   const reserveCashFlow = results.cashFlow || results.reserveCashFlow || [];
   const reserveFullFundingCashFlow = results.fullFundingCashFlow || [];
@@ -261,6 +280,33 @@ export default function ResultsPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Project Settings Bar */}
+        <div className="bg-gray-100 border border-gray-300 rounded-lg px-6 py-3 mb-6 flex flex-wrap items-center gap-6">
+          <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Study Parameters:</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">Beginning Year</span>
+            <span className="text-sm font-semibold text-gray-900">{beginningYear}</span>
+          </div>
+          {inflationRate > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500">Inflation Rate</span>
+              <span className="text-sm font-semibold text-gray-900">{(inflationRate * 100).toFixed(2)}%</span>
+            </div>
+          )}
+          {interestRate > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500">Interest Rate</span>
+              <span className="text-sm font-semibold text-gray-900">{(interestRate * 100).toFixed(2)}%</span>
+            </div>
+          )}
+          {costAdjustmentFactor !== 1.0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500">Cost Adj. Factor (GF)</span>
+              <span className="text-sm font-semibold text-amber-700">{costAdjustmentFactor.toFixed(2)}</span>
             </div>
           )}
         </div>
@@ -596,6 +642,11 @@ export default function ResultsPage() {
             {activeTab === 'reserve-cashflow' && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">💰 Reserve Fund - 30-Year Cash Flow Projection</h3>
+                {hasCostAdjustments && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 mb-3 inline-block">
+                    📈 {costNoteText}
+                  </p>
+                )}
                 <div className="flex justify-end mb-2">
                   <button
                     onClick={() => {
@@ -715,7 +766,12 @@ export default function ResultsPage() {
             {activeTab === 'pm-cashflow' && pmRequired && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">🟣 PM Fund Cash Flow (30-Year)</h3>
-                <p className="text-sm text-gray-600 mb-6">Comparison: Current Funding vs. Recommended Funding</p>
+                <p className="text-sm text-gray-600 mb-2">Comparison: Current Funding vs. Recommended Funding</p>
+                {hasCostAdjustments && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 mb-3 inline-block">
+                    📈 {costNoteText}
+                  </p>
+                )}
                 <div className="overflow-x-auto border border-gray-300 rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-purple-900 text-white">
@@ -758,7 +814,12 @@ export default function ResultsPage() {
             {activeTab === 'reserve-expenditures' && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">📅 Reserve Annual Expenditure Schedule</h3>
-                <p className="text-sm text-gray-600 mb-6">Total anticipated expenses by year (Reserve Items Only).</p>
+                <p className="text-sm text-gray-600 mb-2">Total anticipated expenses by year (Reserve Items Only).</p>
+                {hasCostAdjustments && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 mb-3 inline-block">
+                    📈 {costNoteText}
+                  </p>
+                )}
                 <div className="overflow-x-auto border border-gray-300 rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-blue-800 text-white">
@@ -792,7 +853,12 @@ export default function ResultsPage() {
             {activeTab === 'pm-expenditures' && pmRequired && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">📅 PM Annual Expenditure Schedule</h3>
-                <p className="text-sm text-gray-600 mb-6">Total anticipated expenses by year (Preventive Maintenance Items Only).</p>
+                <p className="text-sm text-gray-600 mb-2">Total anticipated expenses by year (Preventive Maintenance Items Only).</p>
+                {hasCostAdjustments && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 mb-3 inline-block">
+                    📈 {costNoteText}
+                  </p>
+                )}
                 <div className="overflow-x-auto border border-gray-300 rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-purple-800 text-white">
@@ -825,15 +891,22 @@ export default function ResultsPage() {
             {activeTab === 'schedule' && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">📋 Master Replacement Schedule</h3>
-                <p className="text-sm text-gray-600 mb-6">Combined list of all components and their replacement timeline.</p>
+                <p className="text-sm text-gray-600 mb-2">Combined list of all components and their replacement timeline.</p>
+                {hasCostAdjustments && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 mb-3 inline-block">
+                    📈 {costNoteText}
+                  </p>
+                )}
                 <div className="overflow-x-auto border border-gray-300 rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-green-700 text-white">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-bold uppercase">Category</th>
                         <th className="px-4 py-3 text-left text-xs font-bold uppercase">Component</th>
+                        {pmRequired && <th className="px-4 py-3 text-center text-xs font-bold uppercase">Fund</th>}
                         <th className="px-4 py-3 text-right text-xs font-bold uppercase">Repl. Year</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">Cost</th>
+                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">Base Cost</th>
+                        {hasCostAdjustments && <th className="px-4 py-3 text-right text-xs font-bold uppercase">Adjusted Cost</th>}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -841,8 +914,18 @@ export default function ResultsPage() {
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-4 py-2 text-sm text-gray-900">{item.category}</td>
                           <td className="px-4 py-2 text-sm text-gray-900">{item.description}</td>
+                          {pmRequired && (
+                            <td className="px-4 py-2 text-center text-xs">
+                              <span className={`px-2 py-0.5 rounded-full font-medium ${item.isPM ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                                {item.isPM ? 'PM' : 'Reserve'}
+                              </span>
+                            </td>
+                          )}
                           <td className="px-4 py-2 text-right text-sm text-gray-900">{item.year}</td>
-                          <td className="px-4 py-2 text-right text-sm font-medium text-gray-900">${Math.round(item.cost).toLocaleString()}</td>
+                          <td className="px-4 py-2 text-right text-sm text-gray-900">${Math.round(item.baseCost || item.cost).toLocaleString()}</td>
+                          {hasCostAdjustments && (
+                            <td className="px-4 py-2 text-right text-sm font-medium text-gray-900">${Math.round(item.adjustedCost || item.inflatedCost || item.cost).toLocaleString()}</td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
