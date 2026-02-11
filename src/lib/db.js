@@ -1,5 +1,6 @@
 // src/lib/db.js
-// Database Operations - FIXED saveProjections
+// Database Operations
+// FIX: saveProjections now does full replace (no merge) to prevent stale data
 
 import { db } from './firebase';
 import { 
@@ -158,12 +159,13 @@ export async function deleteComponent(siteId, componentId) {
 }
 
 // ============================================
-// PROJECTIONS MANAGEMENT (for Week 5) - FIXED
+// PROJECTIONS MANAGEMENT - FIXED
 // ============================================
 
 /**
  * Save calculation results/projections for a site
- * FIXED: Uses setDoc instead of updateDoc to create if doesn't exist
+ * FIXED: Full replace (no merge) so old/stale data is completely wiped
+ * This ensures re-importing components + recalculating gives clean results
  */
 export async function saveProjections(siteId, projectionsData) {
   const projectionsRef = doc(db, 'sites', siteId, 'projections', 'latest');
@@ -173,8 +175,9 @@ export async function saveProjections(siteId, projectionsData) {
     calculatedAt: serverTimestamp(),
   };
   
-  // Use setDoc with merge:true to create or update
-  await setDoc(projectionsRef, data, { merge: true });
+  // Full replace - wipes old document completely before writing new data
+  // This prevents stale fields from persisting after component re-imports
+  await setDoc(projectionsRef, data);
 }
 
 /**
