@@ -421,39 +421,93 @@ export default function HelpPage() {
               ))
             )}
 
-            {/* Quick Reference Card */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100" style={{ backgroundColor: '#1d398f' }}>
-                <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                  Quick Reference — Workflow Steps
-                </h2>
-              </div>
-              <div className="p-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          </div>
+
+          {/* Right Sidebar - Sticky Workflow */}
+          <div className="hidden xl:block w-60 flex-shrink-0">
+            <div className="sticky top-4 space-y-4">
+              {/* Workflow Steps */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100" style={{ backgroundColor: '#1d398f' }}>
+                  <h3 className="text-[11px] font-bold text-white flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    Quick Reference
+                  </h3>
+                </div>
+                <div className="p-3 space-y-3">
                   {[
-                    { step: 1, title: 'Create Project', desc: 'Add a new site with property details and project number', link: '/sites', linkLabel: 'Go to Projects', color: '#1d398f' },
-                    { step: 2, title: 'Configure & Add', desc: 'Set financial parameters, then import or add components', link: null, linkLabel: null, color: '#3b82f6' },
-                    { step: 3, title: 'Calculate', desc: 'Generate 30-year projections and funding analysis', link: null, linkLabel: null, color: '#8b5cf6' },
-                    { step: 4, title: 'Report & Monitor', desc: 'Generate client reports and track component health', link: '/monitoring', linkLabel: 'Health Monitor', color: '#22c55e' },
-                  ].map(item => (
-                    <div key={item.step} className="text-center">
-                      <div className="w-10 h-10 mx-auto rounded-full flex items-center justify-center text-white font-bold text-sm mb-2" style={{ backgroundColor: item.color }}>
-                        {item.step}
+                    { step: 1, title: 'Create Project', desc: 'Add a new site with property details', link: '/sites', linkLabel: 'Go to Projects', color: '#1d398f' },
+                    { step: 2, title: 'Configure & Add', desc: 'Set financial parameters, import components', link: null, linkLabel: null, color: '#3b82f6' },
+                    { step: 3, title: 'Calculate', desc: 'Generate 30-year projections', link: null, linkLabel: null, color: '#8b5cf6' },
+                    { step: 4, title: 'Report & Monitor', desc: 'Deliver reports, track health', link: '/monitoring', linkLabel: 'Health Monitor', color: '#22c55e' },
+                  ].map((item, i, arr) => (
+                    <div key={item.step}>
+                      <div className="flex items-start gap-3">
+                        <div className="flex flex-col items-center">
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0" style={{ backgroundColor: item.color }}>
+                            {item.step}
+                          </div>
+                          {i < arr.length - 1 && <div className="w-0.5 h-4 bg-gray-200 mt-1"></div>}
+                        </div>
+                        <div className="pt-0.5">
+                          <h4 className="text-xs font-bold text-gray-900">{item.title}</h4>
+                          <p className="text-[10px] text-gray-500 leading-relaxed mt-0.5">{item.desc}</p>
+                          {item.link && (
+                            <Link href={item.link} className="inline-block mt-1 text-[10px] font-semibold" style={{ color: item.color }}>
+                              {item.linkLabel} →
+                            </Link>
+                          )}
+                        </div>
                       </div>
-                      <h4 className="text-xs font-bold text-gray-900 mb-1">{item.title}</h4>
-                      <p className="text-[11px] text-gray-500 leading-relaxed">{item.desc}</p>
-                      {item.link && (
-                        <Link href={item.link} className="inline-block mt-2 text-[10px] font-semibold" style={{ color: item.color }}>
-                          {item.linkLabel} →
-                        </Link>
-                      )}
                     </div>
                   ))}
                 </div>
               </div>
+
+              {/* Key Terms */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <h3 className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    Key Terms
+                  </h3>
+                </div>
+                <div className="p-3 space-y-2.5">
+                  {[
+                    { term: 'CAF', def: 'Cost Adjustment Factor — regional pricing multiplier' },
+                    { term: 'RUL', def: 'Remaining Useful Life — years until replacement' },
+                    { term: 'UL', def: 'Useful Life — total expected lifespan' },
+                    { term: 'PM', def: 'Preventive Maintenance — operating budget items' },
+                    { term: 'Full Funding', def: 'Recommended contribution to stay positive 30yr' },
+                  ].map(item => (
+                    <div key={item.term} className="flex gap-2">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 flex-shrink-0">{item.term}</span>
+                      <span className="text-[10px] text-gray-500 leading-relaxed">{item.def}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Need More Help? */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-4 text-center">
+                <div className="w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center" style={{ backgroundColor: '#1d398f' }}>
+                  <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <p className="text-[11px] font-bold text-gray-900">Need more help?</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">Contact Pronoia Solutions for support</p>
+                <a href="mailto:support@pronoia.solutions" className="inline-block mt-2 text-[10px] font-semibold" style={{ color: '#1d398f' }}>
+                  support@pronoia.solutions
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
             </div>
           </div>
         </div>
