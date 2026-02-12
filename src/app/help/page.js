@@ -508,9 +508,6 @@ export default function HelpPage() {
             </div>
           </div>
         </div>
-            </div>
-          </div>
-        </div>
 
         <div className="py-8 text-center">
           <p className="text-[11px] text-gray-400">Help & FAQ — Pronoia Solutions</p>
