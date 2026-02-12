@@ -22,6 +22,7 @@ export default function MonitoringPage() {
   const [showThresholdEditor, setShowThresholdEditor] = useState(false);
   const [componentLimit, setComponentLimit] = useState(25);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSiteId, setSelectedSiteId] = useState(null);
 
   useEffect(() => {
     if (!user) {
@@ -464,46 +465,313 @@ export default function MonitoringPage() {
                 {healthData.siteSummaries.length === 0 ? (
                   <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-sm text-gray-500">No sites with components</div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {healthData.siteSummaries.map(site => {
-                      const total = site.critical + site.warning + site.healthy;
-                      const critPct = total > 0 ? (site.critical / total) * 100 : 0;
-                      const warnPct = total > 0 ? (site.warning / total) * 100 : 0;
-                      const healthPct = total > 0 ? (site.healthy / total) * 100 : 0;
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {healthData.siteSummaries.map(site => {
+                        const total = site.critical + site.warning + site.healthy;
+                        const critPct = total > 0 ? (site.critical / total) * 100 : 0;
+                        const warnPct = total > 0 ? (site.warning / total) * 100 : 0;
+                        const healthPct = total > 0 ? (site.healthy / total) * 100 : 0;
+                        const isSelected = selectedSiteId === site.siteId;
+                        return (
+                          <button
+                            key={site.siteId}
+                            onClick={() => setSelectedSiteId(isSelected ? null : site.siteId)}
+                            className="text-left w-full"
+                          >
+                            <div className={`bg-white rounded-xl border-2 p-5 hover:shadow-md transition-all ${isSelected ? 'border-blue-500 shadow-md' : 'border-gray-200 hover:border-gray-300'}`}>
+                              <div className="flex items-start justify-between mb-1">
+                                <div>
+                                  <h4 className="text-sm font-bold text-gray-900">{site.siteName}</h4>
+                                  {site.projectNumber && <p className="text-[10px] text-gray-400 mt-0.5">{site.projectNumber}</p>}
+                                </div>
+                                <span className={`text-xs transition-transform duration-200 ${isSelected ? 'text-blue-500 rotate-90' : 'text-gray-300'}`}>→</span>
+                              </div>
+                              <div className="flex rounded-full h-2.5 overflow-hidden my-3 bg-gray-100">
+                                {critPct > 0 && <div style={{ width: `${critPct}%`, backgroundColor: '#ef4444' }}></div>}
+                                {warnPct > 0 && <div style={{ width: `${warnPct}%`, backgroundColor: '#f59e0b' }}></div>}
+                                {healthPct > 0 && <div style={{ width: `${healthPct}%`, backgroundColor: '#22c55e' }}></div>}
+                              </div>
+                              <div className="flex items-center justify-between text-[10px] mb-2">
+                                <div className="flex gap-3">
+                                  {site.critical > 0 && <span className="text-red-600 font-semibold">{site.critical} critical</span>}
+                                  {site.warning > 0 && <span className="text-amber-600 font-semibold">{site.warning} warning</span>}
+                                  <span className="text-green-600">{site.healthy} healthy</span>
+                                </div>
+                                <span className="font-medium text-gray-500">{total} total</span>
+                              </div>
+                              {(site.criticalCost > 0 || site.warningCost > 0) && (
+                                <div className="flex gap-3 text-[10px] pt-2 border-t border-gray-100">
+                                  {site.criticalCost > 0 && <span className="text-red-600 font-medium">{formatCurrency(site.criticalCost)} critical</span>}
+                                  {site.warningCost > 0 && <span className="text-amber-600 font-medium">{formatCurrency(site.warningCost)} warning</span>}
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* === SITE DRILL-DOWN DETAIL === */}
+                    {selectedSiteId && (() => {
+                      const siteComps = healthData.sorted.filter(c => c.siteId === selectedSiteId).length > 0
+                        ? allComponents.map(comp => {
+                            const currentYear = new Date().getFullYear();
+                            const rul = parseFloat(comp.remainingUsefulLife) || 0;
+                            const ul = parseFloat(comp.usefulLife) || 20;
+                            const replacementYear = comp.beginningYear + rul;
+                            const yearsRemaining = replacementYear - currentYear;
+                            const cost = parseFloat(comp.totalCost) || 0;
+                            const isPM = comp.isPreventiveMaintenance || comp.pm || false;
+                            let tier = 'healthy';
+                            if (yearsRemaining <= thresholds.critical) tier = 'critical';
+                            else if (yearsRemaining <= thresholds.warning) tier = 'warning';
+                            return { ...comp, replacementYear, yearsRemaining, cost, isPM, usefulLifeNum: ul, tier };
+                          }).filter(c => c.siteId === selectedSiteId).sort((a, b) => a.yearsRemaining - b.yearsRemaining)
+                        : [];
+                      const siteSummary = healthData.siteSummaries.find(s => s.siteId === selectedSiteId);
+                      if (!siteSummary || siteComps.length === 0) return null;
+
+                      const total = siteSummary.critical + siteSummary.warning + siteSummary.healthy;
+                      const critPct = total > 0 ? Math.round((siteSummary.critical / total) * 100) : 0;
+                      const warnPct = total > 0 ? Math.round((siteSummary.warning / total) * 100) : 0;
+                      const healthPct = total > 0 ? Math.round((siteSummary.healthy / total) * 100) : 0;
+
+                      // Build replacement year buckets for timeline chart
+                      const currentYear = new Date().getFullYear();
+                      const yearBuckets = {};
+                      siteComps.forEach(c => {
+                        const yr = c.replacementYear;
+                        if (!yearBuckets[yr]) yearBuckets[yr] = { year: yr, cost: 0, count: 0, critical: 0, warning: 0, healthy: 0 };
+                        yearBuckets[yr].cost += c.cost;
+                        yearBuckets[yr].count++;
+                        yearBuckets[yr][c.tier]++;
+                      });
+                      const yearData = Object.values(yearBuckets).sort((a, b) => a.year - b.year);
+                      const maxYearCost = Math.max(...yearData.map(y => y.cost), 1);
+
+                      // Category breakdown
+                      const catBuckets = {};
+                      siteComps.forEach(c => {
+                        const cat = c.category || 'Uncategorized';
+                        if (!catBuckets[cat]) catBuckets[cat] = { name: cat, cost: 0, count: 0, critical: 0, warning: 0, healthy: 0 };
+                        catBuckets[cat].cost += c.cost;
+                        catBuckets[cat].count++;
+                        catBuckets[cat][c.tier]++;
+                      });
+                      const catData = Object.values(catBuckets).sort((a, b) => b.cost - a.cost);
+
                       return (
-                        <Link key={site.siteId} href={`/sites/${site.siteId}/components`} className="group">
-                          <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-blue-300 transition-all">
-                            <div className="flex items-start justify-between mb-1">
-                              <div>
-                                <h4 className="text-sm font-bold text-gray-900">{site.siteName}</h4>
-                                {site.projectNumber && <p className="text-[10px] text-gray-400 mt-0.5">{site.projectNumber}</p>}
-                              </div>
-                              <span className="text-gray-300 group-hover:text-blue-500 transition-colors text-xs">→</span>
+                        <div className="mt-5 bg-white rounded-xl border-2 border-blue-200 overflow-hidden">
+                          {/* Detail Header */}
+                          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between" style={{ backgroundColor: '#f8faff' }}>
+                            <div>
+                              <h3 className="text-base font-bold text-gray-900">{siteSummary.siteName}</h3>
+                              <p className="text-xs text-gray-500 mt-0.5">{siteSummary.projectNumber || ''} — {total} components</p>
                             </div>
-                            <div className="flex rounded-full h-2.5 overflow-hidden my-3 bg-gray-100">
-                              {critPct > 0 && <div style={{ width: `${critPct}%`, backgroundColor: '#ef4444' }}></div>}
-                              {warnPct > 0 && <div style={{ width: `${warnPct}%`, backgroundColor: '#f59e0b' }}></div>}
-                              {healthPct > 0 && <div style={{ width: `${healthPct}%`, backgroundColor: '#22c55e' }}></div>}
+                            <div className="flex items-center gap-3">
+                              <Link
+                                href={`/sites/${selectedSiteId}/components`}
+                                className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                                style={{ backgroundColor: '#dbebff', color: '#1d398f' }}
+                              >
+                                Manage Components →
+                              </Link>
+                              <button onClick={() => setSelectedSiteId(null)} className="text-gray-400 hover:text-gray-600">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
                             </div>
-                            <div className="flex items-center justify-between text-[10px] mb-2">
-                              <div className="flex gap-3">
-                                {site.critical > 0 && <span className="text-red-600 font-semibold">{site.critical} critical</span>}
-                                {site.warning > 0 && <span className="text-amber-600 font-semibold">{site.warning} warning</span>}
-                                <span className="text-green-600">{site.healthy} healthy</span>
-                              </div>
-                              <span className="font-medium text-gray-500">{total} total</span>
-                            </div>
-                            {(site.criticalCost > 0 || site.warningCost > 0) && (
-                              <div className="flex gap-3 text-[10px] pt-2 border-t border-gray-100">
-                                {site.criticalCost > 0 && <span className="text-red-600 font-medium">{formatCurrency(site.criticalCost)} critical</span>}
-                                {site.warningCost > 0 && <span className="text-amber-600 font-medium">{formatCurrency(site.warningCost)} warning</span>}
-                              </div>
-                            )}
                           </div>
-                        </Link>
+
+                          {/* Stats Row */}
+                          <div className="grid grid-cols-2 lg:grid-cols-5 gap-0 border-b border-gray-100">
+                            <div className="p-4 border-r border-gray-100 text-center">
+                              <div className="text-xl font-bold text-red-600">{siteSummary.critical}</div>
+                              <div className="text-[10px] text-gray-500 uppercase tracking-wide font-medium">Critical</div>
+                            </div>
+                            <div className="p-4 border-r border-gray-100 text-center">
+                              <div className="text-xl font-bold text-amber-600">{siteSummary.warning}</div>
+                              <div className="text-[10px] text-gray-500 uppercase tracking-wide font-medium">Warning</div>
+                            </div>
+                            <div className="p-4 border-r border-gray-100 text-center">
+                              <div className="text-xl font-bold text-green-600">{siteSummary.healthy}</div>
+                              <div className="text-[10px] text-gray-500 uppercase tracking-wide font-medium">Healthy</div>
+                            </div>
+                            <div className="p-4 border-r border-gray-100 text-center">
+                              <div className="text-xl font-bold text-red-600">{formatCurrency(siteSummary.criticalCost)}</div>
+                              <div className="text-[10px] text-gray-500 uppercase tracking-wide font-medium">Critical $</div>
+                            </div>
+                            <div className="p-4 text-center">
+                              <div className="text-xl font-bold" style={{ color: '#1d398f' }}>{formatCurrency(siteSummary.totalCost)}</div>
+                              <div className="text-[10px] text-gray-500 uppercase tracking-wide font-medium">Total Cost</div>
+                            </div>
+                          </div>
+
+                          {/* Charts Row */}
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 border-b border-gray-100">
+
+                            {/* Replacement Timeline Chart */}
+                            <div className="p-5 border-r border-gray-100">
+                              <h4 className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                                Replacement Cost by Year
+                              </h4>
+                              <div className="space-y-1.5">
+                                {yearData.slice(0, 12).map(yr => {
+                                  const pct = (yr.cost / maxYearCost) * 100;
+                                  const yearDiff = yr.year - currentYear;
+                                  let barColor = '#22c55e';
+                                  if (yearDiff <= thresholds.critical) barColor = '#ef4444';
+                                  else if (yearDiff <= thresholds.warning) barColor = '#f59e0b';
+                                  return (
+                                    <div key={yr.year} className="flex items-center gap-2">
+                                      <span className={`text-[10px] font-mono w-8 text-right ${yr.year <= currentYear ? 'text-red-600 font-bold' : 'text-gray-500'}`}>{yr.year}</span>
+                                      <div className="flex-1 bg-gray-100 rounded h-5 overflow-hidden">
+                                        <div
+                                          className="h-full rounded flex items-center pl-2 transition-all duration-300"
+                                          style={{ width: `${Math.max(pct, yr.cost > 0 ? 8 : 0)}%`, backgroundColor: barColor }}
+                                        >
+                                          {yr.cost > 500 && <span className="text-[9px] font-bold text-white whitespace-nowrap">{formatCurrency(yr.cost)}</span>}
+                                        </div>
+                                      </div>
+                                      <span className="text-[10px] text-gray-400 w-16 text-right">{yr.count} item{yr.count > 1 ? 's' : ''}</span>
+                                    </div>
+                                  );
+                                })}
+                                {yearData.length > 12 && (
+                                  <p className="text-[10px] text-gray-400 text-center pt-1">+ {yearData.length - 12} more years</p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Health Distribution + Category Breakdown */}
+                            <div className="p-5">
+                              {/* Donut Chart */}
+                              <h4 className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                                </svg>
+                                Health Distribution
+                              </h4>
+                              <div className="flex items-center gap-6 mb-5">
+                                {/* SVG Donut */}
+                                <div className="relative w-24 h-24 flex-shrink-0">
+                                  <svg viewBox="0 0 36 36" className="w-full h-full">
+                                    {/* Background */}
+                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#f3f4f6" strokeWidth="3" />
+                                    {/* Healthy arc */}
+                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#22c55e" strokeWidth="3"
+                                      strokeDasharray={`${healthPct} ${100 - healthPct}`} strokeDashoffset="25" />
+                                    {/* Warning arc */}
+                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#f59e0b" strokeWidth="3"
+                                      strokeDasharray={`${warnPct} ${100 - warnPct}`} strokeDashoffset={`${25 - healthPct}`} />
+                                    {/* Critical arc */}
+                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#ef4444" strokeWidth="3"
+                                      strokeDasharray={`${critPct} ${100 - critPct}`} strokeDashoffset={`${25 - healthPct - warnPct}`} />
+                                  </svg>
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className="text-sm font-bold text-gray-900">{total}</span>
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-sm bg-red-500"></span>
+                                    <span className="text-xs text-gray-600">Critical: <strong className="text-red-600">{siteSummary.critical}</strong> ({critPct}%)</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-sm bg-amber-500"></span>
+                                    <span className="text-xs text-gray-600">Warning: <strong className="text-amber-600">{siteSummary.warning}</strong> ({warnPct}%)</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-sm bg-green-500"></span>
+                                    <span className="text-xs text-gray-600">Healthy: <strong className="text-green-600">{siteSummary.healthy}</strong> ({healthPct}%)</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Category Breakdown */}
+                              <h4 className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                </svg>
+                                By Category
+                              </h4>
+                              <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
+                                {catData.map(cat => (
+                                  <div key={cat.name} className="flex items-center justify-between text-xs py-1 border-b border-gray-50">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-gray-700 font-medium truncate max-w-[120px]">{cat.name}</span>
+                                      <span className="text-gray-400">({cat.count})</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {cat.critical > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-semibold">{cat.critical}</span>}
+                                      {cat.warning > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 font-semibold">{cat.warning}</span>}
+                                      <span className="text-gray-600 font-medium">{formatCurrency(cat.cost)}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Component List */}
+                          <div>
+                            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100">
+                              <h4 className="text-xs font-bold text-gray-900">All Components — sorted by urgency</h4>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="border-b border-gray-200">
+                                    <th className="text-left text-[10px] font-medium text-gray-500 uppercase tracking-wide px-5 py-2">Status</th>
+                                    <th className="text-left text-[10px] font-medium text-gray-500 uppercase tracking-wide px-4 py-2">Component</th>
+                                    <th className="text-left text-[10px] font-medium text-gray-500 uppercase tracking-wide px-4 py-2">Category</th>
+                                    <th className="text-center text-[10px] font-medium text-gray-500 uppercase tracking-wide px-4 py-2">Useful Life</th>
+                                    <th className="text-center text-[10px] font-medium text-gray-500 uppercase tracking-wide px-4 py-2">Years Left</th>
+                                    <th className="text-center text-[10px] font-medium text-gray-500 uppercase tracking-wide px-4 py-2">Replace By</th>
+                                    <th className="text-right text-[10px] font-medium text-gray-500 uppercase tracking-wide px-5 py-2">Est. Cost</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {siteComps.map((comp, i) => {
+                                    const ts = getTierStyle(comp.tier);
+                                    return (
+                                      <tr key={comp.id + '-' + i} className="border-b border-gray-50 hover:bg-gray-50/80 transition-colors">
+                                        <td className="px-5 py-2">
+                                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: ts.bg, color: ts.text, border: `1px solid ${ts.border}` }}>
+                                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ts.dot }}></span>
+                                            {ts.label}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-2">
+                                          <div className="text-xs font-medium text-gray-900 max-w-[250px] truncate">{comp.description || comp.componentName || 'Unnamed'}</div>
+                                          {comp.isPM && <span className="text-[9px] text-green-600 font-medium">PM</span>}
+                                        </td>
+                                        <td className="px-4 py-2 text-xs text-gray-500">{comp.category || '—'}</td>
+                                        <td className="px-4 py-2 text-center text-xs text-gray-500">{comp.usefulLifeNum}yr</td>
+                                        <td className="px-4 py-2 text-center">
+                                          <span className="text-xs font-bold" style={{ color: ts.text }}>
+                                            {comp.yearsRemaining <= 0 ? 'Overdue' : `${comp.yearsRemaining}yr`}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-2 text-center text-xs text-gray-600">{comp.replacementYear}</td>
+                                        <td className="px-5 py-2 text-right text-xs font-medium text-gray-900">${Math.round(comp.cost).toLocaleString()}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
                       );
-                    })}
-                  </div>
+                    })()}
+                  </>
                 )}
               </div>
             )}
