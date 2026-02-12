@@ -208,6 +208,9 @@ export default function AdminPage() {
               custom_message: customMessage || 'You have been invited to join our reserve study management platform.',
               signup_url: signupUrl,
               expires_date: expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+              logo_html: orgSettings.logoUrl
+                ? `<img src="${orgSettings.logoUrl}" alt="${organization.name || 'Logo'}" style="max-height:50px;max-width:240px;width:auto;display:block;margin:0 auto;" />`
+                : `<span style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:0.5px;">${organization.name || 'Your Organization'}</span>`,
             }, orgSettings.emailjsPublicKey);
             emailSent = true;
           }
@@ -259,6 +262,9 @@ export default function AdminPage() {
               custom_message: 'This is a reminder about your pending invitation.',
               signup_url: signupUrl,
               expires_date: newExpires.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+              logo_html: orgSettings.logoUrl
+                ? `<img src="${orgSettings.logoUrl}" alt="${organization.name || 'Logo'}" style="max-height:50px;max-width:240px;width:auto;display:block;margin:0 auto;" />`
+                : `<span style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:0.5px;">${organization.name || 'Your Organization'}</span>`,
             }, orgSettings.emailjsPublicKey);
             emailSent = true;
           }
