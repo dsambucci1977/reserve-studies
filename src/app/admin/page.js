@@ -181,22 +181,39 @@ export default function AdminPage() {
       const emailjsConfigured = orgSettings.emailjsServiceId && orgSettings.emailjsTemplateId && orgSettings.emailjsPublicKey;
       let emailSent = false;
 
-      if (emailjsConfigured && window.emailjs) {
+      if (emailjsConfigured) {
         try {
-          const signupUrl = `${window.location.origin}/auth/signup?token=${docRef.id}`;
-          await window.emailjs.send(orgSettings.emailjsServiceId, orgSettings.emailjsTemplateId, {
-            to_email: email,
-            to_name: email.split('@')[0],
-            from_name: organization.name || 'Pronoia Solutions',
-            role: role,
-            organization_name: organization.name || 'Your Organization',
-            custom_message: customMessage || 'You have been invited to join our reserve study management platform.',
-            signup_url: signupUrl,
-            expires_date: expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-          }, orgSettings.emailjsPublicKey);
-          emailSent = true;
+          // Wait for emailjs to be available (CDN might still be loading)
+          let ejs = window.emailjs;
+          if (!ejs) {
+            // Try dynamic load as fallback
+            await new Promise((resolve, reject) => {
+              const script = document.createElement('script');
+              script.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+              script.onload = resolve;
+              script.onerror = reject;
+              document.head.appendChild(script);
+            });
+            ejs = window.emailjs;
+          }
+
+          if (ejs) {
+            const signupUrl = `${window.location.origin}/auth/signup?token=${docRef.id}`;
+            await ejs.send(orgSettings.emailjsServiceId, orgSettings.emailjsTemplateId, {
+              to_email: email,
+              to_name: email.split('@')[0],
+              from_name: organization.name || 'Pronoia Solutions',
+              role: role,
+              organization_name: organization.name || 'Your Organization',
+              custom_message: customMessage || 'You have been invited to join our reserve study management platform.',
+              signup_url: signupUrl,
+              expires_date: expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+            }, orgSettings.emailjsPublicKey);
+            emailSent = true;
+          }
         } catch (emailErr) {
-          console.warn('EmailJS failed, invite created without email:', emailErr);
+          console.error('EmailJS error:', emailErr);
+          setMessage(`Invitation created but email failed: ${emailErr?.text || emailErr?.message || 'Unknown error'}. You can still copy the invite link.`);
         }
       }
 
@@ -228,21 +245,24 @@ export default function AdminPage() {
       const emailjsConfigured = orgSettings.emailjsServiceId && orgSettings.emailjsTemplateId && orgSettings.emailjsPublicKey;
       let emailSent = false;
 
-      if (emailjsConfigured && window.emailjs) {
+      if (emailjsConfigured) {
         try {
-          const signupUrl = `${window.location.origin}/auth/signup?token=${inviteId}`;
-          await window.emailjs.send(orgSettings.emailjsServiceId, orgSettings.emailjsTemplateId, {
-            to_email: email,
-            to_name: email.split('@')[0],
-            from_name: organization.name || 'Pronoia Solutions',
-            role: 'specialist',
-            organization_name: organization.name || 'Your Organization',
-            custom_message: 'This is a reminder about your pending invitation.',
-            signup_url: signupUrl,
-            expires_date: newExpires.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-          }, orgSettings.emailjsPublicKey);
-          emailSent = true;
-        } catch (e) { console.warn('EmailJS resend failed:', e); }
+          const ejs = window.emailjs;
+          if (ejs) {
+            const signupUrl = `${window.location.origin}/auth/signup?token=${inviteId}`;
+            await ejs.send(orgSettings.emailjsServiceId, orgSettings.emailjsTemplateId, {
+              to_email: email,
+              to_name: email.split('@')[0],
+              from_name: organization.name || 'Pronoia Solutions',
+              role: 'specialist',
+              organization_name: organization.name || 'Your Organization',
+              custom_message: 'This is a reminder about your pending invitation.',
+              signup_url: signupUrl,
+              expires_date: newExpires.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+            }, orgSettings.emailjsPublicKey);
+            emailSent = true;
+          }
+        } catch (e) { console.error('EmailJS resend error:', e); }
       }
 
       await loadInvitations(organization.id);
@@ -270,7 +290,11 @@ export default function AdminPage() {
         ...updates,
         updatedAt: new Date()
       });
-      setOrganization(prev => ({ ...prev, ...updates }));
+      // Re-fetch organization to get properly nested data from Firestore
+      const orgDoc = await getDoc(doc(db, 'organizations', organization.id));
+      if (orgDoc.exists()) {
+        setOrganization({ id: orgDoc.id, ...orgDoc.data() });
+      }
       setMessage('Organization settings saved');
     } catch (error) {
       console.error('Error updating organization:', error);

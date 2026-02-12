@@ -29,7 +29,7 @@ export default function RootLayout({ children }) {
           <Navigation />
           {children}
         </AuthProvider>
-        <Script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" strategy="lazyOnload" />
+        <Script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" strategy="afterInteractive" />
       </body>
     </html>
   );
