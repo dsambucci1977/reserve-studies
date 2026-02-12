@@ -427,6 +427,23 @@ export default function MonitoringPage() {
             {/* === EXPOSURE VIEW === */}
             {healthView === 'exposure' && (
               <div className="space-y-5">
+
+                {/* Scope indicator */}
+                <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-900">
+                      {siteFilter === 'all' 
+                        ? `All Sites (${healthData.uniqueSites.length})` 
+                        : healthData.uniqueSites.find(s => s.id === siteFilter)?.name || 'Filtered Site'}
+                    </span>
+                    {hasFilters && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Filtered</span>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-400">{healthData.total} component{healthData.total !== 1 ? 's' : ''} • Total exposure: {formatCurrency(healthData.exposure10)}</span>
+                </div>
+
+                {/* Summary cards */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {[
                     { label: 'Within 1 Year', value: healthData.exposure1, color: '#dc2626', count: healthData.sorted.filter(c => c.yearsRemaining <= 1).length },
@@ -441,6 +458,7 @@ export default function MonitoringPage() {
                     </div>
                   ))}
                 </div>
+
                 {/* Bar chart */}
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
                   <p className="text-xs font-bold text-gray-900 mb-4">Replacement Cost Timeline</p>
@@ -464,6 +482,128 @@ export default function MonitoringPage() {
                     );
                   })}
                 </div>
+
+                {/* Per-site exposure breakdown */}
+                {siteFilter === 'all' && healthData.uniqueSites.length > 1 && (() => {
+                  const siteExposures = healthData.uniqueSites.map(site => {
+                    const siteComps = healthData.sorted.filter(c => c.siteId === site.id);
+                    return {
+                      ...site,
+                      within1: siteComps.filter(c => c.yearsRemaining <= 1).reduce((s, c) => s + c.cost, 0),
+                      within3: siteComps.filter(c => c.yearsRemaining <= 3).reduce((s, c) => s + c.cost, 0),
+                      within5: siteComps.filter(c => c.yearsRemaining <= 5).reduce((s, c) => s + c.cost, 0),
+                      within10: siteComps.filter(c => c.yearsRemaining <= 10).reduce((s, c) => s + c.cost, 0),
+                      compCount: siteComps.filter(c => c.yearsRemaining <= 10).length,
+                    };
+                  }).filter(s => s.within10 > 0).sort((a, b) => b.within10 - a.within10);
+
+                  return siteExposures.length > 0 ? (
+                    <div className="bg-white rounded-xl border border-gray-200 p-5">
+                      <p className="text-xs font-bold text-gray-900 mb-1">Exposure by Site</p>
+                      <p className="text-[10px] text-gray-400 mb-4">Which sites have the most replacement costs coming due</p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="text-left text-[10px] font-medium text-gray-500 uppercase pb-2 pr-4">Site</th>
+                              <th className="text-right text-[10px] font-medium text-gray-500 uppercase pb-2 px-3">0-1yr</th>
+                              <th className="text-right text-[10px] font-medium text-gray-500 uppercase pb-2 px-3">1-3yr</th>
+                              <th className="text-right text-[10px] font-medium text-gray-500 uppercase pb-2 px-3">3-5yr</th>
+                              <th className="text-right text-[10px] font-medium text-gray-500 uppercase pb-2 px-3">5-10yr</th>
+                              <th className="text-right text-[10px] font-medium text-gray-500 uppercase pb-2 pl-3">Total 10yr</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {siteExposures.map(site => {
+                              const maxSiteExposure = siteExposures[0]?.within10 || 1;
+                              const barPct = (site.within10 / maxSiteExposure) * 100;
+                              return (
+                                <tr key={site.id} className="hover:bg-gray-50">
+                                  <td className="py-2.5 pr-4">
+                                    <div className="text-xs font-medium text-gray-900">{site.name}</div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <div className="flex-1 bg-gray-100 rounded-full h-1.5 max-w-[120px]">
+                                        <div className="h-full rounded-full" style={{ width: `${barPct}%`, backgroundColor: '#1d398f' }}></div>
+                                      </div>
+                                      <span className="text-[10px] text-gray-400">{site.compCount} items</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right text-xs tabular-nums" style={{ color: site.within1 > 0 ? '#dc2626' : '#d1d5db' }}>
+                                    {site.within1 > 0 ? formatCurrency(site.within1) : '—'}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right text-xs tabular-nums" style={{ color: (site.within3 - site.within1) > 0 ? '#ea580c' : '#d1d5db' }}>
+                                    {(site.within3 - site.within1) > 0 ? formatCurrency(site.within3 - site.within1) : '—'}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right text-xs tabular-nums" style={{ color: (site.within5 - site.within3) > 0 ? '#d97706' : '#d1d5db' }}>
+                                    {(site.within5 - site.within3) > 0 ? formatCurrency(site.within5 - site.within3) : '—'}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right text-xs tabular-nums" style={{ color: (site.within10 - site.within5) > 0 ? '#1d398f' : '#d1d5db' }}>
+                                    {(site.within10 - site.within5) > 0 ? formatCurrency(site.within10 - site.within5) : '—'}
+                                  </td>
+                                  <td className="py-2.5 pl-3 text-right text-xs font-bold text-gray-900 tabular-nums">
+                                    {formatCurrency(site.within10)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t-2 border-gray-300">
+                              <td className="pt-2.5 pr-4 text-xs font-bold text-gray-900">Portfolio Total</td>
+                              <td className="pt-2.5 px-3 text-right text-xs font-bold" style={{ color: healthData.exposure1 > 0 ? '#dc2626' : '#d1d5db' }}>{healthData.exposure1 > 0 ? formatCurrency(healthData.exposure1) : '—'}</td>
+                              <td className="pt-2.5 px-3 text-right text-xs font-bold" style={{ color: (healthData.exposure3 - healthData.exposure1) > 0 ? '#ea580c' : '#d1d5db' }}>{(healthData.exposure3 - healthData.exposure1) > 0 ? formatCurrency(healthData.exposure3 - healthData.exposure1) : '—'}</td>
+                              <td className="pt-2.5 px-3 text-right text-xs font-bold" style={{ color: (healthData.exposure5 - healthData.exposure3) > 0 ? '#d97706' : '#d1d5db' }}>{(healthData.exposure5 - healthData.exposure3) > 0 ? formatCurrency(healthData.exposure5 - healthData.exposure3) : '—'}</td>
+                              <td className="pt-2.5 px-3 text-right text-xs font-bold" style={{ color: (healthData.exposure10 - healthData.exposure5) > 0 ? '#1d398f' : '#d1d5db' }}>{(healthData.exposure10 - healthData.exposure5) > 0 ? formatCurrency(healthData.exposure10 - healthData.exposure5) : '—'}</td>
+                              <td className="pt-2.5 pl-3 text-right text-xs font-bold text-gray-900">{formatCurrency(healthData.exposure10)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+
+                {/* Top components by cost */}
+                {(() => {
+                  const topComps = healthData.sorted
+                    .filter(c => c.yearsRemaining <= 10)
+                    .sort((a, b) => b.cost - a.cost)
+                    .slice(0, 10);
+                  return topComps.length > 0 ? (
+                    <div className="bg-white rounded-xl border border-gray-200 p-5">
+                      <p className="text-xs font-bold text-gray-900 mb-1">Highest Cost Items (Next 10 Years)</p>
+                      <p className="text-[10px] text-gray-400 mb-4">Top components by replacement cost within the 10-year window</p>
+                      <div className="space-y-2">
+                        {topComps.map((comp, i) => {
+                          const ts = getTierStyle(comp.tier);
+                          const maxCost = topComps[0]?.cost || 1;
+                          const barPct = (comp.cost / maxCost) * 100;
+                          return (
+                            <div key={`${comp.siteId}-${comp.id}-${i}`} className="flex items-center gap-3">
+                              <span className="text-[10px] text-gray-400 w-4 text-right">{i + 1}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-medium text-gray-900 truncate">{comp.componentName || comp.description || 'Unnamed'}</span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0" style={{ backgroundColor: ts.bg, color: ts.text, border: `1px solid ${ts.border}` }}>
+                                    {comp.yearsRemaining <= 0 ? 'Overdue' : `${comp.yearsRemaining}yr`}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <div className="flex-1 bg-gray-100 rounded-full h-1.5 max-w-[200px]">
+                                    <div className="h-full rounded-full" style={{ width: `${barPct}%`, backgroundColor: ts.dot }}></div>
+                                  </div>
+                                  <span className="text-[10px] text-gray-400 flex-shrink-0">{comp.siteName}</span>
+                                </div>
+                              </div>
+                              <span className="text-xs font-bold text-gray-900 tabular-nums whitespace-nowrap">${Math.round(comp.cost).toLocaleString()}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+
               </div>
             )}
 
