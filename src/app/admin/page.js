@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc, deleteDoc, setDoc, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -39,6 +39,8 @@ export default function AdminPage() {
   const [userProfile, setUserProfile] = useState(null);
   const [users, setUsers] = useState([]);
   const [invitations, setInvitations] = useState([]);
+  const [auditTrail, setAuditTrail] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -199,6 +201,25 @@ export default function AdminPage() {
     }
   };
 
+  const loadAuditTrail = async () => {
+    if (auditTrail.length > 0) return; // Already loaded
+    setAuditLoading(true);
+    try {
+      const thirtyDaysAgo = Timestamp.fromDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+      const auditQuery = query(
+        collection(db, 'deletionAudit'),
+        orderBy('deletedAt', 'desc'),
+        limit(100)
+      );
+      const snapshot = await getDocs(auditQuery);
+      setAuditTrail(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (error) {
+      console.error('Error loading audit trail:', error);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -292,6 +313,16 @@ export default function AdminPage() {
               >
                 🎨 Branding & Settings
               </button>
+              <button
+                onClick={() => { setActiveTab('audit'); loadAuditTrail(); }}
+                className={`px-6 py-4 font-medium text-sm border-b-2 ${
+                  activeTab === 'audit'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🗂️ Audit Trail
+              </button>
             </nav>
           </div>
 
@@ -327,6 +358,106 @@ export default function AdminPage() {
                 onSave={handleUpdateOrganization}
                 setMessage={setMessage}
               />
+            )}
+
+            {activeTab === 'audit' && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Deletion Audit Trail</h2>
+                    <p className="text-sm text-gray-500 mt-1">Record of deleted projects and their associated data</p>
+                  </div>
+                  <button
+                    onClick={() => { setAuditTrail([]); loadAuditTrail(); }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+                  >
+                    ↻ Refresh
+                  </button>
+                </div>
+
+                {auditLoading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                    <p className="text-sm text-gray-500">Loading audit trail...</p>
+                  </div>
+                ) : auditTrail.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                    <div className="text-3xl mb-2">🗂️</div>
+                    <p className="text-sm text-gray-500">No deletions recorded yet</p>
+                    <p className="text-xs text-gray-400 mt-1">Deleted projects will appear here for auditing</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Project</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Project #</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Components</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Deleted By</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Location</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {auditTrail.map(entry => {
+                          const deletedDate = entry.deletedAt?.seconds
+                            ? new Date(entry.deletedAt.seconds * 1000)
+                            : null;
+                          const daysSince = deletedDate
+                            ? Math.floor((Date.now() - deletedDate.getTime()) / (1000 * 60 * 60 * 24))
+                            : null;
+                          const isRecent = daysSince !== null && daysSince <= 7;
+
+                          return (
+                            <tr key={entry.id} className={`hover:bg-gray-50 ${isRecent ? 'bg-red-50/30' : ''}`}>
+                              <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                                <div>{deletedDate ? deletedDate.toLocaleDateString() : '—'}</div>
+                                <div className="text-[10px] text-gray-400">
+                                  {deletedDate ? deletedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                  {daysSince !== null && (
+                                    <span className={`ml-1 ${isRecent ? 'text-red-500 font-medium' : ''}`}>
+                                      ({daysSince === 0 ? 'today' : daysSince === 1 ? 'yesterday' : `${daysSince}d ago`})
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="text-sm font-medium text-gray-900">{entry.siteName || 'Unknown'}</div>
+                                {entry.siteData?.numberOfUnits > 0 && (
+                                  <div className="text-[10px] text-gray-400">{entry.siteData.numberOfUnits} units</div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600 font-mono">{entry.projectNumber || '—'}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                                  {entry.componentCount || 0}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                  entry.siteData?.status === 'calculated' ? 'bg-blue-100 text-blue-700' :
+                                  entry.siteData?.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                  entry.siteData?.status === 'sent' ? 'bg-purple-100 text-purple-700' :
+                                  'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {entry.siteData?.status || 'draft'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{entry.deletedByEmail || '—'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-500">{entry.siteData?.location || '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <div className="mt-4 text-xs text-gray-400 text-center">
+                      Showing last {auditTrail.length} deletion{auditTrail.length !== 1 ? 's' : ''} • Records are retained for auditing purposes
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
           </div>

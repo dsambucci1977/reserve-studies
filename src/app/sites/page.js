@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, getDocs, doc, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, deleteDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -211,17 +211,53 @@ export default function SitesPage() {
   const handleDeleteSite = async (siteId, siteName, projectNumber, e) => {
     e.preventDefault(); e.stopPropagation();
     const displayName = projectNumber ? `${siteName} (${projectNumber})` : siteName;
-    if (!confirm(`Delete "${displayName}"? This will also delete all components and cannot be undone.`)) return;
+    if (!confirm(`Delete "${displayName}"?\n\nThis will permanently delete:\n• All components\n• Calculation results\n• Projections data\n\nThis cannot be undone.`)) return;
     try {
       setDeleting(siteId);
+
+      // Get site data for audit log before deleting
+      const siteDoc = await getDoc(doc(db, 'sites', siteId));
+      const siteData = siteDoc.exists() ? siteDoc.data() : {};
+
+      // Count components for audit log
       const componentsSnapshot = await getDocs(collection(db, `sites/${siteId}/components`));
+      const componentCount = componentsSnapshot.docs.length;
+
+      // 1. Delete all components
       await Promise.all(componentsSnapshot.docs.map(d => deleteDoc(d.ref)));
+
+      // 2. Delete projections
+      try {
+        await deleteDoc(doc(db, 'sites', siteId, 'projections', 'latest'));
+      } catch (e) { /* projections may not exist */ }
+
+      // 3. Delete the site document
       await deleteDoc(doc(db, 'sites', siteId));
+
+      // 4. Log to audit trail
+      try {
+        await addDoc(collection(db, 'deletionAudit'), {
+          action: 'site_deleted',
+          siteId,
+          siteName: siteName || 'Unknown',
+          projectNumber: projectNumber || '',
+          componentCount,
+          deletedBy: user.uid,
+          deletedByEmail: user.email || user.displayName || 'Unknown',
+          deletedAt: serverTimestamp(),
+          siteData: {
+            location: siteData.location || siteData.companyState || '',
+            numberOfUnits: siteData.numberOfUnits || 0,
+            status: siteData.status || 'draft',
+            createdAt: siteData.createdAt || null,
+          }
+        });
+      } catch (e) { console.warn('Could not log deletion audit:', e); }
+
       setSites(prev => prev.filter(s => s.id !== siteId));
-      alert('Site deleted successfully');
     } catch (error) {
       console.error('Error deleting site:', error);
-      alert('Error deleting site');
+      alert('Error deleting site. Please try again.');
     } finally {
       setDeleting(null);
     }
@@ -504,7 +540,7 @@ export default function SitesPage() {
                     const pmActive = project.studies.some(s => isPMRequired(s.companyState || s.state));
 
                     return (
-                      <div key={project.name} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 flex flex-col">
+                      <div key={project.name} className="group bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 flex flex-col">
                         
                         {/* Status accent bar */}
                         <div className="h-1.5 flex">
@@ -569,14 +605,35 @@ export default function SitesPage() {
                           {/* Footer */}
                           <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-xs text-gray-400">
                             <span>Updated {formatDate({ seconds: project.latestUpdate })}</span>
-                            {studyCount > 1 && (
-                              <span className="text-blue-500 font-medium">
-                                {isExpanded ? 'Hide ▲' : 'View ▼'}
-                              </span>
-                            )}
-                            {studyCount === 1 && (
-                              <span className="text-blue-500 font-medium">Open →</span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {studyCount === 1 && (
+                                <button
+                                  onClick={(e) => handleDeleteSite(project.studies[0].id, project.studies[0].siteName, project.studies[0].projectNumber, e)}
+                                  disabled={deleting === project.studies[0].id}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-500 p-0.5"
+                                  title="Delete project"
+                                >
+                                  {deleting === project.studies[0].id ? (
+                                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                    </svg>
+                                  ) : (
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  )}
+                                </button>
+                              )}
+                              {studyCount > 1 && (
+                                <span className="text-blue-500 font-medium">
+                                  {isExpanded ? 'Hide ▲' : 'View ▼'}
+                                </span>
+                              )}
+                              {studyCount === 1 && (
+                                <span className="text-blue-500 font-medium">Open →</span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -668,8 +725,24 @@ export default function SitesPage() {
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-xs text-gray-500">{formatDate({ seconds: project.latestUpdate })}</td>
-                              <td className="px-4 py-3 text-right text-xs text-blue-500 font-medium">
-                                {project.studies.length === 1 ? 'Open →' : (isExpanded ? 'Hide ▲' : 'Expand ▼')}
+                              <td className="px-4 py-3 text-right text-xs">
+                                <div className="flex items-center justify-end gap-2">
+                                  {project.studies.length === 1 && (
+                                    <button
+                                      onClick={(e) => handleDeleteSite(project.studies[0].id, project.studies[0].siteName, project.studies[0].projectNumber, e)}
+                                      disabled={deleting === project.studies[0].id}
+                                      className="text-gray-300 hover:text-red-500 transition-colors"
+                                      title="Delete project"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                  <span className="text-blue-500 font-medium">
+                                    {project.studies.length === 1 ? 'Open →' : (isExpanded ? 'Hide ▲' : 'Expand ▼')}
+                                  </span>
+                                </div>
                               </td>
                             </tr>
                             {/* Expanded rows */}
