@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc, deleteDoc, setDoc, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc, deleteDoc, setDoc, orderBy, limit, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -104,11 +104,18 @@ export default function AdminPage() {
   const loadInvitations = async (orgId) => {
     const invitesQuery = query(
       collection(db, 'invitations'), 
-      where('organizationId', '==', orgId),
-      where('status', '==', 'pending')
+      where('organizationId', '==', orgId)
     );
     const invitesSnapshot = await getDocs(invitesQuery);
     const invitesList = invitesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Sort: pending first, then by date
+    invitesList.sort((a, b) => {
+      const order = { pending: 0, accepted: 1, expired: 2 };
+      const aOrder = order[a.status] ?? 1;
+      const bOrder = order[b.status] ?? 1;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
+    });
     setInvitations(invitesList);
   };
 
@@ -135,24 +142,114 @@ export default function AdminPage() {
     }
   };
 
-  const handleInviteUser = async (email, role) => {
+  const handleInviteUser = async (email, role, customMessage) => {
     try {
+      // Check for existing pending invite
+      const existingQuery = query(
+        collection(db, 'invitations'),
+        where('email', '==', email),
+        where('organizationId', '==', organization.id),
+        where('status', '==', 'pending')
+      );
+      const existing = await getDocs(existingQuery);
+      if (!existing.empty) {
+        setMessage('An invitation is already pending for this email. You can resend it from the list below.');
+        return;
+      }
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
       const inviteData = {
         email,
         role,
+        customMessage: customMessage || '',
         organizationId: organization.id,
-        organizationName: organization.name,
+        organizationName: organization.name || 'Your Organization',
         status: 'pending',
-        createdAt: new Date(),
-        invitedBy: user.uid
+        createdAt: serverTimestamp(),
+        expiresAt: Timestamp.fromDate(expiresAt),
+        invitedBy: user.uid,
+        invitedByEmail: user.email || '',
+        resendCount: 0,
       };
-      
-      await addDoc(collection(db, 'invitations'), inviteData);
+
+      const docRef = await addDoc(collection(db, 'invitations'), inviteData);
+
+      // Try EmailJS if configured
+      const orgSettings = organization.settings || {};
+      const emailjsConfigured = orgSettings.emailjsServiceId && orgSettings.emailjsTemplateId && orgSettings.emailjsPublicKey;
+      let emailSent = false;
+
+      if (emailjsConfigured && window.emailjs) {
+        try {
+          const signupUrl = `${window.location.origin}/auth/signup?token=${docRef.id}`;
+          await window.emailjs.send(orgSettings.emailjsServiceId, orgSettings.emailjsTemplateId, {
+            to_email: email,
+            to_name: email.split('@')[0],
+            from_name: organization.name || 'Pronoia Solutions',
+            role: role,
+            organization_name: organization.name || 'Your Organization',
+            custom_message: customMessage || 'You have been invited to join our reserve study management platform.',
+            signup_url: signupUrl,
+            expires_date: expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+          }, orgSettings.emailjsPublicKey);
+          emailSent = true;
+        } catch (emailErr) {
+          console.warn('EmailJS failed, invite created without email:', emailErr);
+        }
+      }
+
       await loadInvitations(organization.id);
-      setMessage(`Invitation sent to ${email}`);
+      setMessage(emailSent
+        ? `Invitation emailed to ${email}`
+        : `Invitation created for ${email}. Copy the invite link to share it.`
+      );
     } catch (error) {
       console.error('Error sending invitation:', error);
       setMessage('Error sending invitation');
+    }
+  };
+
+  const handleResendInvite = async (inviteId, email) => {
+    try {
+      const newExpires = new Date();
+      newExpires.setDate(newExpires.getDate() + 7);
+
+      await updateDoc(doc(db, 'invitations', inviteId), {
+        status: 'pending',
+        expiresAt: Timestamp.fromDate(newExpires),
+        resentAt: serverTimestamp(),
+        resendCount: (await getDoc(doc(db, 'invitations', inviteId))).data()?.resendCount + 1 || 1,
+      });
+
+      // Try EmailJS resend
+      const orgSettings = organization.settings || {};
+      const emailjsConfigured = orgSettings.emailjsServiceId && orgSettings.emailjsTemplateId && orgSettings.emailjsPublicKey;
+      let emailSent = false;
+
+      if (emailjsConfigured && window.emailjs) {
+        try {
+          const signupUrl = `${window.location.origin}/auth/signup?token=${inviteId}`;
+          await window.emailjs.send(orgSettings.emailjsServiceId, orgSettings.emailjsTemplateId, {
+            to_email: email,
+            to_name: email.split('@')[0],
+            from_name: organization.name || 'Pronoia Solutions',
+            role: 'specialist',
+            organization_name: organization.name || 'Your Organization',
+            custom_message: 'This is a reminder about your pending invitation.',
+            signup_url: signupUrl,
+            expires_date: newExpires.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+          }, orgSettings.emailjsPublicKey);
+          emailSent = true;
+        } catch (e) { console.warn('EmailJS resend failed:', e); }
+      }
+
+      await loadInvitations(organization.id);
+      setMessage(emailSent ? `Invitation re-sent to ${email}` : `Invitation renewed for ${email}. Copy the link to share.`);
+    } catch (error) {
+      console.error('Error resending invitation:', error);
+      setMessage('Error resending invitation');
     }
   };
 
@@ -342,6 +439,8 @@ export default function AdminPage() {
                 invitations={invitations}
                 onInvite={handleInviteUser}
                 onCancel={handleCancelInvitation}
+                onResend={handleResendInvite}
+                organization={organization}
               />
             )}
 
@@ -470,61 +569,112 @@ export default function AdminPage() {
 
 // ==================== USERS TAB ====================
 function UsersTab({ users, currentUserId, onUpdateRole, onDeactivate }) {
+
+  const formatLastLogin = (ts) => {
+    if (!ts) return null;
+    const d = ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
+    const diffMs = Date.now() - d.getTime();
+    const diffMin = Math.floor(diffMs / (1000 * 60));
+    const diffHr = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMin < 5) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHr < 24) return `${diffHr}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return d.toLocaleDateString();
+  };
+
+  const getActivityBadge = (user) => {
+    if (!user.lastLoginAt) return { label: 'Never signed in', color: 'bg-gray-100 text-gray-600' };
+    const d = user.lastLoginAt.seconds ? new Date(user.lastLoginAt.seconds * 1000) : new Date(user.lastLoginAt);
+    const diffDays = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays > 30) return { label: 'Inactive 30+ days', color: 'bg-red-100 text-red-600' };
+    if (diffDays > 7) return { label: `${diffDays}d inactive`, color: 'bg-amber-100 text-amber-700' };
+    return { label: 'Active', color: 'bg-green-100 text-green-700' };
+  };
+
   return (
     <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-4">Active Users</h2>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Team Members</h2>
+          <p className="text-xs text-gray-500 mt-0.5">{users.length} user{users.length !== 1 ? 's' : ''} in your organization</p>
+        </div>
+      </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">User</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actions</th>
+              <th className="px-5 py-3 text-left text-xs font-medium text-gray-700 uppercase">User</th>
+              <th className="px-5 py-3 text-left text-xs font-medium text-gray-700 uppercase">Role</th>
+              <th className="px-5 py-3 text-left text-xs font-medium text-gray-700 uppercase">Activity</th>
+              <th className="px-5 py-3 text-left text-xs font-medium text-gray-700 uppercase">Last Login</th>
+              <th className="px-5 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
+              <th className="px-5 py-3 text-right text-xs font-medium text-gray-700 uppercase">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {users.map(u => (
-              <tr key={u.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {u.displayName || 'No name'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                  {u.email}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <select
-                    value={u.role || 'specialist'}
-                    onChange={(e) => onUpdateRole(u.id, e.target.value)}
-                    disabled={u.id === currentUserId}
-                    className="text-sm border border-gray-300 rounded px-2 py-1 bg-white text-gray-900"
-                  >
-                    <option value="specialist">Specialist</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    u.status === 'active' 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {u.status || 'active'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  {u.id !== currentUserId && u.status === 'active' && (
-                    <button
-                      onClick={() => onDeactivate(u.id)}
-                      className="text-red-600 hover:text-red-800"
+          <tbody className="bg-white divide-y divide-gray-100">
+            {users.map(u => {
+              const activity = getActivityBadge(u);
+              return (
+                <tr key={u.id} className="hover:bg-gray-50">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#dbebff' }}>
+                        <span className="text-xs font-bold" style={{ color: '#1d398f' }}>{(u.displayName || u.email || '?')[0].toUpperCase()}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{u.displayName || 'No name'}</p>
+                        <p className="text-[11px] text-gray-400">{u.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <select
+                      value={u.role || 'specialist'}
+                      onChange={(e) => onUpdateRole(u.id, e.target.value)}
+                      disabled={u.id === currentUserId}
+                      className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Deactivate
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                      <option value="specialist">Specialist</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${activity.color}`}>
+                      {activity.label}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-xs text-gray-500">
+                    {formatLastLogin(u.lastLoginAt) || '—'}
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                      u.status === 'active' || !u.status
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}>
+                      {u.status || 'active'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    {u.id !== currentUserId && (u.status === 'active' || !u.status) && (
+                      <button
+                        onClick={() => onDeactivate(u.id)}
+                        className="text-[11px] px-2.5 py-1 rounded-md bg-red-50 text-red-500 hover:bg-red-100 font-medium transition-colors"
+                      >
+                        Deactivate
+                      </button>
+                    )}
+                    {u.id === currentUserId && (
+                      <span className="text-[10px] text-gray-400 italic">You</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -533,73 +683,310 @@ function UsersTab({ users, currentUserId, onUpdateRole, onDeactivate }) {
 }
 
 // ==================== INVITATIONS TAB ====================
-function InvitationsTab({ invitations, onInvite, onCancel }) {
+function InvitationsTab({ invitations, onInvite, onCancel, onResend, organization }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('specialist');
+  const [customMessage, setCustomMessage] = useState('');
+  const [showMessage, setShowMessage] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!email.trim()) return;
-    onInvite(email.trim(), role);
+    onInvite(email.trim(), role, customMessage.trim());
     setEmail('');
     setRole('specialist');
+    setCustomMessage('');
+    setShowMessage(false);
   };
+
+  const copyInviteLink = (inviteId) => {
+    const url = `${window.location.origin}/auth/signup?token=${inviteId}`;
+    navigator.clipboard.writeText(url);
+    setCopiedId(inviteId);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const getInviteStatus = (invite) => {
+    if (invite.status === 'accepted') return { label: 'Accepted', color: 'bg-green-100 text-green-700', icon: '✅' };
+    if (invite.status === 'expired') return { label: 'Expired', color: 'bg-red-100 text-red-700', icon: '🔴' };
+
+    // Check if pending but expired by date
+    const expiresAt = invite.expiresAt?.seconds
+      ? new Date(invite.expiresAt.seconds * 1000)
+      : invite.expiresAt ? new Date(invite.expiresAt) : null;
+
+    if (expiresAt && expiresAt < new Date()) return { label: 'Expired', color: 'bg-red-100 text-red-700', icon: '🔴' };
+    return { label: 'Pending', color: 'bg-amber-100 text-amber-700', icon: '🟡' };
+  };
+
+  const formatRelativeDate = (ts) => {
+    if (!ts) return 'N/A';
+    const d = ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
+    const diff = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    return `${diff} days ago`;
+  };
+
+  const getExpiresIn = (invite) => {
+    const expiresAt = invite.expiresAt?.seconds
+      ? new Date(invite.expiresAt.seconds * 1000)
+      : invite.expiresAt ? new Date(invite.expiresAt) : null;
+    if (!expiresAt) return '';
+    const diff = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    if (diff <= 0) return 'Expired';
+    if (diff === 1) return '1 day left';
+    return `${diff} days left`;
+  };
+
+  const emailjsConfigured = organization?.settings?.emailjsServiceId && organization?.settings?.emailjsTemplateId && organization?.settings?.emailjsPublicKey;
+
+  // Separate invites by status
+  const pendingInvites = invitations.filter(i => getInviteStatus(i).label === 'Pending');
+  const acceptedInvites = invitations.filter(i => getInviteStatus(i).label === 'Accepted');
+  const expiredInvites = invitations.filter(i => getInviteStatus(i).label === 'Expired');
 
   return (
     <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-4">Invite New User</h2>
-      
-      <form onSubmit={handleSubmit} className="mb-8 flex gap-4 items-end">
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="user@example.com"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="specialist">Specialist</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
-        <button
-          type="submit"
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-        >
-          Send Invite
-        </button>
-      </form>
+      {/* Send invite form */}
+      <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Invite a New User</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          {emailjsConfigured
+            ? 'An email will be sent with a signup link that expires in 7 days.'
+            : 'A signup link will be generated. Copy it and send it to the user manually.'}
+        </p>
 
-      {invitations.length > 0 && (
-        <>
-          <h3 className="text-lg font-bold text-gray-900 mb-3">Pending Invitations</h3>
-          <div className="space-y-3">
-            {invitations.map(invite => (
-              <div key={invite.id} className="flex items-center justify-between bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div>
-                  <p className="font-medium text-gray-900">{invite.email}</p>
-                  <p className="text-sm text-gray-600">Role: {invite.role} • Sent: {invite.createdAt?.seconds ? new Date(invite.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
-                </div>
-                <button
-                  onClick={() => onCancel(invite.id)}
-                  className="text-red-600 hover:text-red-800 text-sm font-medium"
-                >
-                  Cancel
-                </button>
-              </div>
-            ))}
+        <form onSubmit={handleSubmit}>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="colleague@example.com"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="specialist">Specialist</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <button
+              type="submit"
+              className="px-5 py-2 text-white rounded-lg font-medium text-sm transition-colors"
+              style={{ backgroundColor: '#1d398f' }}
+            >
+              {emailjsConfigured ? 'Send Invite' : 'Create Invite'}
+            </button>
           </div>
-        </>
+
+          {/* Custom message toggle */}
+          <div className="mt-3">
+            {!showMessage ? (
+              <button
+                type="button"
+                onClick={() => setShowMessage(true)}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+              >
+                + Add a personal message
+              </button>
+            ) : (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Personal Message (optional)</label>
+                <textarea
+                  value={customMessage}
+                  onChange={e => setCustomMessage(e.target.value)}
+                  placeholder="Welcome to the team! We're excited to have you..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                  maxLength={500}
+                />
+                <div className="flex justify-between mt-1">
+                  <button type="button" onClick={() => { setShowMessage(false); setCustomMessage(''); }} className="text-xs text-gray-400 hover:text-gray-600">Remove message</button>
+                  <span className="text-xs text-gray-400">{customMessage.length}/500</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </form>
+      </div>
+
+      {/* EmailJS setup hint */}
+      {!emailjsConfigured && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex gap-3">
+            <span className="text-lg">💡</span>
+            <div>
+              <p className="text-xs font-medium text-blue-900">Want to send emails automatically?</p>
+              <p className="text-xs text-blue-700 mt-0.5">
+                Go to <strong>Branding & Settings</strong> tab to configure EmailJS (free, 200 emails/month). 
+                Until then, copy the invite link and email it yourself.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invitation list */}
+      {invitations.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+          <div className="text-3xl mb-2">✉️</div>
+          <p className="text-sm text-gray-500">No invitations yet</p>
+          <p className="text-xs text-gray-400 mt-1">Use the form above to invite team members</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Pending */}
+          {pendingInvites.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                Pending ({pendingInvites.length})
+              </h3>
+              <div className="space-y-2">
+                {pendingInvites.map(invite => {
+                  const expiresIn = getExpiresIn(invite);
+                  return (
+                    <div key={invite.id} className="bg-white border border-amber-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-100">
+                            <span className="text-amber-700 text-xs font-bold">{(invite.email || '?')[0].toUpperCase()}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{invite.email}</p>
+                            <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                              <span className="capitalize">{invite.role || 'specialist'}</span>
+                              <span>•</span>
+                              <span>Sent {formatRelativeDate(invite.resentAt || invite.createdAt)}</span>
+                              {invite.resendCount > 0 && (
+                                <span className="text-blue-500 font-medium">• Resent ×{invite.resendCount}</span>
+                              )}
+                              <span>•</span>
+                              <span className={expiresIn === 'Expired' ? 'text-red-500 font-medium' : expiresIn.includes('1 day') ? 'text-amber-600 font-medium' : ''}>
+                                {expiresIn}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                          <button
+                            onClick={() => copyInviteLink(invite.id)}
+                            className={`text-[11px] px-2.5 py-1 rounded-md font-medium transition-colors ${
+                              copiedId === invite.id
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {copiedId === invite.id ? '✓ Copied!' : 'Copy Link'}
+                          </button>
+                          <button
+                            onClick={() => onResend(invite.id, invite.email)}
+                            className="text-[11px] px-2.5 py-1 rounded-md font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          >
+                            Resend
+                          </button>
+                          <button
+                            onClick={() => onCancel(invite.id)}
+                            className="text-[11px] px-2.5 py-1 rounded-md font-medium bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                      {invite.customMessage && (
+                        <div className="mt-2 pl-12 text-xs text-gray-400 italic truncate">&quot;{invite.customMessage}&quot;</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Accepted */}
+          {acceptedInvites.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                Accepted ({acceptedInvites.length})
+              </h3>
+              <div className="space-y-2">
+                {acceptedInvites.map(invite => (
+                  <div key={invite.id} className="bg-green-50/50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center bg-green-100">
+                          <span className="text-green-700 text-xs font-bold">✓</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{invite.email}</p>
+                          <div className="text-[11px] text-gray-500">
+                            <span className="capitalize">{invite.role || 'specialist'}</span>
+                            <span> • Accepted {formatRelativeDate(invite.acceptedAt || invite.createdAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Joined</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Expired */}
+          {expiredInvites.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                Expired ({expiredInvites.length})
+              </h3>
+              <div className="space-y-2">
+                {expiredInvites.map(invite => (
+                  <div key={invite.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4 opacity-75">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center bg-gray-200">
+                          <span className="text-gray-500 text-xs font-bold">✕</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-600">{invite.email}</p>
+                          <div className="text-[11px] text-gray-400">
+                            <span className="capitalize">{invite.role || 'specialist'}</span>
+                            <span> • Sent {formatRelativeDate(invite.createdAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => onResend(invite.id, invite.email)}
+                          className="text-[11px] px-2.5 py-1 rounded-md font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                        >
+                          Re-invite
+                        </button>
+                        <button
+                          onClick={() => onCancel(invite.id)}
+                          className="text-[11px] px-2.5 py-1 rounded-md font-medium bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -806,6 +1193,9 @@ function OrganizationSettingsTab({ organization, onSave, setMessage }) {
     website: organization?.settings?.website || '',
     preparedBy: organization?.settings?.preparedBy || '',
     licenseNumber: organization?.settings?.licenseNumber || '',
+    emailjsServiceId: organization?.settings?.emailjsServiceId || '',
+    emailjsTemplateId: organization?.settings?.emailjsTemplateId || '',
+    emailjsPublicKey: organization?.settings?.emailjsPublicKey || '',
   });
   const [logoUploading, setLogoUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -852,6 +1242,9 @@ function OrganizationSettingsTab({ organization, onSave, setMessage }) {
       'settings.website': formData.website,
       'settings.preparedBy': formData.preparedBy,
       'settings.licenseNumber': formData.licenseNumber,
+      'settings.emailjsServiceId': formData.emailjsServiceId.trim(),
+      'settings.emailjsTemplateId': formData.emailjsTemplateId.trim(),
+      'settings.emailjsPublicKey': formData.emailjsPublicKey.trim(),
     });
     setSaving(false);
   };
@@ -998,6 +1391,69 @@ function OrganizationSettingsTab({ organization, onSave, setMessage }) {
       </div>
 
       {/* Save Button */}
+      {/* EmailJS Configuration */}
+      <div className="border-t border-gray-200 pt-6 mb-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-1">Email Integration (EmailJS)</h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Configure EmailJS to automatically send invitation emails. Free tier: 200 emails/month.
+          {' '}<a href="https://www.emailjs.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">Set up at emailjs.com</a>
+        </p>
+
+        {formData.emailjsServiceId && formData.emailjsTemplateId && formData.emailjsPublicKey ? (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 flex items-center gap-2">
+            <span className="text-green-600">✓</span>
+            <span className="text-xs text-green-800 font-medium">EmailJS is configured — invitation emails will be sent automatically</span>
+          </div>
+        ) : (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-center gap-2">
+            <span className="text-amber-600">⚠</span>
+            <span className="text-xs text-amber-800 font-medium">EmailJS not configured — you&apos;ll need to copy invite links manually</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Service ID</label>
+            <input
+              type="text"
+              value={formData.emailjsServiceId}
+              onChange={(e) => handleChange('emailjsServiceId', e.target.value)}
+              placeholder="service_xxxxxxx"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Template ID</label>
+            <input
+              type="text"
+              value={formData.emailjsTemplateId}
+              onChange={(e) => handleChange('emailjsTemplateId', e.target.value)}
+              placeholder="template_xxxxxxx"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Public Key</label>
+            <input
+              type="text"
+              value={formData.emailjsPublicKey}
+              onChange={(e) => handleChange('emailjsPublicKey', e.target.value)}
+              placeholder="xxxxxxxxxxxxxxx"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+            />
+          </div>
+        </div>
+        <div className="mt-3 bg-gray-50 rounded-lg p-3">
+          <p className="text-[11px] font-medium text-gray-700 mb-1.5">Quick Setup Guide:</p>
+          <ol className="text-[11px] text-gray-500 space-y-1 list-decimal list-inside">
+            <li>Create a free account at <a href="https://www.emailjs.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">emailjs.com</a></li>
+            <li>Add an email service (Gmail, Outlook, etc.) — copy the <strong>Service ID</strong></li>
+            <li>Create an email template using these variables: <code className="bg-gray-200 px-1 rounded text-[10px]">{'{{to_email}} {{to_name}} {{from_name}} {{role}} {{organization_name}} {{custom_message}} {{signup_url}} {{expires_date}}'}</code></li>
+            <li>Copy the <strong>Template ID</strong> and your <strong>Public Key</strong> (from Account → API Keys)</li>
+          </ol>
+        </div>
+      </div>
+
       <div className="flex justify-end">
         <button
           onClick={handleSubmit}

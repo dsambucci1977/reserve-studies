@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import Link from 'next/link';
 
 export default function SignInPage() {
@@ -27,7 +28,11 @@ export default function SignInPage() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // Track last login
+      try {
+        await updateDoc(doc(db, 'users', userCredential.user.uid), { lastLoginAt: serverTimestamp() });
+      } catch (e) { /* user doc may not exist yet for legacy accounts */ }
       router.push('/');
     } catch (error) {
       console.error('Sign in error:', error);
