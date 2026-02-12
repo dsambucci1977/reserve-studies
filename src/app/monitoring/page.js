@@ -428,16 +428,27 @@ export default function MonitoringPage() {
             {healthView === 'exposure' && (
               <div className="space-y-5">
 
-                {/* Scope indicator */}
+                {/* Scope / Site filter bar */}
                 <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-gray-900">
-                      {siteFilter === 'all' 
-                        ? `All Sites (${healthData.uniqueSites.length})` 
-                        : healthData.uniqueSites.find(s => s.id === siteFilter)?.name || 'Filtered Site'}
-                    </span>
-                    {hasFilters && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Filtered</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Showing</span>
+                    <select 
+                      value={siteFilter} 
+                      onChange={e => setSiteFilter(e.target.value)} 
+                      className="text-xs font-bold px-3 py-1.5 border border-gray-200 rounded-lg text-gray-900 bg-white hover:border-blue-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+                    >
+                      <option value="all">All Sites ({healthData.uniqueSites.length})</option>
+                      {healthData.uniqueSites.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}{s.projectNumber ? ` (${s.projectNumber})` : ''}</option>
+                      ))}
+                    </select>
+                    {siteFilter !== 'all' && (
+                      <button 
+                        onClick={() => setSiteFilter('all')}
+                        className="text-[10px] text-red-500 hover:text-red-700 font-medium"
+                      >
+                        ✕ Clear
+                      </button>
                     )}
                   </div>
                   <span className="text-xs text-gray-400">{healthData.total} component{healthData.total !== 1 ? 's' : ''} • Total exposure: {formatCurrency(healthData.exposure10)}</span>
