@@ -114,7 +114,7 @@ export default function NewSitePage() {
                 value={projectNumber}
                 onChange={(e) => setProjectNumber(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., 25CA 003"
+                placeholder="e.g., 26NJ-101"
                 required
               />
               <p className="text-sm text-gray-500 mt-1">
@@ -132,7 +132,7 @@ export default function NewSitePage() {
                 value={siteName}
                 onChange={(e) => setSiteName(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., Willow Park Condominium Association"
+                placeholder="e.g., Oakridge Towers Homeowners Association"
                 required
               />
             </div>
@@ -147,7 +147,7 @@ export default function NewSitePage() {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., Hoboken, New Jersey"
+                placeholder="e.g., Springfield, New Jersey"
                 required
               />
             </div>
@@ -162,7 +162,7 @@ export default function NewSitePage() {
                 value={numberOfUnits}
                 onChange={(e) => setNumberOfUnits(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., 71"
+                placeholder="e.g., 48"
                 required
                 min="1"
               />

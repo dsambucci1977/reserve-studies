@@ -111,7 +111,7 @@ export default function ProjectInfoPage() {
                   {...register('projectNumber', { required: true })}
                   defaultValue={site?.projectNumber}
                   className="w-full px-3 py-2 border rounded text-gray-900"
-                  placeholder="25CA 003"
+                  placeholder="26NJ-101"
                 />
               </div>
               
@@ -123,7 +123,7 @@ export default function ProjectInfoPage() {
                   {...register('siteName', { required: true })}
                   defaultValue={site?.siteName}
                   className="w-full px-3 py-2 border rounded text-gray-900"
-                  placeholder="Willow Park Condominium Association"
+                  placeholder="Oakridge Towers HOA"
                 />
               </div>
               
@@ -135,7 +135,7 @@ export default function ProjectInfoPage() {
                   {...register('location', { required: true })}
                   defaultValue={site?.location}
                   className="w-full px-3 py-2 border rounded text-gray-900"
-                  placeholder="Hoboken, New Jersey"
+                  placeholder="Springfield, New Jersey"
                 />
               </div>
             </div>
@@ -193,7 +193,7 @@ export default function ProjectInfoPage() {
                   {...register('companyCity')}
                   defaultValue={site?.companyCity}
                   className="w-full px-3 py-2 border rounded text-gray-900"
-                  placeholder="Hoboken"
+                  placeholder="Springfield"
                 />
               </div>
               
