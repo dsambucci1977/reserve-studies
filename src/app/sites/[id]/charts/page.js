@@ -179,7 +179,7 @@ export default function ChartsPage() {
             href={`/sites/${siteId}`}
             className="inline-block px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
           >
-            ← Back to Site
+            ← Back to Project
           </Link>
         </div>
       </div>

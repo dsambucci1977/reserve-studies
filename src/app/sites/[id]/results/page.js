@@ -199,7 +199,7 @@ export default function ResultsPage() {
     <div className="min-h-screen bg-gray-50">
       <main className="w-full px-6 py-8">
         <Link href={`/sites/${siteId}`} className="text-red-600 hover:text-red-700 font-medium">
-          ← Back to Site
+          ← Back to Project
         </Link>
         
         <div className="mt-6 mb-6 flex justify-between items-start">

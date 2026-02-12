@@ -52,7 +52,7 @@ export default function Navigation() {
           {/* Navigation Links */}
           <div className="flex items-center space-x-1">
             
-            {navLink('/sites', 'Sites')}
+            {navLink('/sites', 'Projects')}
             {navLink('/monitoring', 'Health')}
             {navLink('/notes', 'Notes')}
             {navLink('/profile', 'Profile')}

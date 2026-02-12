@@ -275,7 +275,7 @@ export default function ProfilePage() {
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <div className="text-sm font-semibold text-gray-900">Manage Sites</div>
+                    <div className="text-sm font-semibold text-gray-900">Manage Projects</div>
                     <div className="text-xs text-gray-400">View all projects</div>
                   </div>
                   <span className="text-gray-300 group-hover:text-blue-500 transition-colors">→</span>

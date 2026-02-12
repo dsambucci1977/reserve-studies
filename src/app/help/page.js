@@ -18,7 +18,7 @@ const faqSections = [
     items: [
       {
         q: 'How do I create a new reserve study project?',
-        a: 'From the Dashboard, click "Manage Projects" → then click the "+ New Site" button in the top right. Fill in the site name, project number, and address. Once created, you\'ll be taken to the site detail page where you can add project information and components.'
+        a: 'From the Dashboard, click "Manage Projects" → then click the "+ New Project" button in the top right. Fill in the site name, project number, and address. Once created, you\'ll be taken to the site detail page where you can add project information and components.'
       },
       {
         q: 'What is the typical workflow for a reserve study?',

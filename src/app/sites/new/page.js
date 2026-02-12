@@ -1,5 +1,5 @@
 // src/app/sites/new/page.js
-// Create New Site - Basic site creation form
+// Create New Project - Basic site creation form
 
 'use client';
 
@@ -87,12 +87,12 @@ export default function NewSitePage() {
             href="/sites"
             className="text-blue-600 hover:text-blue-700 text-sm font-medium"
           >
-            ← Back to Sites
+            ← Back to Projects
           </Link>
         </div>
 
         <div className="bg-white rounded-lg shadow p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New Site</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New Project</h1>
           <p className="text-gray-600 mb-8">
             Enter basic information to get started. You can add detailed project info and components later.
           </p>
@@ -189,7 +189,7 @@ export default function NewSitePage() {
                 disabled={loading}
                 className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {loading ? 'Creating...' : 'Create Site'}
+                {loading ? 'Creating...' : 'Create Project'}
               </button>
               <Link
                 href="/sites"

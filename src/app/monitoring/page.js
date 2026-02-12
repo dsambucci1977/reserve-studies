@@ -122,7 +122,7 @@ export default function MonitoringPage() {
     const uniqueSites = [...new Map(enriched.map(c => [c.siteId, { id: c.siteId, name: c.siteName, projectNumber: c.projectNumber }])).values()];
     const uniqueCategories = [...new Set(enriched.map(c => c.category).filter(Boolean))].sort();
 
-    return { critical, warning, healthy, exposure1, exposure3, exposure5, exposure10, siteSummaries, sorted, uniqueSites, uniqueCategories, total: filtered.length, totalAll: enriched.length };
+    return { critical, warning, healthy, exposure1, exposure3, exposure5, exposure10, siteSummaries, sorted, uniqueSites, uniqueCategories, total: filtered.length, totalAll: enriched.length, allCritical: enriched.filter(c => c.tier === 'critical'), allWarning: enriched.filter(c => c.tier === 'warning'), allHealthy: enriched.filter(c => c.tier === 'healthy'), enriched };
   }, [allComponents, thresholds, siteFilter, categoryFilter, tierFilter, pmFilter, searchTerm]);
 
   const formatCurrency = (val) => {
@@ -178,15 +178,15 @@ export default function MonitoringPage() {
             </div>
             <div className="hidden md:flex items-center gap-6 text-center">
               <div>
-                <div className="text-2xl font-bold text-red-300">{healthData.critical.length}</div>
+                <div className="text-2xl font-bold text-red-300">{healthData.allCritical.length}</div>
                 <div className="text-[10px] text-blue-200 uppercase tracking-wide">Critical</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-amber-300">{healthData.warning.length}</div>
+                <div className="text-2xl font-bold text-amber-300">{healthData.allWarning.length}</div>
                 <div className="text-[10px] text-blue-200 uppercase tracking-wide">Warning</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-green-300">{healthData.healthy.length}</div>
+                <div className="text-2xl font-bold text-green-300">{healthData.allHealthy.length}</div>
                 <div className="text-[10px] text-blue-200 uppercase tracking-wide">Healthy</div>
               </div>
               <div>
@@ -522,21 +522,9 @@ export default function MonitoringPage() {
 
                     {/* === SITE DRILL-DOWN DETAIL === */}
                     {selectedSiteId && (() => {
-                      const siteComps = healthData.sorted.filter(c => c.siteId === selectedSiteId).length > 0
-                        ? allComponents.map(comp => {
-                            const currentYear = new Date().getFullYear();
-                            const rul = parseFloat(comp.remainingUsefulLife) || 0;
-                            const ul = parseFloat(comp.usefulLife) || 20;
-                            const replacementYear = comp.beginningYear + rul;
-                            const yearsRemaining = replacementYear - currentYear;
-                            const cost = parseFloat(comp.totalCost) || 0;
-                            const isPM = comp.isPreventiveMaintenance || comp.pm || false;
-                            let tier = 'healthy';
-                            if (yearsRemaining <= thresholds.critical) tier = 'critical';
-                            else if (yearsRemaining <= thresholds.warning) tier = 'warning';
-                            return { ...comp, replacementYear, yearsRemaining, cost, isPM, usefulLifeNum: ul, tier };
-                          }).filter(c => c.siteId === selectedSiteId).sort((a, b) => a.yearsRemaining - b.yearsRemaining)
-                        : [];
+                      const siteComps = healthData.enriched
+                        .filter(c => c.siteId === selectedSiteId)
+                        .sort((a, b) => a.yearsRemaining - b.yearsRemaining);
                       const siteSummary = healthData.siteSummaries.find(s => s.siteId === selectedSiteId);
                       if (!siteSummary || siteComps.length === 0) return null;
 
