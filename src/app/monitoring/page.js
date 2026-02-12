@@ -200,7 +200,8 @@ export default function MonitoringPage() {
 
       <div className="w-full px-6 -mt-8 relative z-10">
 
-        {/* Filters Bar */}
+        {/* Filters Bar - only for Expiring Soonest */}
+        {healthView === 'urgency' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-5">
           <div className="flex flex-wrap items-center gap-3">
             {/* Search */}
@@ -293,6 +294,7 @@ export default function MonitoringPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* View Tabs */}
         <div className="flex gap-1 mb-5">
@@ -309,7 +311,13 @@ export default function MonitoringPage() {
           ].map(tab => (
             <button
               key={tab.key}
-              onClick={() => setHealthView(tab.key)}
+              onClick={() => {
+                setHealthView(tab.key);
+                if (tab.key !== 'urgency') {
+                  setSiteFilter('all'); setCategoryFilter('all'); setTierFilter('all'); setPmFilter('all'); setSearchTerm('');
+                }
+                if (tab.key !== 'sites') setSelectedSiteId(null);
+              }}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border transition-all ${
                 healthView === tab.key
                   ? 'text-white shadow-sm'
