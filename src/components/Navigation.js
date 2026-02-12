@@ -53,8 +53,10 @@ export default function Navigation() {
           <div className="flex items-center space-x-1">
             
             {navLink('/sites', 'Sites')}
+            {navLink('/monitoring', 'Health')}
             {navLink('/notes', 'Notes')}
             {navLink('/profile', 'Profile')}
+            {navLink('/help', 'Help')}
 
             {/* Admin Link - Only for admin/super_admin users */}
             {isAdmin && navLink('/admin', 'Admin')}
