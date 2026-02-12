@@ -103,7 +103,7 @@ export default function NewComponentPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="w-full px-6 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-red-600">Pronoia Reserve Studies</h1>
             <div className="flex gap-4">
@@ -115,7 +115,7 @@ export default function NewComponentPage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="w-full px-6 py-8">
         <Link href={`/sites/${siteId}/components`} className="text-red-600 hover:text-red-700 font-medium">
           ← Back to Components
         </Link>

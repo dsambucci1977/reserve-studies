@@ -85,7 +85,7 @@ export default function ProjectInfoPage() {
     <div className="min-h-screen bg-gray-50">
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="w-full px-6 py-8">
         <Link href={`/sites/${siteId}`} className="text-red-600 hover:text-red-700 font-medium">
           ← Back to Site
         </Link>

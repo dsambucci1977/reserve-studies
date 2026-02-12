@@ -215,7 +215,7 @@ export default function ComponentsListPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-full mx-auto px-4">
+      <div className="w-full px-6">
         
         <Link href={`/sites/${siteId}`} className="text-red-600 hover:text-red-800 mb-4 inline-block">
           ← Back to Site

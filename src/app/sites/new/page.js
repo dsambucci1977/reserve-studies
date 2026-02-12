@@ -81,7 +81,7 @@ export default function NewSitePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Main Content */}
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="w-full px-6 py-8">
         <div className="mb-6">
           <Link
             href="/sites"

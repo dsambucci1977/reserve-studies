@@ -246,7 +246,7 @@ Building Exterior,Seal Coat - Parking Lot,5000,SF,1.25,4,2,Good,Yes,PM item - pr
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
       <header className="bg-white shadow">
-        <div className="max-w-6xl mx-auto px-4 py-4">
+        <div className="w-full px-6 py-4">
           <Link href={`/sites/${siteId}/components`} className="text-red-600 hover:text-red-800">
             ← Back to Components
           </Link>
@@ -255,7 +255,7 @@ Building Exterior,Seal Coat - Parking Lot,5000,SF,1.25,4,2,Good,Yes,PM item - pr
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="w-full px-6 py-6">
         {/* Instructions */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
           <h2 className="text-lg font-bold text-blue-900 mb-3">CSV Format Instructions</h2>

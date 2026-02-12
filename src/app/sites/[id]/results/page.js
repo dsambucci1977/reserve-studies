@@ -61,7 +61,7 @@ export default function ResultsPage() {
   if (!results) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <main className="max-w-4xl mx-auto px-4 py-8">
+        <main className="w-full px-6 py-8">
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">No Results Yet</h2>
             <p className="text-gray-600 mb-6">Run calculations first to see results.</p>
@@ -197,7 +197,7 @@ export default function ResultsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="w-full px-6 py-8">
         <Link href={`/sites/${siteId}`} className="text-red-600 hover:text-red-700 font-medium">
           ← Back to Site
         </Link>
