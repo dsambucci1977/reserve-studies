@@ -669,7 +669,13 @@ export default function SitesPage() {
                                     <div className="flex items-center gap-1.5">
                                       <Link href={`/sites/${site.id}/calculate`} onClick={e => e.stopPropagation()} className="px-2 py-0.5 rounded font-medium" style={{ backgroundColor: '#dbebff', color: '#1d398f' }}>Calc</Link>
                                       <Link href={`/sites/${site.id}/reports`} onClick={e => e.stopPropagation()} className="px-2 py-0.5 rounded bg-green-50 text-green-700 font-medium">Report</Link>
-                                      <button onClick={e => handleDeleteSite(site.id, site.siteName, site.projectNumber, e)} disabled={deleting === site.id} className="px-1 text-gray-400 hover:text-red-500">🗑️</button>
+                                      <button 
+                                        onClick={e => handleDeleteSite(site.id, site.siteName, site.projectNumber, e)} 
+                                        disabled={deleting === site.id} 
+                                        className="px-2 py-0.5 rounded bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-700 font-medium transition-colors"
+                                      >
+                                        {deleting === site.id ? '...' : 'Delete'}
+                                      </button>
                                     </div>
                                   </div>
                                 </div>
@@ -767,7 +773,7 @@ export default function SitesPage() {
                                     <div className="flex items-center justify-end gap-1.5">
                                       <Link href={`/sites/${site.id}/calculate`} className="text-[10px] px-2 py-1 rounded font-medium" style={{ backgroundColor: '#dbebff', color: '#1d398f' }}>Calculate</Link>
                                       <Link href={`/sites/${site.id}/reports`} className="text-[10px] px-2 py-1 rounded bg-green-50 text-green-700 font-medium">Reports</Link>
-                                      <button onClick={e => handleDeleteSite(site.id, site.siteName, site.projectNumber, e)} disabled={deleting === site.id} className="text-[10px] px-1 text-gray-400 hover:text-red-500">🗑️</button>
+                                      <button onClick={e => handleDeleteSite(site.id, site.siteName, site.projectNumber, e)} disabled={deleting === site.id} className="text-[10px] px-2 py-1 rounded bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-700 font-medium transition-colors">{deleting === site.id ? '...' : 'Delete'}</button>
                                     </div>
                                   </td>
                                 </tr>
