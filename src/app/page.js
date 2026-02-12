@@ -98,7 +98,7 @@ export default function Home() {
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h2v22H20v-1.5z' fill='%23ffffff' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E")`,
         }}></div>
         
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
+        <div className="relative w-full px-4 sm:px-6 lg:px-8 py-8 pb-16">
           {/* Top bar: logo + welcome */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
@@ -135,7 +135,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
+      <div className="w-full px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
 
         {/* Stats Cards - overlapping hero */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
