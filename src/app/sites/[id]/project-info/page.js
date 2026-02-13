@@ -135,7 +135,7 @@ export default function ProjectInfoPage() {
                   {...register('location', { required: true })}
                   defaultValue={site?.location}
                   className="w-full px-3 py-2 border rounded text-gray-900"
-                  placeholder="Springfield, New Jersey"
+                  placeholder="Maplewood, New Jersey"
                 />
               </div>
             </div>
@@ -152,7 +152,7 @@ export default function ProjectInfoPage() {
                   {...register('contactName')}
                   defaultValue={site?.contactName}
                   className="w-full px-3 py-2 border rounded text-gray-900"
-                  placeholder="Mark Horowitz"
+                  placeholder="Jane Cooper"
                 />
               </div>
               
@@ -163,7 +163,7 @@ export default function ProjectInfoPage() {
                   type="email"
                   defaultValue={site?.contactEmail}
                   className="w-full px-3 py-2 border rounded text-gray-900"
-                  placeholder="mark@hunterhomes.com"
+                  placeholder="jane@cooperproperties.com"
                 />
               </div>
               
@@ -173,7 +173,7 @@ export default function ProjectInfoPage() {
                   {...register('clientName')}
                   defaultValue={site?.clientName}
                   className="w-full px-3 py-2 border rounded text-gray-900"
-                  placeholder="Hunter Homes of NJ"
+                  placeholder="Cooper Property Group"
                 />
               </div>
               
@@ -183,7 +183,7 @@ export default function ProjectInfoPage() {
                   {...register('companyAddress')}
                   defaultValue={site?.companyAddress}
                   className="w-full px-3 py-2 border rounded text-gray-900"
-                  placeholder="33 Newark Street"
+                  placeholder="450 Elmwood Avenue"
                 />
               </div>
               
@@ -193,7 +193,7 @@ export default function ProjectInfoPage() {
                   {...register('companyCity')}
                   defaultValue={site?.companyCity}
                   className="w-full px-3 py-2 border rounded text-gray-900"
-                  placeholder="Springfield"
+                  placeholder="Maplewood"
                 />
               </div>
               
@@ -220,7 +220,7 @@ export default function ProjectInfoPage() {
                   {...register('companyZip')}
                   defaultValue={site?.companyZip}
                   className="w-full px-3 py-2 border rounded text-gray-900"
-                  placeholder="07030"
+                  placeholder="07040"
                 />
               </div>
             </div>
