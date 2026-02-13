@@ -307,6 +307,9 @@ export default function ComponentsListPage() {
           </div>
         </div>
 
+        {/* Note about cost adjustments */}
+        <p className="text-xs text-gray-500 mb-2 italic">Costs shown are base costs. Cost Adjustment Factor (GF) and interest will be applied during calculation.</p>
+
         {/* Spreadsheet-style table with frozen header */}
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
