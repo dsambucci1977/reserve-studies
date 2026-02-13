@@ -253,6 +253,13 @@ export default function ProjectInfoPage() {
                   <option value="Townhouse">Townhouse</option>
                   <option value="Cooperative">Cooperative</option>
                   <option value="Apartment">Apartment</option>
+                  <option value="HOA / Planned Community">HOA / Planned Community</option>
+                  <option value="Single Family (HOA)">Single Family (HOA)</option>
+                  <option value="Mobile Home Park">Mobile Home Park</option>
+                  <option value="Office Building">Office Building</option>
+                  <option value="Retail / Shopping Center">Retail / Shopping Center</option>
+                  <option value="Industrial / Warehouse">Industrial / Warehouse</option>
+                  <option value="Mixed-Use">Mixed-Use</option>
                 </select>
               </div>
               
