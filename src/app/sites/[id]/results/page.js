@@ -845,7 +845,7 @@ export default function ResultsPage() {
                             <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">{item.category}</span>
                           </td>
                           <td className="px-4 py-2 text-sm text-gray-900">{item.description}</td>
-                          <td className="px-4 py-2 text-right text-sm font-medium text-gray-900">${Math.round(item.cost).toLocaleString()}</td>
+                          <td className="px-4 py-2 text-right text-sm font-medium text-gray-900">${Math.round(item.adjustedCost || item.cost).toLocaleString()}</td>
                         </tr>
                       )) : (
                         <tr><td colSpan="4" className="px-4 py-8 text-center text-gray-500">No Reserve expenditures found.</td></tr>
@@ -884,7 +884,7 @@ export default function ResultsPage() {
                             <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">{item.category}</span>
                           </td>
                           <td className="px-4 py-2 text-sm text-gray-900">{item.description}</td>
-                          <td className="px-4 py-2 text-right text-sm font-medium text-gray-900">${Math.round(item.cost).toLocaleString()}</td>
+                          <td className="px-4 py-2 text-right text-sm font-medium text-gray-900">${Math.round(item.adjustedCost || item.cost).toLocaleString()}</td>
                         </tr>
                       )) : (
                         <tr><td colSpan="4" className="px-4 py-8 text-center text-gray-500">No PM expenditures found.</td></tr>
