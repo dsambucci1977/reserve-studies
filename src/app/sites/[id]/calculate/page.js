@@ -9,11 +9,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { getSite, getComponents, updateSite, saveProjections } from '@/lib/db';
 import { calculateReserveStudy } from '@/lib/calculations';
 import { doc, getDoc } from 'firebase/firestore';
 import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
 export default function CalculatePage() {
@@ -27,15 +28,13 @@ export default function CalculatePage() {
   const params = useParams();
   const router = useRouter();
   const siteId = params.id;
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) { router.push('/auth/signin'); return; }
+    
     const loadData = async () => {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        router.push('/');
-        return;
-      }
-      
       try {
         const [siteData, componentsData] = await Promise.all([
           getSite(siteId),
@@ -87,7 +86,7 @@ export default function CalculatePage() {
     };
     
     loadData();
-  }, [siteId, router]);
+  }, [user, authLoading, siteId, router]);
 
   const handleCalculate = async () => {
     if (!site || components.length === 0) {

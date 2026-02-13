@@ -4,10 +4,11 @@
 // Site Detail with Status Management and Study Type Display
 'use client';
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { getSite, getComponents } from '@/lib/db';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
 // Status configuration
@@ -26,15 +27,14 @@ export default function SiteDetailPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const params = useParams();
   const siteId = params.id;
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) { router.push('/auth/signin'); return; }
+    
     const loadData = async () => {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        window.location.href = '/';
-        return;
-      }
-      
       try {
         const [siteData, componentsData] = await Promise.all([
           getSite(siteId),
@@ -46,7 +46,7 @@ export default function SiteDetailPage() {
           setComponents(componentsData);
         } else {
           alert('Site not found');
-          window.location.href = '/sites';
+          router.push('/sites');
         }
       } catch (error) {
         console.error('Error loading site:', error);
@@ -57,7 +57,7 @@ export default function SiteDetailPage() {
     };
     
     loadData();
-  }, [siteId]);
+  }, [user, authLoading, siteId, router]);
 
   const handleStatusChange = async (newStatus) => {
     try {

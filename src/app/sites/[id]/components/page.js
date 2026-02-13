@@ -3,9 +3,10 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { getSite, getComponents, updateComponent, deleteComponent } from '@/lib/db';
 import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 
@@ -30,20 +31,17 @@ export default function ComponentsListPage() {
   const params = useParams();
   const router = useRouter();
   const siteId = params.id;
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) { router.push('/auth/signin'); return; }
     loadData();
-  }, [siteId]);
+  }, [user, authLoading, siteId]);
 
   const loadData = async () => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      router.push('/auth/signin');
-      return;
-    }
-
     try {
-      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+      const userDoc = await getDoc(doc(db, 'users', user?.uid));
       if (userDoc.exists()) {
         const orgId = userDoc.data().organizationId;
         setOrganizationId(orgId);

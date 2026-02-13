@@ -3,9 +3,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { getSite, getComponent, updateComponent, deleteComponent } from '@/lib/db';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { NoteSelector } from '@/components/NoteSelector';
@@ -23,6 +24,8 @@ export default function ComponentDetailPage() {
   const params = useParams();
   const siteId = params.id;
   const componentId = params.componentId;
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   
   const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm();
   
@@ -30,16 +33,13 @@ export default function ComponentDetailPage() {
   const unitCost = watch('unitCost');
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) { router.push('/auth/signin'); return; }
+    
     const loadData = async () => {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        window.location.href = '/';
-        return;
-      }
-      
       try {
         // Load user's organization
-        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
           setOrganizationId(userDoc.data().organizationId);
         }
@@ -63,7 +63,7 @@ export default function ComponentDetailPage() {
     };
     
     loadData();
-  }, [siteId, componentId, reset]);
+  }, [user, authLoading, siteId, componentId, reset, router]);
 
   // Auto-calculate total cost in edit mode
   useEffect(() => {
@@ -114,7 +114,7 @@ export default function ComponentDetailPage() {
     try {
       await deleteComponent(siteId, componentId);
       alert('Component deleted successfully!');
-      window.location.href = `/sites/${siteId}/components`;
+      router.push(`/sites/${siteId}/components`);
     } catch (error) {
       console.error('Error:', error);
       alert('Error deleting component');

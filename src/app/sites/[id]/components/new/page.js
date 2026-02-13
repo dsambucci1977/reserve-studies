@@ -4,9 +4,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { auth } from '@/lib/firebase';
 import { getSite, createComponent } from '@/lib/db';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 
@@ -16,6 +16,8 @@ export default function NewComponentPage() {
   const [saving, setSaving] = useState(false);
   const params = useParams();
   const siteId = params.id;
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
@@ -35,13 +37,10 @@ export default function NewComponentPage() {
   const unitCost = watch('unitCost');
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) { router.push('/auth/signin'); return; }
+    
     const loadData = async () => {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        window.location.href = '/';
-        return;
-      }
-      
       try {
         const siteData = await getSite(siteId);
         setSite(siteData);
@@ -53,7 +52,7 @@ export default function NewComponentPage() {
     };
     
     loadData();
-  }, []);
+  }, [user, authLoading, siteId, router]);
 
   // Auto-calculate total cost
   useEffect(() => {
@@ -82,7 +81,7 @@ export default function NewComponentPage() {
       
       await createComponent(siteId, componentData);
       alert('Component added successfully!');
-      window.location.href = `/sites/${siteId}/components`;
+      router.push(`/sites/${siteId}/components`);
     } catch (error) {
       console.error('Error:', error);
       alert('Error adding component');

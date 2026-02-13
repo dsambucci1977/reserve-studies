@@ -4,9 +4,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { auth } from '@/lib/firebase';
 import { getSite, updateSite } from '@/lib/db';
 import { useParams } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 
@@ -16,17 +16,15 @@ export default function ProjectInfoPage() {
   const [saving, setSaving] = useState(false);
   const params = useParams();
   const siteId = params.id;
+  const { user, loading: authLoading } = useAuth();
 
   const { register, handleSubmit, formState: { errors } } = useForm();
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+    
     const loadData = async () => {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        window.location.href = '/';
-        return;
-      }
-      
       try {
         const siteData = await getSite(siteId);
         setSite(siteData);
@@ -39,7 +37,7 @@ export default function ProjectInfoPage() {
     };
     
     loadData();
-  }, []); // Run once
+  }, [user, authLoading, siteId]);
 
   const onSubmit = async (data) => {
     setSaving(true);
@@ -64,7 +62,6 @@ export default function ProjectInfoPage() {
       
       await updateSite(siteId, processedData);
       alert('Project information saved successfully!');
-      window.location.href = `/sites/${siteId}`;
     } catch (error) {
       console.error('Error saving:', error);
       alert('Error saving project information');

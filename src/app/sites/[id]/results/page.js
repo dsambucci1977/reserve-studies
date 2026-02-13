@@ -11,9 +11,9 @@
 'use client';
 
 import { useEffect, useState, Fragment } from 'react';
-import { auth } from '@/lib/firebase';
 import { getSite, getProjections } from '@/lib/db';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
 export default function ResultsPage() {
@@ -23,15 +23,14 @@ export default function ResultsPage() {
   const [activeTab, setActiveTab] = useState('summary');
   const params = useParams();
   const siteId = params.id;
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) { router.push('/auth/signin'); return; }
+    
     const loadData = async () => {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        window.location.href = '/';
-        return;
-      }
-      
       try {
         const [siteData, projectionsData] = await Promise.all([
           getSite(siteId),
@@ -48,7 +47,7 @@ export default function ResultsPage() {
     };
     
     loadData();
-  }, [siteId]);
+  }, [user, authLoading, siteId, router]);
 
   if (loading) {
     return (
