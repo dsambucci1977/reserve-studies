@@ -1,6 +1,10 @@
 // src/lib/calculations.js
-// Reserve Study Calculation Engine v8
-// Fixes:
+// Reserve Study Calculation Engine v9
+// v9: Apply Cost Adjustment Factor (CAF) consistently across ALL calculation paths:
+//     calculateYear, calculateComponent, runCashFlow (thresholds), and annual funding loop.
+//     Previously CAF was only applied in buildCashFlowWithCycling (display cash flow),
+//     causing Component Summary replacement costs to show base costs without CAF.
+// v8 Fixes:
 // 1. TIMING FIX: Items with RUL 1 now trigger in Year 1 (not Year 2).
 //    (replacementYear = beginningYear + estimatedRemainingLife - 1)
 // 2. This aligns the Expenditure Schedule with the Excel "YearOne" RULs.
@@ -47,6 +51,7 @@ export function calculateReserveStudy(projectInfo, components) {
 function calculateYear(year, projectInfo, components, previousYears) {
   const fiscalYear = projectInfo.beginningYear + year - 1;
   const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year - 1);
+  const caf = projectInfo.costAdjustmentFactor || 1.0;
   
   let componentCurrentReserves = {};
   
@@ -58,7 +63,7 @@ function calculateYear(year, projectInfo, components, previousYears) {
     let totalFFB = 0;
     
     components.forEach(comp => {
-      const costPerUnit = (comp.costPerUnit || 0) * inflationMultiplier;
+      const costPerUnit = (comp.costPerUnit || 0) * caf * inflationMultiplier;
       const totalCost = (comp.quantity || 0) * costPerUnit;
       const remainingLife = Math.max(0, comp.estimatedRemainingLife);
       
@@ -112,7 +117,8 @@ function calculateYear(year, projectInfo, components, previousYears) {
  * Calculate single component for a specific year
  */
 function calculateComponent(component, year, fiscalYear, projectInfo, inflationMultiplier, componentCurrentReserve) {
-  const costPerUnit = (component.costPerUnit || 0) * inflationMultiplier;
+  const caf = projectInfo.costAdjustmentFactor || 1.0;
+  const costPerUnit = (component.costPerUnit || 0) * caf * inflationMultiplier;
   const totalCost = (component.quantity || 0) * costPerUnit;
   const remainingLife = Math.max(0, component.estimatedRemainingLife - (year - 1));
   
@@ -262,6 +268,7 @@ function buildExpenditureSchedule(components, years) {
 }
 
 function calculateThresholdScenario(projectInfo, components, thresholdRate) {
+  const caf = projectInfo.costAdjustmentFactor || 1.0;
   
   // Helper: Run a 31-year cash flow with component cycling
   function runCashFlow(constantContribution) {
@@ -281,7 +288,7 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
       let totalCostThisYear = 0;
       
       compStates.forEach(comp => {
-        const costPerUnit = (comp.costPerUnit || 0) * inflationMultiplier;
+        const costPerUnit = (comp.costPerUnit || 0) * caf * inflationMultiplier;
         const compTotalCost = (comp.quantity || 0) * costPerUnit;
         const remainingLife = Math.max(0, comp.currentRemainingLife);
         
@@ -352,7 +359,7 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
   
   if (thresholdRate === null) {
     let low = 0;
-    let high = components.reduce((acc, c) => acc + (c.quantity * c.costPerUnit), 0) / 2;
+    let high = components.reduce((acc, c) => acc + (c.quantity * c.costPerUnit), 0) * caf / 2;
     
     for (let i = 0; i < 100; i++) {
       const mid = (low + high) / 2;
@@ -387,7 +394,7 @@ function calculateThresholdScenario(projectInfo, components, thresholdRate) {
     // 2a. Calculate Total FFB to determine distribution
     let totalFFBThisYear = 0;
     const compCalculations = compStatesForAF.map(comp => {
-      const costPerUnit = (comp.costPerUnit || 0) * inflationMultiplier;
+      const costPerUnit = (comp.costPerUnit || 0) * caf * inflationMultiplier;
       const compTotalCost = (comp.quantity || 0) * costPerUnit;
       const remainingLife = Math.max(0, comp.currentRemainingLife);
       
