@@ -661,11 +661,7 @@ export default function ResultsPage() {
                       reserveCashFlow.forEach((row, index) => {
                         const ffT = thresholds.projectionFull?.[index];
                         const ffRow = ffT || reserveFullFundingCashFlow[index] || {};
-                        const ffAnnual = ffT 
-                          ? (index === 0 
-                            ? (ffT.endingBalance || 0) - (reserveFund.currentBalance || 0) + (ffT.expenditures || 0)
-                            : (ffT.endingBalance || 0) - (thresholds.projectionFull?.[index - 1]?.endingBalance || 0) + (ffT.expenditures || 0))
-                          : (ffRow.annualContribution || averageAnnualContribution);
+                        const ffAnnual = reserveFullFundingCashFlow[index]?.annualContribution || averageAnnualContribution;
                         csv += `${row.year},${Math.round(row.contributions||0)},${Math.round(row.expenditures||0)},${Math.round(row.endingBalance||0)},${Math.round(ffAnnual)},${Math.round(averageAnnualContribution)},${Math.round(ffRow.endingBalance||0)}\n`;
                       });
                       const blob = new Blob([csv], { type: 'text/csv' });
@@ -735,15 +731,12 @@ export default function ResultsPage() {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {reserveCashFlow.map((row, index) => {
-                        // Use threshold projectionFull as source of truth for Full Funding
+                        // Use threshold projectionFull as source of truth for Full Funding ending balance
                         const ffThreshold = thresholds.projectionFull?.[index];
                         const ffRow = ffThreshold || reserveFullFundingCashFlow[index] || {};
-                        // Annual contribution: derive from threshold data (ending - prev_ending + expenditures)
-                        const ffAnnualContribution = ffThreshold 
-                          ? (index === 0 
-                            ? (ffThreshold.endingBalance || 0) - (reserveFund.currentBalance || 0) + (ffThreshold.expenditures || 0)
-                            : (ffThreshold.endingBalance || 0) - (thresholds.projectionFull?.[index - 1]?.endingBalance || 0) + (ffThreshold.expenditures || 0))
-                          : (ffRow.annualContribution || averageAnnualContribution);
+                        // Annual Contribution = Component Method per-year total (varies as components cycle)
+                        // This comes from yearlyAnnualFunding calculated in the engine
+                        const ffAnnualContribution = reserveFullFundingCashFlow[index]?.annualContribution || averageAnnualContribution;
                         
                         return (
                           <tr key={row.year} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
