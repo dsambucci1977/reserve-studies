@@ -228,7 +228,7 @@ export default function NewComponentPage() {
                   readOnly
                   placeholder="Auto-calculated"
                 />
-                <p className="text-xs text-gray-600 mt-1">Auto-calculated: Quantity × Unit Cost</p>
+                <p className="text-xs text-gray-600 mt-1">Auto-calculated: Quantity × Unit Cost. Cost Adjustment Factor (GF) and interest will be applied during calculation.</p>
               </div>
             </div>
           </section>
