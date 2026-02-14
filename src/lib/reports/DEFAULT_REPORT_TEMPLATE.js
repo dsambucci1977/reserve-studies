@@ -518,6 +518,39 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break"></div>
 <div class="page-break-indicator no-print"></div>
 
+<!-- ==================== TABLE OF CONTENTS ==================== -->
+<div class="toc-page">
+  <div class="toc-title">TABLE OF CONTENTS</div>
+  
+  <table class="toc-table" style="width:100%; border-collapse:collapse; font-size:10pt;">
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#introduction" style="text-decoration:none; color:#1a1a1a;">Introduction</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#description" style="text-decoration:none; color:#1a1a1a;">Description of Development</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#reserve-chart" style="text-decoration:none; color:#1a1a1a;">Reserve Study Chart</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#terms" style="text-decoration:none; color:#1a1a1a;">Terms and Definitions</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#responsible-charge" style="text-decoration:none; color:#1a1a1a;">Responsible Charge</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#special-assessment" style="text-decoration:none; color:#1a1a1a;">Special Assessment</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#physical-analysis" style="text-decoration:none; color:#1a1a1a;">Physical Analysis</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#component-summary" style="text-decoration:none; color:#1a1a1a;">Component Schedule Summary</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#capital-items" style="text-decoration:none; color:#1a1a1a;">Capital Items / Components</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#component-notes" style="text-decoration:none; color:#1a1a1a;">Components Notes</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#financial-results" style="text-decoration:none; color:#1a1a1a;">Financial Results</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#cash-flow" style="text-decoration:none; color:#1a1a1a;">Reserve Fund Thirty Year Cash Flow</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#threshold" style="text-decoration:none; color:#1a1a1a;">Reserve Fund Thirty Year Threshold Funding</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#expenditures" style="text-decoration:none; color:#1a1a1a;">Reserve Fund Expenditures</a></td></tr>
+<!--PM_START-->
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#pm-section" style="text-decoration:none; color:#1a1a1a;">Preventive Maintenance</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#pm-expenditures" style="text-decoration:none; color:#1a1a1a;">PM Expenditures</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#pm-cash-flow" style="text-decoration:none; color:#1a1a1a;">PM Thirty Year Cash Flow</a></td></tr>
+<!--PM_END-->
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#recommendations" style="text-decoration:none; color:#1a1a1a;">Recommendations</a></td></tr>
+    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#disclosures" style="text-decoration:none; color:#1a1a1a;">Disclosures</a></td></tr>
+    <tr><td style="padding:6px 4px;"><a href="#bibliography" style="text-decoration:none; color:#1a1a1a;">Bibliography</a></td></tr>
+  </table>
+</div>
+
+<div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
+
 <!-- ==================== INTRODUCTION ==================== -->
 <div id="introduction" class="section-header">INTRODUCTION</div>
 

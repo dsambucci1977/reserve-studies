@@ -182,7 +182,19 @@ export async function exportToWord(htmlContent, fileName) {
     footer.remove();
   });
   
-  // 15. Strip border-radius from all inline styles (Word doesn't support it)
+  // 15. Table of Contents styling
+  tempDiv.querySelectorAll('.toc-page').forEach(el => {
+    el.style.cssText = 'padding: 16px;';
+  });
+  tempDiv.querySelectorAll('.toc-title').forEach(el => {
+    el.style.cssText = 'font-size:16pt; font-weight:bold; color:#1e3a5f; text-align:center; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #1e3a5f;';
+  });
+  // Remove borders from TOC table cells (they inherit from global td style)
+  tempDiv.querySelectorAll('.toc-table td').forEach(td => {
+    td.style.cssText = (td.getAttribute('style') || '') + ' border:none; border-bottom:1px dotted #ccc;';
+  });
+  
+  // 16. Strip border-radius from all inline styles (Word doesn't support it)
   tempDiv.querySelectorAll('[style]').forEach(el => {
     if (el.style.cssText.includes('border-radius')) {
       el.style.cssText = el.style.cssText.replace(/border-radius\s*:\s*[^;]+;?/g, '');
