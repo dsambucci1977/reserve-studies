@@ -522,29 +522,29 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="toc-page">
   <div class="toc-title">TABLE OF CONTENTS</div>
   
-  <table class="toc-table" style="width:100%; border-collapse:collapse; font-size:10pt;">
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#introduction" style="text-decoration:none; color:#1a1a1a;">Introduction</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#description" style="text-decoration:none; color:#1a1a1a;">Description of Development</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#reserve-chart" style="text-decoration:none; color:#1a1a1a;">Reserve Study Chart</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#terms" style="text-decoration:none; color:#1a1a1a;">Terms and Definitions</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#responsible-charge" style="text-decoration:none; color:#1a1a1a;">Responsible Charge</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#special-assessment" style="text-decoration:none; color:#1a1a1a;">Special Assessment</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#physical-analysis" style="text-decoration:none; color:#1a1a1a;">Physical Analysis</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#component-summary" style="text-decoration:none; color:#1a1a1a;">Component Schedule Summary</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#capital-items" style="text-decoration:none; color:#1a1a1a;">Capital Items / Components</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#component-notes" style="text-decoration:none; color:#1a1a1a;">Components Notes</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#financial-results" style="text-decoration:none; color:#1a1a1a;">Financial Results</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#cash-flow" style="text-decoration:none; color:#1a1a1a;">Reserve Fund Thirty Year Cash Flow</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#threshold" style="text-decoration:none; color:#1a1a1a;">Reserve Fund Thirty Year Threshold Funding</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#expenditures" style="text-decoration:none; color:#1a1a1a;">Reserve Fund Expenditures</a></td></tr>
+  <table class="toc-table" style="width:100%; border-collapse:collapse; font-size:11pt;">
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#introduction" style="text-decoration:none; color:#1a1a1a;">Introduction</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_introduction">3</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#description" style="text-decoration:none; color:#1a1a1a;">Description of Development</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_description">4</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#reserve-chart" style="text-decoration:none; color:#1a1a1a;">Reserve Study Chart</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_reservechart">5</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#terms" style="text-decoration:none; color:#1a1a1a;">Terms and Definitions</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_terms">5</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#responsible-charge" style="text-decoration:none; color:#1a1a1a;">Responsible Charge</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_responsiblecharge">7</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#special-assessment" style="text-decoration:none; color:#1a1a1a;">Special Assessment</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_specialassessment">7</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#physical-analysis" style="text-decoration:none; color:#1a1a1a;">Physical Analysis</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_physicalanalysis">7</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#component-summary" style="text-decoration:none; color:#1a1a1a;">Component Schedule Summary</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_componentsummary">8</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#capital-items" style="text-decoration:none; color:#1a1a1a;">Capital Items / Components</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_capitalitems">9</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#component-notes" style="text-decoration:none; color:#1a1a1a;">Components Notes</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_componentnotes">11</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#financial-results" style="text-decoration:none; color:#1a1a1a;">Financial Results</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_financialresults">12</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#cash-flow" style="text-decoration:none; color:#1a1a1a;">Reserve Fund Thirty Year Cash Flow</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_cashflow">13</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#threshold" style="text-decoration:none; color:#1a1a1a;">Reserve Fund Thirty Year Threshold Funding</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_threshold">15</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#expenditures" style="text-decoration:none; color:#1a1a1a;">Reserve Fund Expenditures</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_expenditures">18</span></td></tr>
 <!--PM_START-->
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#pm-section" style="text-decoration:none; color:#1a1a1a;">Preventive Maintenance</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#pm-expenditures" style="text-decoration:none; color:#1a1a1a;">PM Expenditures</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#pm-cash-flow" style="text-decoration:none; color:#1a1a1a;">PM Thirty Year Cash Flow</a></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#pm-section" style="text-decoration:none; color:#1a1a1a;">Preventive Maintenance</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_pmsection">19</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#pm-expenditures" style="text-decoration:none; color:#1a1a1a;">PM Expenditures</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_pmexpenditures">20</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#pm-cash-flow" style="text-decoration:none; color:#1a1a1a;">PM Thirty Year Cash Flow</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_pmcashflow">21</span></td></tr>
 <!--PM_END-->
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#recommendations" style="text-decoration:none; color:#1a1a1a;">Recommendations</a></td></tr>
-    <tr><td style="padding:6px 4px; border-bottom:1px dotted #ccc;"><a href="#disclosures" style="text-decoration:none; color:#1a1a1a;">Disclosures</a></td></tr>
-    <tr><td style="padding:6px 4px;"><a href="#bibliography" style="text-decoration:none; color:#1a1a1a;">Bibliography</a></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#recommendations" style="text-decoration:none; color:#1a1a1a;">Recommendations</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_recommendations">23</span></td></tr>
+    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#disclosures" style="text-decoration:none; color:#1a1a1a;">Disclosures</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_disclosures">23</span></td></tr>
+    <tr><td style="padding:8px 4px;"><a href="#bibliography" style="text-decoration:none; color:#1a1a1a;">Bibliography</a></td><td style="padding:8px 4px; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_bibliography">24</span></td></tr>
   </table>
 </div>
 
@@ -552,6 +552,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break-indicator no-print"></div>
 
 <!-- ==================== INTRODUCTION ==================== -->
+<a name="_introduction"></a>
 <div id="introduction" class="section-header">INTRODUCTION</div>
 
 <div class="content-section">
@@ -573,6 +574,9 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <!-- ==================== DESCRIPTION ==================== -->
+<div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
+<a name="_description"></a>
 <div id="description" class="section-header">DESCRIPTION OF DEVELOPMENT</div>
 
 <div class="content-section">
@@ -586,6 +590,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break-indicator no-print"></div>
 
 <!-- ==================== RESERVE STUDY CHART (own page) ==================== -->
+<a name="_reservechart"></a>
 <div id="reserve-chart" class="section-header">RESERVE STUDY CHART</div>
 
 <div class="content-section">
@@ -691,6 +696,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <!--PM_END-->
 
 <!-- ==================== TERMS ==================== -->
+<a name="_terms"></a>
 <div id="terms" class="section-header">TERMS AND DEFINITIONS</div>
 
 <div class="content-section">
@@ -766,6 +772,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <!-- ==================== RESPONSIBLE CHARGE ==================== -->
+<a name="_responsiblecharge"></a>
 <div id="responsible-charge" class="section-header">RESPONSIBLE CHARGE</div>
 <div class="content-section">
   <p>A <strong>Reserve Specialist (RS)</strong> who is in responsible charge of a reserve study must provide consistent and effective oversight of all individuals performing tasks that directly impact the quality and accuracy of the study. The RS must retain sufficient records to demonstrate that they exercised appropriate and regular supervision throughout the course of the project.</p>
@@ -779,6 +786,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <!-- ==================== SPECIAL ASSESSMENT ==================== -->
+<a name="_specialassessment"></a>
 <div id="special-assessment" class="section-header">SPECIAL ASSESSMENT</div>
 <div class="content-section">
   <p>A <strong>Special Assessment</strong> is a temporary fee imposed on association members in addition to regular dues or assessments. These assessments are typically used to cover unexpected or one-time expenses and are often subject to limitations or procedures outlined in the association's governing documents or applicable local laws.</p>
@@ -801,6 +809,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <!--UPDATE_END-->
 
 <!-- ==================== PHYSICAL ANALYSIS ==================== -->
+<a name="_physicalanalysis"></a>
 <div id="physical-analysis" class="section-header">PHYSICAL ANALYSIS</div>
 <div class="content-section">
   <p>The quantities used in the replacement cost estimates of the common elements were generated from field measurements taken during our site visit on {inspectionDate}, and/or from take-offs based on architectural and site design drawings. The remaining life expectancies of the common elements were determined through a visual site inspection of the Community, as well as information provided by the Property Manager and maintenance contractors familiar with the common elements of the Community. The common elements were identified through a review of the governing documents.</p>
@@ -816,6 +825,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break-indicator no-print"></div>
 
 <!-- ==================== COMPONENT SCHEDULE SUMMARY ==================== -->
+<a name="_componentsummary"></a>
 <div id="component-summary" class="section-header">COMPONENT SCHEDULE SUMMARY</div>
 
 <div class="content-section">
@@ -827,6 +837,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break-indicator no-print"></div>
 
 <!-- ==================== CAPITAL ITEMS ==================== -->
+<a name="_capitalitems"></a>
 <div id="capital-items" class="section-header">CAPITAL ITEMS / COMPONENTS</div>
 
 <div class="content-section">
@@ -839,6 +850,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break-indicator no-print"></div>
 
 <!-- ==================== COMPONENT NOTES ==================== -->
+<a name="_componentnotes"></a>
 <div id="component-notes" class="section-header">COMPONENTS NOTES</div>
 
 <div class="content-section">
@@ -850,6 +862,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break-indicator no-print"></div>
 
 <!-- ==================== FINANCIAL RESULTS ==================== -->
+<a name="_financialresults"></a>
 <div id="financial-results" class="section-header">FINANCIAL RESULTS</div>
 
 <div class="content-section">
@@ -895,6 +908,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break-indicator no-print"></div>
 
 <!-- ==================== CASH FLOW (own page) ==================== -->
+<a name="_cashflow"></a>
 <div id="cash-flow" class="section-header">RESERVE FUND THIRTY YEAR CASH FLOW</div>
 
 <div class="content-section">
@@ -905,6 +919,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break-indicator no-print"></div>
 
 <!-- ==================== THRESHOLD (own page) ==================== -->
+<a name="_threshold"></a>
 <div id="threshold" class="section-header">RESERVE FUND THIRTY YEAR THRESHOLD FUNDING</div>
 
 <div class="content-section">
@@ -915,6 +930,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break-indicator no-print"></div>
 
 <!-- ==================== EXPENDITURES (own page) ==================== -->
+<a name="_expenditures"></a>
 <div id="expenditures" class="section-header">RESERVE FUND EXPENDITURES</div>
 
 <div class="content-section">
@@ -926,6 +942,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 
 <!-- ==================== PM SECTION (own page) - PM only ==================== -->
 <!--PM_START-->
+<a name="_pmsection"></a>
 <div id="pm-section" class="section-header section-header-green">PREVENTIVE MAINTENANCE</div>
 
 <div class="content-section">
@@ -937,6 +954,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break-indicator no-print"></div>
 
 <!-- ==================== PM EXPENDITURES - PM only ==================== -->
+<a name="_pmexpenditures"></a>
 <div id="pm-expenditures" class="section-header section-header-green">PM EXPENDITURES</div>
 
 <div class="content-section">
@@ -947,6 +965,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="page-break-indicator no-print"></div>
 
 <!-- ==================== PM CASH FLOW - PM only ==================== -->
+<a name="_pmcashflow"></a>
 <div id="pm-cash-flow" class="section-header section-header-green">PM THIRTY YEAR CASH FLOW</div>
 
 <div class="content-section">
@@ -958,6 +977,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <!--PM_END-->
 
 <!-- ==================== RECOMMENDATIONS ==================== -->
+<a name="_recommendations"></a>
 <div id="recommendations" class="section-header section-header-orange">RECOMMENDATIONS</div>
 
 <div class="content-section">
@@ -999,6 +1019,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </div>
 
 <!-- ==================== DISCLOSURES & BIBLIOGRAPHY (same page) ==================== -->
+<a name="_disclosures"></a>
 <div id="disclosures" class="section-header">DISCLOSURES</div>
 
 <div class="content-section">
@@ -1023,6 +1044,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <p>The items included in the Component Inventory are based on information provided in the governing documents and by the association's managing agent. The quantities have not been field measured by a representative of {companyName} unless specifically noted.</p>
 </div>
 
+<a name="_bibliography"></a>
 <div id="bibliography" class="section-header">BIBLIOGRAPHY</div>
 
 <div class="content-section">

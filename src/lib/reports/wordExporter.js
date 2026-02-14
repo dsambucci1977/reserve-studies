@@ -184,23 +184,26 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
     footer.remove();
   });
   
-  // 15. Table of Contents - convert links to plain text (anchors don't work in .doc)
+  // 15. Table of Contents - style cells, keep links functional
   tempDiv.querySelectorAll('.toc-page').forEach(el => {
     el.style.cssText = 'padding: 16px;';
   });
   tempDiv.querySelectorAll('.toc-title').forEach(el => {
     el.style.cssText = 'font-size:16pt; font-weight:bold; color:#1e3a5f; text-align:center; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #1e3a5f;';
   });
-  // Convert TOC links to plain text and remove borders from cells
+  // Style TOC table cells - remove borders, keep links
   tempDiv.querySelectorAll('.toc-table td').forEach(td => {
-    td.style.cssText = 'border:none; border-bottom:1px dotted #ccc; padding:6px 4px;';
-    const link = td.querySelector('a');
-    if (link) {
-      const span = document.createElement('span');
-      span.textContent = link.textContent;
-      span.style.cssText = 'color:#1a1a1a;';
-      link.parentNode.replaceChild(span, link);
+    // Preserve existing inline styles but ensure no visible border
+    const existing = td.getAttribute('style') || '';
+    if (!existing.includes('border-bottom:1px dotted')) {
+      td.style.cssText = existing + ' border:none;';
+    } else {
+      td.style.cssText = existing.replace(/border:1px solid #ddd;?/g, '');
     }
+  });
+  // Mark toc-pageref spans for string replacement (PAGEREF field codes)
+  tempDiv.querySelectorAll('.toc-pageref').forEach(span => {
+    span.setAttribute('data-word-pageref', span.getAttribute('data-ref') || '');
   });
   
   // 16. Strip border-radius from all inline styles (Word doesn't support it)
@@ -219,6 +222,30 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
     /<div data-word-page-break="true"><\/div>/g,
     '<p style="page-break-before:always; margin:0; padding:0; line-height:0; font-size:1pt;">&nbsp;</p>'
   );
+  
+  // Replace PAGEREF markers with Word field codes for TOC page numbers
+  // Pattern: <span class="toc-pageref" data-ref="xxx" data-word-pageref="xxx">fallback</span>
+  bodyContent = bodyContent.replace(
+    /<span[^>]*data-word-pageref="([^"]*)"[^>]*>(\d+)<\/span>/g,
+    '<span style=\'mso-field-code:" PAGEREF $1 \\\\h"\'>$2</span>'
+  );
+  
+  // Split into Cover Section (no footer) and Main Section (with footer)
+  // Find the first page break - everything before it is the cover page
+  const firstBreakMarker = '<p style="page-break-before:always; margin:0; padding:0; line-height:0; font-size:1pt;">&nbsp;</p>';
+  const firstBreakIdx = bodyContent.indexOf(firstBreakMarker);
+  
+  if (firstBreakIdx !== -1) {
+    const coverContent = bodyContent.substring(0, firstBreakIdx);
+    const mainContent = bodyContent.substring(firstBreakIdx + firstBreakMarker.length);
+    
+    // Word section break between cover and main content
+    bodyContent = '<div class="CoverSection">' + coverContent + '</div>' +
+      '<br clear="all" style="page-break-before:always; mso-break-type:section-break;">' +
+      '<div class="MainSection">' + mainContent + '</div>';
+  } else {
+    bodyContent = '<div class="MainSection">' + bodyContent + '</div>';
+  }
   
   // ============================================================
   // CONVERT IMAGES TO BASE64
@@ -242,11 +269,17 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
   
   // Build footer text from company info
   const footerParts = [companyName, companyAddress, companyPhone].filter(Boolean);
-  const footerText = footerParts.join(' | ');
+  const footerLine = footerParts.length > 1 
+    ? `<b style='color:#1e3a5f;'>${companyName || ''}</b> | ${footerParts.slice(1).join(' | ')}`
+    : `<b style='color:#1e3a5f;'>${companyName || ''}</b>`;
   
   // ============================================================
   // BUILD WORD-COMPATIBLE DOCUMENT
   // ============================================================
+  // NOTE: The footer uses mso-element:footer which ONLY works in Microsoft Word.
+  // We wrap it in conditional comments so non-Word apps (LibreOffice, etc.)
+  // don't render it as body content at the top of the document.
+  // The @page CSS footer reference also only works in Word.
   const wordDoc = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
     xmlns:w="urn:schemas-microsoft-com:office:word"
     xmlns="http://www.w3.org/TR/REC-html40">
@@ -263,16 +296,25 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
 </xml>
 <![endif]-->
 <style>
-  @page WordSection1 {
+  /* Cover page section - no footer */
+  @page CoverSection {
+    size: 8.5in 11.0in;
+    mso-page-orientation: portrait;
+    margin: 0.75in 0.75in 0.75in 0.75in;
+  }
+  div.CoverSection { page: CoverSection; }
+  
+  /* Main content section - with footer */
+  @page MainSection {
     size: 8.5in 11.0in;
     mso-page-orientation: portrait;
     margin: 0.75in 0.75in 0.75in 0.75in;
     mso-header-margin: 0.3in;
     mso-footer-margin: 0.3in;
-    mso-title-page: yes;
     mso-footer: f1;
   }
-  div.WordSection1 { page: WordSection1; }
+  div.MainSection { page: MainSection; }
+  
   body { 
     font-family: Arial, Helvetica, sans-serif; 
     font-size: 10pt; 
@@ -319,17 +361,17 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
 </style>
 </head>
 <body>
+<!--[if gte mso 9]>
 <div style='mso-element:footer' id=f1>
   <table width='100%' style='border:none; border-top:1px solid #ccc; font-size:7pt; color:#666; font-family:Arial,sans-serif;'>
     <tr>
-      <td style='border:none; padding:4px 0; text-align:left;'><b style='color:#1e3a5f;'>${companyName || ''}</b>${footerParts.length > 1 ? ' | ' + footerParts.slice(1).join(' | ') : ''}</td>
+      <td style='border:none; padding:4px 0; text-align:left;'>${footerLine}</td>
       <td style='border:none; padding:4px 0; text-align:right;'>Page <span style='mso-field-code:" PAGE "'>1</span></td>
     </tr>
   </table>
 </div>
-<div class="WordSection1">
+<![endif]-->
 ${bodyContent}
-</div>
 </body>
 </html>`;
   
