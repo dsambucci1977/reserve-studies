@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "date-fns": "^4.1.0",
+    "docx": "^9.5.2",
+    "file-saver": "^2.0.5",
     "firebase": "^12.8.0",
     "firebase-admin": "^13.6.0",
     "jspdf": "^2.5.1",
@@ -19,8 +21,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.1",
-    "xlsx": "^0.18.5",
-    "recharts": "^2.12.7"
+    "recharts": "^2.12.7",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -8,7 +8,7 @@ import { collection, getDocs, doc, getDoc, addDoc, deleteDoc, query, orderBy } f
 import { db } from '@/lib/firebase';
 import { loadReportData, generateReport } from '@/lib/reports/reportGenerator';
 import { DEFAULT_REPORT_TEMPLATE } from '@/lib/reports/DEFAULT_REPORT_TEMPLATE';
-import { exportToWord } from '@/lib/reports/wordExporter';
+import { exportToDocx } from '@/lib/reports/docxExporter';
 
 export default function ReportsListPage() {
   const { user } = useAuth();
@@ -111,23 +111,12 @@ export default function ReportsListPage() {
     try {
       setDownloadingId(report.id);
       const siteName = site?.siteName || 'Site';
-      const fileName = `${siteName} - ${report.title}.doc`;
+      const fileName = `${siteName} - ${report.title}.docx`;
       
-      // Build company info for footer
-      const org = organization || {};
-      const orgCity = org.city || '';
-      const orgState = org.state || '';
-      const orgZip = org.zip || '';
-      const addressParts = [orgCity, orgState].filter(Boolean).join(', ');
-      const companyAddress = addressParts + (orgZip ? ' ' + orgZip : '');
-      const companyPhone = org.phone ? 'C:' + org.phone : '';
-      const companyName = org.name || site?.companyName || '';
+      // Load fresh report data for docx generation
+      const reportData = await loadReportData(siteId, organizationId);
 
-      await exportToWord(report.htmlContent, fileName, {
-        companyName,
-        companyAddress,
-        companyPhone
-      });
+      await exportToDocx(reportData, fileName);
     } catch (error) {
       console.error('Error downloading report:', error);
       alert('Error downloading: ' + error.message);
@@ -220,7 +209,7 @@ export default function ReportsListPage() {
                       disabled={downloadingId === report.id}
                       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
                     >
-                      {downloadingId === report.id ? '⏳ Preparing...' : '📄 Download Word'}
+                      {downloadingId === report.id ? '⏳ Preparing...' : '📄 Download .docx'}
                     </button>
                     <button onClick={(e) => handleDeleteReport(report.id, e)}
                       className="px-4 py-2 text-red-600 hover:bg-red-50 rounded text-sm">
