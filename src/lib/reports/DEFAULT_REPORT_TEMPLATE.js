@@ -522,30 +522,30 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="toc-page">
   <div class="toc-title">TABLE OF CONTENTS</div>
   
-  <table class="toc-table" style="width:100%; border-collapse:collapse; font-size:11pt;">
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#introduction" style="text-decoration:none; color:#1a1a1a;">Introduction</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_introduction">3</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#description" style="text-decoration:none; color:#1a1a1a;">Description of Development</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_description">4</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#reserve-chart" style="text-decoration:none; color:#1a1a1a;">Reserve Study Chart</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_reservechart">5</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#terms" style="text-decoration:none; color:#1a1a1a;">Terms and Definitions</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_terms">5</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#responsible-charge" style="text-decoration:none; color:#1a1a1a;">Responsible Charge</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_responsiblecharge">7</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#special-assessment" style="text-decoration:none; color:#1a1a1a;">Special Assessment</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_specialassessment">7</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#physical-analysis" style="text-decoration:none; color:#1a1a1a;">Physical Analysis</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_physicalanalysis">7</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#component-summary" style="text-decoration:none; color:#1a1a1a;">Component Schedule Summary</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_componentsummary">8</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#capital-items" style="text-decoration:none; color:#1a1a1a;">Capital Items / Components</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_capitalitems">9</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#component-notes" style="text-decoration:none; color:#1a1a1a;">Components Notes</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_componentnotes">11</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#financial-results" style="text-decoration:none; color:#1a1a1a;">Financial Results</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_financialresults">12</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#cash-flow" style="text-decoration:none; color:#1a1a1a;">Reserve Fund Thirty Year Cash Flow</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_cashflow">13</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#threshold" style="text-decoration:none; color:#1a1a1a;">Reserve Fund Thirty Year Threshold Funding</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_threshold">15</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#expenditures" style="text-decoration:none; color:#1a1a1a;">Reserve Fund Expenditures</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_expenditures">18</span></td></tr>
+  <div class="toc-entries" style="font-size:11pt; line-height:2.2;">
+    <p class="toc-entry"><a href="#_introduction">Introduction</a></p>
+    <p class="toc-entry"><a href="#_description">Description of Development</a></p>
+    <p class="toc-entry"><a href="#_reservechart">Reserve Study Chart</a></p>
+    <p class="toc-entry"><a href="#_terms">Terms and Definitions</a></p>
+    <p class="toc-entry"><a href="#_responsiblecharge">Responsible Charge</a></p>
+    <p class="toc-entry"><a href="#_specialassessment">Special Assessment</a></p>
+    <p class="toc-entry"><a href="#_physicalanalysis">Physical Analysis</a></p>
+    <p class="toc-entry"><a href="#_componentsummary">Component Schedule Summary</a></p>
+    <p class="toc-entry"><a href="#_capitalitems">Capital Items / Components</a></p>
+    <p class="toc-entry"><a href="#_componentnotes">Components Notes</a></p>
+    <p class="toc-entry"><a href="#_financialresults">Financial Results</a></p>
+    <p class="toc-entry"><a href="#_cashflow">Reserve Fund Thirty Year Cash Flow</a></p>
+    <p class="toc-entry"><a href="#_threshold">Reserve Fund Thirty Year Threshold Funding</a></p>
+    <p class="toc-entry"><a href="#_expenditures">Reserve Fund Expenditures</a></p>
 <!--PM_START-->
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#pm-section" style="text-decoration:none; color:#1a1a1a;">Preventive Maintenance</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_pmsection">19</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#pm-expenditures" style="text-decoration:none; color:#1a1a1a;">PM Expenditures</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_pmexpenditures">20</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#pm-cash-flow" style="text-decoration:none; color:#1a1a1a;">PM Thirty Year Cash Flow</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_pmcashflow">21</span></td></tr>
+    <p class="toc-entry"><a href="#_pmsection">Preventive Maintenance</a></p>
+    <p class="toc-entry"><a href="#_pmexpenditures">PM Expenditures</a></p>
+    <p class="toc-entry"><a href="#_pmcashflow">PM Thirty Year Cash Flow</a></p>
 <!--PM_END-->
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#recommendations" style="text-decoration:none; color:#1a1a1a;">Recommendations</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_recommendations">23</span></td></tr>
-    <tr><td style="padding:8px 4px; border-bottom:1px dotted #ccc;"><a href="#disclosures" style="text-decoration:none; color:#1a1a1a;">Disclosures</a></td><td style="padding:8px 4px; border-bottom:1px dotted #ccc; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_disclosures">23</span></td></tr>
-    <tr><td style="padding:8px 4px;"><a href="#bibliography" style="text-decoration:none; color:#1a1a1a;">Bibliography</a></td><td style="padding:8px 4px; text-align:right; width:40px;" class="toc-pagenum"><span class="toc-pageref" data-ref="_bibliography">24</span></td></tr>
-  </table>
+    <p class="toc-entry"><a href="#_recommendations">Recommendations</a></p>
+    <p class="toc-entry"><a href="#_disclosures">Disclosures</a></p>
+    <p class="toc-entry"><a href="#_bibliography">Bibliography</a></p>
+  </div>
 </div>
 
 <div class="page-break"></div>

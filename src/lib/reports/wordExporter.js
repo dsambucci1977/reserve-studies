@@ -142,7 +142,8 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
   // 10. Section headers
   tempDiv.querySelectorAll('.section-header').forEach(header => {
     const isGreen = header.classList.contains('section-header-green');
-    const bg = isGreen ? '#166534' : '#1e3a5f';
+    const isOrange = header.classList.contains('section-header-orange');
+    const bg = isGreen ? '#166534' : isOrange ? '#c55a11' : '#1e3a5f';
     header.style.cssText = `background-color:${bg}; color:white; padding:8px 12px; font-size:12pt; font-weight:bold; letter-spacing:1px; margin:16px 0 0 0;`;
   });
   
@@ -184,26 +185,20 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
     footer.remove();
   });
   
-  // 15. Table of Contents - style cells, keep links functional
+  // 15. Table of Contents - style as simple paragraphs (NOT a table)
   tempDiv.querySelectorAll('.toc-page').forEach(el => {
     el.style.cssText = 'padding: 16px;';
   });
   tempDiv.querySelectorAll('.toc-title').forEach(el => {
-    el.style.cssText = 'font-size:16pt; font-weight:bold; color:#1e3a5f; text-align:center; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #1e3a5f;';
+    el.style.cssText = 'font-size:16pt; font-weight:bold; color:#1e3a5f; text-align:center; margin-bottom:20px; padding-bottom:8px; border-bottom:2px solid #1e3a5f;';
   });
-  // Style TOC table cells - remove borders, keep links
-  tempDiv.querySelectorAll('.toc-table td').forEach(td => {
-    // Preserve existing inline styles but ensure no visible border
-    const existing = td.getAttribute('style') || '';
-    if (!existing.includes('border-bottom:1px dotted')) {
-      td.style.cssText = existing + ' border:none;';
-    } else {
-      td.style.cssText = existing.replace(/border:1px solid #ddd;?/g, '');
+  // Style TOC entry paragraphs
+  tempDiv.querySelectorAll('.toc-entry').forEach(p => {
+    p.style.cssText = 'margin:0; padding:8px 0; border-bottom:1px dotted #ccc; font-size:11pt;';
+    const link = p.querySelector('a');
+    if (link) {
+      link.style.cssText = 'text-decoration:none; color:#1a1a1a;';
     }
-  });
-  // Mark toc-pageref spans for string replacement (PAGEREF field codes)
-  tempDiv.querySelectorAll('.toc-pageref').forEach(span => {
-    span.setAttribute('data-word-pageref', span.getAttribute('data-ref') || '');
   });
   
   // 16. Strip border-radius from all inline styles (Word doesn't support it)
@@ -221,13 +216,6 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
   bodyContent = bodyContent.replace(
     /<div data-word-page-break="true"><\/div>/g,
     '<p style="page-break-before:always; margin:0; padding:0; line-height:0; font-size:1pt;">&nbsp;</p>'
-  );
-  
-  // Replace PAGEREF markers with Word field codes for TOC page numbers
-  // Pattern: <span class="toc-pageref" data-ref="xxx" data-word-pageref="xxx">fallback</span>
-  bodyContent = bodyContent.replace(
-    /<span[^>]*data-word-pageref="([^"]*)"[^>]*>(\d+)<\/span>/g,
-    '<span style=\'mso-field-code:" PAGEREF $1 \\\\h"\'>$2</span>'
   );
   
   // ============================================================
@@ -250,31 +238,13 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
     }
   }
   
-  // Build footer text from company info
+  // Build footer content
   const footerParts = [companyName, companyAddress, companyPhone].filter(Boolean);
-  const footerLine = footerParts.length > 1 
-    ? `<b style='color:#1e3a5f;'>${companyName || ''}</b> | ${footerParts.slice(1).join(' | ')}`
-    : `<b style='color:#1e3a5f;'>${companyName || ''}</b>`;
-  
-  // Fix TOC links to match bookmark names
-  // Template TOC uses href="#introduction" but bookmarks are name="_introduction"
-  // Convert all TOC anchor hrefs to match bookmark naming convention
-  bodyContent = bodyContent.replace(
-    /href="#([^"]+)"/g,
-    (match, id) => {
-      // Convert kebab-case to bookmark style: reserve-chart -> _reservechart
-      const bookmarkName = '_' + id.replace(/-/g, '');
-      return `href="#${bookmarkName}"`;
-    }
-  );
+  const footerText = footerParts.join(' | ');
   
   // ============================================================
   // BUILD WORD-COMPATIBLE DOCUMENT  
   // ============================================================
-  // Single section approach with mso-title-page:yes to suppress footer on page 1.
-  // Footer div MUST be outside conditional comments for Word to recognize
-  // mso-element:footer attribute. It won't render visually in body because
-  // Word intercepts elements with mso-element and moves them to the footer area.
   const wordDoc = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
     xmlns:w="urn:schemas-microsoft-com:office:word"
     xmlns="http://www.w3.org/TR/REC-html40">
@@ -298,9 +268,23 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
     mso-header-margin: 0.3in;
     mso-footer-margin: 0.5in;
     mso-title-page: yes;
+    mso-header: h1;
     mso-footer: f1;
   }
   div.WordSection1 { page: WordSection1; }
+  
+  p.MsoFooter, li.MsoFooter, div.MsoFooter {
+    margin: 0in;
+    font-size: 7.0pt;
+    font-family: Arial, sans-serif;
+    color: #666666;
+  }
+  p.MsoHeader, li.MsoHeader, div.MsoHeader {
+    margin: 0in;
+    font-size: 10.0pt;
+    font-family: Arial, sans-serif;
+  }
+  
   body { 
     font-family: Arial, Helvetica, sans-serif; 
     font-size: 10pt; 
@@ -346,13 +330,16 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
   .expenditure-table-green th { background: #166534; color: white; border: 1px solid #166534; }
 </style>
 </head>
-<body>
-<div style='mso-element:footer' id=f1>
-  <p style='text-align:center; font-size:7pt; color:#666; font-family:Arial,sans-serif; border-top:1px solid #ccc; padding-top:4px;'>
-    ${footerLine} &nbsp;&nbsp;|&nbsp;&nbsp; Page <span style='mso-field-code:" PAGE "'>1</span>
-  </p>
+<body lang=EN-US>
+<div style='mso-element:header' id=h1>
+<p class=MsoHeader>&nbsp;</p>
 </div>
-<div class="WordSection1">
+<div style='mso-element:footer' id=f1>
+<p class=MsoFooter style='text-align:center; border-top:1px solid #ccc; padding-top:4pt;'>
+${footerText} &nbsp;|&nbsp; Page <span style='mso-field-code:" PAGE "'>1</span>
+</p>
+</div>
+<div class=WordSection1>
 ${bodyContent}
 </div>
 </body>
