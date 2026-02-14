@@ -230,23 +230,6 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
     '<span style=\'mso-field-code:" PAGEREF $1 \\\\h"\'>$2</span>'
   );
   
-  // Split into Cover Section (no footer) and Main Section (with footer)
-  // Find the first page break - everything before it is the cover page
-  const firstBreakMarker = '<p style="page-break-before:always; margin:0; padding:0; line-height:0; font-size:1pt;">&nbsp;</p>';
-  const firstBreakIdx = bodyContent.indexOf(firstBreakMarker);
-  
-  if (firstBreakIdx !== -1) {
-    const coverContent = bodyContent.substring(0, firstBreakIdx);
-    const mainContent = bodyContent.substring(firstBreakIdx + firstBreakMarker.length);
-    
-    // Word section break between cover and main content
-    bodyContent = '<div class="CoverSection">' + coverContent + '</div>' +
-      '<br clear="all" style="page-break-before:always; mso-break-type:section-break;">' +
-      '<div class="MainSection">' + mainContent + '</div>';
-  } else {
-    bodyContent = '<div class="MainSection">' + bodyContent + '</div>';
-  }
-  
   // ============================================================
   // CONVERT IMAGES TO BASE64
   // ============================================================
@@ -273,13 +256,25 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
     ? `<b style='color:#1e3a5f;'>${companyName || ''}</b> | ${footerParts.slice(1).join(' | ')}`
     : `<b style='color:#1e3a5f;'>${companyName || ''}</b>`;
   
+  // Fix TOC links to match bookmark names
+  // Template TOC uses href="#introduction" but bookmarks are name="_introduction"
+  // Convert all TOC anchor hrefs to match bookmark naming convention
+  bodyContent = bodyContent.replace(
+    /href="#([^"]+)"/g,
+    (match, id) => {
+      // Convert kebab-case to bookmark style: reserve-chart -> _reservechart
+      const bookmarkName = '_' + id.replace(/-/g, '');
+      return `href="#${bookmarkName}"`;
+    }
+  );
+  
   // ============================================================
-  // BUILD WORD-COMPATIBLE DOCUMENT
+  // BUILD WORD-COMPATIBLE DOCUMENT  
   // ============================================================
-  // NOTE: The footer uses mso-element:footer which ONLY works in Microsoft Word.
-  // We wrap it in conditional comments so non-Word apps (LibreOffice, etc.)
-  // don't render it as body content at the top of the document.
-  // The @page CSS footer reference also only works in Word.
+  // Single section approach with mso-title-page:yes to suppress footer on page 1.
+  // Footer div MUST be outside conditional comments for Word to recognize
+  // mso-element:footer attribute. It won't render visually in body because
+  // Word intercepts elements with mso-element and moves them to the footer area.
   const wordDoc = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
     xmlns:w="urn:schemas-microsoft-com:office:word"
     xmlns="http://www.w3.org/TR/REC-html40">
@@ -296,25 +291,16 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
 </xml>
 <![endif]-->
 <style>
-  /* Cover page section - no footer */
-  @page CoverSection {
+  @page WordSection1 {
     size: 8.5in 11.0in;
     mso-page-orientation: portrait;
-    margin: 0.75in 0.75in 0.75in 0.75in;
-  }
-  div.CoverSection { page: CoverSection; }
-  
-  /* Main content section - with footer */
-  @page MainSection {
-    size: 8.5in 11.0in;
-    mso-page-orientation: portrait;
-    margin: 0.75in 0.75in 0.75in 0.75in;
+    margin: 0.75in 0.75in 1.0in 0.75in;
     mso-header-margin: 0.3in;
-    mso-footer-margin: 0.3in;
+    mso-footer-margin: 0.5in;
+    mso-title-page: yes;
     mso-footer: f1;
   }
-  div.MainSection { page: MainSection; }
-  
+  div.WordSection1 { page: WordSection1; }
   body { 
     font-family: Arial, Helvetica, sans-serif; 
     font-size: 10pt; 
@@ -361,17 +347,14 @@ export async function exportToWord(htmlContent, fileName, options = {}) {
 </style>
 </head>
 <body>
-<!--[if gte mso 9]>
 <div style='mso-element:footer' id=f1>
-  <table width='100%' style='border:none; border-top:1px solid #ccc; font-size:7pt; color:#666; font-family:Arial,sans-serif;'>
-    <tr>
-      <td style='border:none; padding:4px 0; text-align:left;'>${footerLine}</td>
-      <td style='border:none; padding:4px 0; text-align:right;'>Page <span style='mso-field-code:" PAGE "'>1</span></td>
-    </tr>
-  </table>
+  <p style='text-align:center; font-size:7pt; color:#666; font-family:Arial,sans-serif; border-top:1px solid #ccc; padding-top:4px;'>
+    ${footerLine} &nbsp;&nbsp;|&nbsp;&nbsp; Page <span style='mso-field-code:" PAGE "'>1</span>
+  </p>
 </div>
-<![endif]-->
+<div class="WordSection1">
 ${bodyContent}
+</div>
 </body>
 </html>`;
   
