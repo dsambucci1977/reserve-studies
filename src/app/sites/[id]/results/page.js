@@ -659,9 +659,8 @@ export default function ResultsPage() {
                     onClick={() => {
                       let csv = 'Fiscal Year,Current Contribution,Annual Expenditures,Current Ending Balance,FF Annual Contribution,FF Average Annual Contribution,FF Ending Balance\n';
                       reserveCashFlow.forEach((row, index) => {
-                        const ffT = thresholds.projectionFull?.[index];
-                        const ffRow = ffT || reserveFullFundingCashFlow[index] || {};
-                        const ffAnnual = reserveFullFundingCashFlow[index]?.annualContribution || averageAnnualContribution;
+                        const ffRow = reserveFullFundingCashFlow[index] || {};
+                        const ffAnnual = ffRow.annualContribution || averageAnnualContribution;
                         csv += `${row.year},${Math.round(row.contributions||0)},${Math.round(row.expenditures||0)},${Math.round(row.endingBalance||0)},${Math.round(ffAnnual)},${Math.round(averageAnnualContribution)},${Math.round(ffRow.endingBalance||0)}\n`;
                       });
                       const blob = new Blob([csv], { type: 'text/csv' });
@@ -731,12 +730,9 @@ export default function ResultsPage() {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {reserveCashFlow.map((row, index) => {
-                        // Use threshold projectionFull as source of truth for Full Funding ending balance
-                        const ffThreshold = thresholds.projectionFull?.[index];
-                        const ffRow = ffThreshold || reserveFullFundingCashFlow[index] || {};
-                        // Annual Contribution = Component Method per-year total (varies as components cycle)
-                        // This comes from yearlyAnnualFunding calculated in the engine
-                        const ffAnnualContribution = reserveFullFundingCashFlow[index]?.annualContribution || averageAnnualContribution;
+                        const ffRow = reserveFullFundingCashFlow[index] || {};
+                        // Annual Contribution = Component Method per-year total (varies)
+                        const ffAnnualContribution = ffRow.annualContribution || averageAnnualContribution;
                         
                         return (
                           <tr key={row.year} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>

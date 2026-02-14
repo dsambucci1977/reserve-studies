@@ -262,14 +262,41 @@ export default function CalculatePage() {
         pmCashFlow: pmCashFlowWithExpend,
         pmFullFundingCashFlow: pmFullFundingCashFlow,
         
-        fullFundingCashFlow: reserveResults.thresholdScenarios.fullFunding.years.map((y, i) => ({
-          year: y.fiscalYear,
-          annualContribution: Math.round(reserveResults.thresholdScenarios.fullFunding.yearlyAnnualFunding[i] || 0),
-          contributions: Math.round(y.reserveBalance.contributions),
-          expenditures: Math.round(y.reserveBalance.expenditures),
-          endingBalance: Math.round(y.reserveBalance.endingBalance),
-        })),
-        averageAnnualContribution: Math.round(reserveRecommendedFunding),
+        fullFundingCashFlow: (() => {
+          // Annual Contribution = Component Method per-year total (varies)
+          const yearlyFunding = reserveResults.thresholdScenarios.fullFunding.yearlyAnnualFunding || [];
+          // Average Annual Contribution = SUM(Annual Contributions) / 30
+          const totalFunding = yearlyFunding.slice(0, 30).reduce((sum, val) => sum + (val || 0), 0);
+          const componentMethodAverage = totalFunding / 30;
+          
+          // Build ending balance projection using the flat average contribution
+          const ffRows = [];
+          let runningBalance = reserveProjectInfo.beginningReserveBalance;
+          
+          for (let i = 0; i < 31; i++) {
+            const year = reserveResults.thresholdScenarios.fullFunding.years[i];
+            if (!year) break;
+            const expenditures = reserveCashFlowWithExpend[i]?.expenditures || 0;
+            const interest = runningBalance * reserveProjectInfo.interestRate;
+            const endingBalance = runningBalance + componentMethodAverage + interest - expenditures;
+            
+            ffRows.push({
+              year: year.fiscalYear,
+              annualContribution: Math.round(yearlyFunding[i] || 0),
+              averageAnnualContribution: Math.round(componentMethodAverage),
+              expenditures: Math.round(expenditures),
+              endingBalance: Math.round(endingBalance),
+            });
+            
+            runningBalance = endingBalance;
+          }
+          return ffRows;
+        })(),
+        averageAnnualContribution: (() => {
+          const yearlyFunding = reserveResults.thresholdScenarios.fullFunding.yearlyAnnualFunding || [];
+          const totalFunding = yearlyFunding.slice(0, 30).reduce((sum, val) => sum + (val || 0), 0);
+          return Math.round(totalFunding / 30);
+        })(),
         cashFlow: reserveCashFlowWithExpend,
         replacementSchedule: buildReplacementSchedule(mappedComponents, site.beginningYear || new Date().getFullYear(), costAdjustmentFactor, inflationRate),
       };
