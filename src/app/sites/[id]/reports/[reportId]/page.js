@@ -18,6 +18,7 @@ export default function ReportEditorPage() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [htmlContent, setHtmlContent] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
@@ -82,7 +83,9 @@ export default function ReportEditorPage() {
     printWindow.print();
   };
 
-  const handleDownloadWord = () => {
+  const handleDownloadWord = async () => {
+    setDownloading(true);
+    try {
     const content = editorRef.current ? editorRef.current.innerHTML : htmlContent;
     const siteName = site?.siteName || 'Site';
     const studyTypeName = site?.studyType || 'Reserve Study';
@@ -103,7 +106,6 @@ export default function ReportEditorPage() {
     if (bodyMatch) {
       bodyContent = bodyMatch[1];
     } else {
-      // If no body tag, strip any head/html tags and use the rest
       bodyContent = content
         .replace(/<!DOCTYPE[^>]*>/gi, '')
         .replace(/<html[^>]*>/gi, '')
@@ -121,13 +123,48 @@ export default function ReportEditorPage() {
       .replace(/<div[^>]*class="[^"]*page-container[^"]*"[^>]*>/gi, '')
       .replace(/<!-- page-container end -->/gi, '');
     
+    // Convert remote images to base64 for Word compatibility
+    const imgRegex = /<img[^>]+src="(https?:\/\/[^"]+)"[^>]*>/gi;
+    const imgMatches = [...bodyContent.matchAll(imgRegex)];
+    for (const match of imgMatches) {
+      try {
+        const response = await fetch(match[1]);
+        const blob = await response.blob();
+        const base64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+        bodyContent = bodyContent.replace(match[1], base64);
+      } catch (e) {
+        console.warn('Could not embed image:', match[1], e);
+      }
+    }
+    
     // Clean up report styles for Word compatibility
     let cleanStyles = reportStyles
       // Remove @media screen blocks (editor-only styles)
       .replace(/@media\s+screen\s*\{[\s\S]*?\}\s*\}/g, '')
-      // Remove @media print blocks (Word handles its own print)
+      // Remove @media print blocks
       .replace(/@media\s+print\s*\{[\s\S]*?\}\s*\}/g, '')
-      // Keep the rest (cover page, section headers, tables, etc.)
+      // Remove CSS reset that kills all spacing
+      .replace(/\*\s*\{[^}]*margin:\s*0[^}]*padding:\s*0[^}]*\}/g, '')
+      .replace(/\*\s*\{[^}]*\}/g, function(match) {
+        // Only remove if it contains margin:0 or padding:0
+        if (/margin\s*:\s*0/.test(match) || /padding\s*:\s*0/.test(match)) return '';
+        return match;
+      })
+      // Remove max-width and margin:auto from body (breaks Word page layout)
+      .replace(/(body\s*\{[^}]*?)max-width\s*:[^;]+;/g, '$1')
+      .replace(/(body\s*\{[^}]*?)margin\s*:\s*0\s+auto[^;]*;/g, '$1')
+      // Replace flexbox with Word-compatible alternatives
+      .replace(/display\s*:\s*flex\s*;/g, '')
+      .replace(/flex-direction\s*:\s*column\s*;/g, '')
+      .replace(/justify-content\s*:\s*[^;]+;/g, '')
+      .replace(/align-items\s*:\s*center\s*;/g, 'text-align: center;')
+      .replace(/align-items\s*:\s*[^;]+;/g, '')
+      .replace(/flex\s*:\s*[^;]+;/g, '')
+      .replace(/gap\s*:\s*[^;]+;/g, '')
       .trim();
     
     // Build Word-compatible document
@@ -149,21 +186,23 @@ export default function ReportEditorPage() {
   <style>
     @page { 
       size: 8.5in 11in; 
-      margin: 0.6in 0.6in 0.75in 0.6in; 
+      margin: 0.75in 0.6in 0.75in 0.6in; 
     }
     body { 
       font-family: Arial, Helvetica, sans-serif; 
       font-size: 10pt; 
       line-height: 1.4;
       color: #1a1a1a;
-      background: white;
     }
+    p { margin: 4pt 0; }
     /* Report styles */
     ${cleanStyles}
     /* Word-specific overrides */
     .page-break { page-break-before: always; height: 0; margin: 0; padding: 0; }
     .page-break-indicator { display: none; }
     .no-print { display: none; }
+    .cover-page { text-align: center; padding: 36pt; }
+    .cover-logo img { max-width: 300px; }
   </style>
 </head>
 <body>
@@ -171,8 +210,8 @@ export default function ReportEditorPage() {
 </body>
 </html>`;
     
-    const blob = new Blob([wordDoc], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
+    const docBlob = new Blob([wordDoc], { type: 'application/msword' });
+    const url = URL.createObjectURL(docBlob);
     const a = document.createElement('a');
     a.href = url;
     a.download = fileName;
@@ -180,6 +219,12 @@ export default function ReportEditorPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Word download error:', err);
+      alert('Error generating Word document. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const execCommand = (command, value) => {
@@ -292,9 +337,10 @@ export default function ReportEditorPage() {
             
             <button
               onClick={handleDownloadWord}
-              className="px-4 py-2 bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 flex items-center gap-1 border border-blue-700"
+              disabled={downloading}
+              className="px-4 py-2 bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1 border border-blue-700"
             >
-              📄 Download Word
+              {downloading ? '⏳ Preparing...' : '📄 Download Word'}
             </button>
           </div>
         </div>
