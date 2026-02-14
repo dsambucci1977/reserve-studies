@@ -25,13 +25,14 @@ export async function exportToWord(htmlContent, fileName) {
   // 1. Strip editor-only elements
   tempDiv.querySelectorAll('.page-break-indicator, .no-print').forEach(el => el.remove());
   
-  // 2. Convert .page-break divs to Word-compatible page breaks
-  //    Word needs a paragraph with specific break style, not just CSS on empty divs
+  // 2. Mark page-break divs with a data attribute for post-DOM string replacement
+  //    CRITICAL: Cannot set page-break-before via DOM because the browser normalizes
+  //    it to 'break-before:page' in innerHTML output, and Word ignores that.
+  //    We mark them here, then do string replacement after getting innerHTML.
   tempDiv.querySelectorAll('.page-break').forEach(el => {
-    const p = document.createElement('p');
-    p.style.cssText = 'page-break-before:always; margin:0; padding:0; line-height:0; font-size:0;';
-    p.innerHTML = '&nbsp;';
-    el.parentNode.replaceChild(p, el);
+    const marker = document.createElement('div');
+    marker.setAttribute('data-word-page-break', 'true');
+    el.parentNode.replaceChild(marker, el);
   });
   
   // 3. Unwrap page-container divs (keep children)
@@ -203,6 +204,13 @@ export async function exportToWord(htmlContent, fileName) {
   
   // Get the transformed HTML
   bodyContent = tempDiv.innerHTML;
+  
+  // Replace page break markers with Word-compatible page breaks
+  // (done as string replacement to avoid browser CSS normalization)
+  bodyContent = bodyContent.replace(
+    /<div data-word-page-break="true"><\/div>/g,
+    '<p style="page-break-before:always; margin:0; padding:0; line-height:0; font-size:1pt;">&nbsp;</p>'
+  );
   
   // ============================================================
   // CONVERT IMAGES TO BASE64
