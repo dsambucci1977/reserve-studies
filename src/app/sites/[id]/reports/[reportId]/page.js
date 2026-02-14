@@ -309,10 +309,14 @@ export default function ReportEditorPage() {
   </xml>
   <![endif]-->
   <style>
-    @page { 
-      size: 8.5in 11in; 
-      margin: 0.75in 0.75in 0.75in 0.75in; 
+    @page WordSection1 {
+      size: 8.5in 11.0in;
+      mso-page-orientation: portrait;
+      margin: 0.75in 0.75in 0.75in 0.75in;
+      mso-header-margin: 0.5in;
+      mso-footer-margin: 0.5in;
     }
+    div.WordSection1 { page: WordSection1; }
     body { 
       font-family: Arial, Helvetica, sans-serif; 
       font-size: 10pt; 
@@ -362,7 +366,9 @@ export default function ReportEditorPage() {
   </style>
 </head>
 <body>
+  <div class="WordSection1">
   ${bodyContent}
+  </div>
 </body>
 </html>`;
       
