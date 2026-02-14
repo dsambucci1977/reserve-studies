@@ -179,6 +179,7 @@ export default function CalculatePage() {
       let pmRecommendedFunding = 0;
       let pmCashFlowWithExpend = [];
       let pmFullFundingCashFlow = [];
+      let pmComponentMethodAvg = 0;
       
       if (pmRequired && pmComponents.length > 0) {
         setProgress(`Calculating PM Fund (${pmComponents.length} components)...`);
@@ -194,13 +195,30 @@ export default function CalculatePage() {
         
         pmCashFlowWithExpend = buildCashFlowWithCycling(pmComponents, pmProjectInfo);
         
-        pmFullFundingCashFlow = pmResults.thresholdScenarios.fullFunding.years.map((y, i) => ({
-          year: y.fiscalYear,
-          annualContribution: Math.round(pmResults.thresholdScenarios.fullFunding.yearlyAnnualFunding[i] || 0),
-          contributions: Math.round(y.reserveBalance.contributions),
-          expenditures: Math.round(y.reserveBalance.expenditures),
-          endingBalance: Math.round(y.reserveBalance.endingBalance),
-        }));
+        // Build PM Full Funding cash flow using 30-year Component Method average
+        const pmYearlyFunding = pmResults.thresholdScenarios.fullFunding.yearlyAnnualFunding || [];
+        const pmTotalFunding = pmYearlyFunding.slice(0, 30).reduce((sum, val) => sum + (val || 0), 0);
+        pmComponentMethodAvg = pmTotalFunding / 30;
+        
+        let pmRunningBalance = parseFloat(site.pmBeginningBalance) || 0;
+        pmFullFundingCashFlow = [];
+        for (let i = 0; i < 31; i++) {
+          const year = pmResults.thresholdScenarios.fullFunding.years[i];
+          if (!year) break;
+          const expenditures = pmCashFlowWithExpend[i]?.expenditures || 0;
+          const interest = pmRunningBalance * pmProjectInfo.interestRate;
+          const endingBalance = pmRunningBalance + pmComponentMethodAvg + interest - expenditures;
+          
+          pmFullFundingCashFlow.push({
+            year: year.fiscalYear,
+            annualContribution: Math.round(pmYearlyFunding[i] || 0),
+            averageAnnualContribution: Math.round(pmComponentMethodAvg),
+            expenditures: Math.round(expenditures),
+            endingBalance: Math.round(endingBalance),
+          });
+          
+          pmRunningBalance = endingBalance;
+        }
       }
 
       // 3. BUILD CASH FLOWS (WITH FFB)
@@ -233,7 +251,7 @@ export default function CalculatePage() {
         reserveFund: {
           percentFunded: (reserveResults.years[0].reserveBalance?.percentFunded || 0) * 100,
           fullyFundedBalance: reserveResults.years[0].totals?.overall?.fullFundingBalance || 0,
-          recommendedContribution: reserveRecommendedFunding || 0,
+          recommendedContribution: componentMethod30YrAvg || 0,
           currentBalance: reserveProjectInfo.beginningReserveBalance,
           currentContribution: reserveProjectInfo.currentAnnualContribution,
           componentCount: reserveComponents.length,
@@ -243,7 +261,7 @@ export default function CalculatePage() {
         pmFund: pmRequired && pmResults ? {
           percentFunded: (pmResults.years[0].reserveBalance?.percentFunded || 0) * 100,
           fullyFundedBalance: pmResults.years[0].totals?.overall?.fullFundingBalance || 0,
-          recommendedContribution: pmRecommendedFunding || 0,
+          recommendedContribution: pmComponentMethodAvg || 0,
           currentBalance: parseFloat(site.pmBeginningBalance) || 0,
           currentContribution: parseFloat(site.pmAnnualContribution) || 0,
           componentCount: pmComponents.length,
@@ -257,7 +275,7 @@ export default function CalculatePage() {
         thresholds: thresholdResults,
         summary: {
           percentFunded: (reserveResults.years[0].reserveBalance?.percentFunded || 0) * 100,
-          recommendedContribution: reserveRecommendedFunding || 0,
+          recommendedContribution: componentMethod30YrAvg || 0,
           currentReserveBalance: reserveProjectInfo.beginningReserveBalance,
           fullyFundedBalance: reserveResults.years[0].totals?.overall?.fullFundingBalance || 0,
           asOfYear: site.beginningYear || new Date().getFullYear(),
