@@ -548,7 +548,7 @@ export default function ResultsPage() {
                         <div className="text-2xl font-bold text-gray-900">{(thresholds.multiplierFull || 1).toFixed(4)}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500">Annual Contribution (Yr 1)</div>
+                        <div className="text-xs text-gray-500">Avg Annual Contribution</div>
                         <div className="text-lg font-bold text-gray-900">${Math.round(thresholds.contributionFull || reserveFund.recommendedContribution || 0).toLocaleString()}</div>
                       </div>
                       <div>

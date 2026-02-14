@@ -167,6 +167,11 @@ export default function CalculatePage() {
         ? reserveResults.summary.byCategory.reduce((sum, c) => sum + (c.annualFunding || 0), 0)
         : reserveResults.thresholdScenarios.fullFunding.averageAnnualContribution;
 
+      // 30-year Component Method average = SUM(yearly annual funding) / 30
+      // This matches the old program formula: =SUM(G$11:G$40)/30
+      const yearlyFunding = reserveResults.thresholdScenarios.fullFunding.yearlyAnnualFunding || [];
+      const componentMethod30YrAvg = yearlyFunding.slice(0, 30).reduce((sum, val) => sum + (val || 0), 0) / 30;
+
       const reserveRecommendedFunding = reserveResults.thresholdScenarios.fullFunding.averageAnnualContribution;
 
       // 2. PM FUND CALCULATION
@@ -212,7 +217,7 @@ export default function CalculatePage() {
         reserveComponents, 
         reserveProjectInfo.beginningReserveBalance,
         reserveRecommendedFunding,
-        componentMethodTotal
+        componentMethod30YrAvg
       );
       
       // 5. ASSEMBLE RESULTS
