@@ -1,13 +1,16 @@
+// src/app/sites/[id]/reports/page.js
+// Reports page - Direct Word download + legacy report list
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, getDocs, doc, getDoc, addDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { loadReportData, generateReport } from '@/lib/reports/reportGenerator';
 import { DEFAULT_REPORT_TEMPLATE } from '@/lib/reports/DEFAULT_REPORT_TEMPLATE';
+import { exportToWord } from '@/lib/reports/wordExporter';
 
 export default function ReportsListPage() {
   const { user } = useAuth();
@@ -18,7 +21,7 @@ export default function ReportsListPage() {
   const [site, setSite] = useState(null);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [organizationId, setOrganizationId] = useState(null);
 
   useEffect(() => {
@@ -40,7 +43,6 @@ export default function ReportsListPage() {
         const reportsSnapshot = await getDocs(reportsQuery);
         setReports(reportsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (e) {
-        console.log('No reports yet');
         setReports([]);
       }
     } catch (error) {
@@ -50,9 +52,9 @@ export default function ReportsListPage() {
     }
   };
 
-  const handleGenerateReport = async () => {
+  const handleDownloadWord = async () => {
     try {
-      setGenerating(true);
+      setDownloading(true);
       const reportData = await loadReportData(siteId, organizationId);
       
       let template = DEFAULT_REPORT_TEMPLATE;
@@ -68,28 +70,16 @@ export default function ReportsListPage() {
       }
 
       const htmlContent = generateReport(template, reportData);
-
-      // Include study type in report title
+      const siteName = site?.siteName || 'Site';
       const studyType = site?.studyType || 'Reserve Study';
-      const reportTitle = `${studyType} Report - ${new Date().toLocaleDateString()}`;
-
-      const reportRef = await addDoc(collection(db, `sites/${siteId}/reports`), {
-        title: reportTitle,
-        studyType: site?.studyType || null,
-        status: 'draft',
-        htmlContent,
-        createdBy: user.uid,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        version: reports.length + 1
-      });
-
-      router.push('/sites/' + siteId + '/reports/' + reportRef.id);
+      const fileName = `${siteName} - ${studyType} Report.doc`;
+      
+      await exportToWord(htmlContent, fileName);
     } catch (error) {
       console.error('Error generating report:', error);
       alert('Error generating report: ' + error.message);
     } finally {
-      setGenerating(false);
+      setDownloading(false);
     }
   };
 
@@ -136,55 +126,66 @@ export default function ReportsListPage() {
               </span>
             )}
           </div>
-          <button
-            onClick={handleGenerateReport}
-            disabled={generating}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
-          >
-            {generating ? '⏳ Generating...' : '📄 Generate New Report'}
-          </button>
         </div>
 
-        {reports.length === 0 ? (
-          <div className="bg-white shadow rounded-lg p-12 text-center">
-            <div className="text-gray-400 text-6xl mb-4">📄</div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">No reports yet</h3>
-            <p className="text-gray-600 mb-6">
-              Generate your first {site?.studyType || 'Reserve Study'} Report
-            </p>
-            <button onClick={handleGenerateReport} disabled={generating}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50">
-              Generate Report
+        {/* PRIMARY: Download Word Report */}
+        <div className="bg-white shadow rounded-lg p-8 mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Download Report</h2>
+              <p className="text-gray-600 text-sm">
+                Generate a formatted Word document with all study data, cash flows, and recommendations. Edit directly in Microsoft Word.
+              </p>
+            </div>
+            <button
+              onClick={handleDownloadWord}
+              disabled={downloading}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+            >
+              {downloading ? (
+                <>
+                  <span className="animate-spin inline-block">⏳</span>
+                  Preparing...
+                </>
+              ) : (
+                <>📄 Download Word Report</>
+              )}
             </button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {reports.map(report => (
-              <div key={report.id} className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow">
-                <div className="flex justify-between items-start">
-                  <Link href={'/sites/' + siteId + '/reports/' + report.id} className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-bold text-gray-900">{report.title}</h3>
-                      <span className={'px-2 py-1 text-xs rounded-full ' + (report.status === 'final' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>
-                        {report.status === 'final' ? 'Final' : 'Draft'}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600">Version {report.version || 1} • Created {formatDate(report.createdAt)}</p>
-                  </Link>
-                  <div className="flex gap-2">
-                    <Link href={'/sites/' + siteId + '/reports/' + report.id}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
-                      Open
+        </div>
+
+        {/* LEGACY: Previously saved reports */}
+        {reports.length > 0 && (
+          <>
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Previously Saved Reports</h3>
+            <div className="space-y-4">
+              {reports.map(report => (
+                <div key={report.id} className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow">
+                  <div className="flex justify-between items-start">
+                    <Link href={'/sites/' + siteId + '/reports/' + report.id} className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-bold text-gray-900">{report.title}</h3>
+                        <span className={'px-2 py-1 text-xs rounded-full ' + (report.status === 'final' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>
+                          {report.status === 'final' ? 'Final' : 'Draft'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600">Version {report.version || 1} • Created {formatDate(report.createdAt)}</p>
                     </Link>
-                    <button onClick={(e) => handleDeleteReport(report.id, e)}
-                      className="px-4 py-2 text-red-600 hover:bg-red-50 rounded text-sm">
-                      Delete
-                    </button>
+                    <div className="flex gap-2">
+                      <Link href={'/sites/' + siteId + '/reports/' + report.id}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 text-sm">
+                        Open Editor
+                      </Link>
+                      <button onClick={(e) => handleDeleteReport(report.id, e)}
+                        className="px-4 py-2 text-red-600 hover:bg-red-50 rounded text-sm">
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
