@@ -2,7 +2,8 @@
 // Converts report HTML to Word-compatible .doc and triggers download
 // Uses DOM-based transformation to handle CSS Grid, Flexbox, gradients etc.
 
-export async function exportToWord(htmlContent, fileName) {
+export async function exportToWord(htmlContent, fileName, options = {}) {
+  const { companyName, companyAddress, companyPhone } = options;
   // Extract body content if it's a full HTML document
   let bodyContent = htmlContent;
   const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
@@ -183,16 +184,23 @@ export async function exportToWord(htmlContent, fileName) {
     footer.remove();
   });
   
-  // 15. Table of Contents styling
+  // 15. Table of Contents - convert links to plain text (anchors don't work in .doc)
   tempDiv.querySelectorAll('.toc-page').forEach(el => {
     el.style.cssText = 'padding: 16px;';
   });
   tempDiv.querySelectorAll('.toc-title').forEach(el => {
     el.style.cssText = 'font-size:16pt; font-weight:bold; color:#1e3a5f; text-align:center; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #1e3a5f;';
   });
-  // Remove borders from TOC table cells (they inherit from global td style)
+  // Convert TOC links to plain text and remove borders from cells
   tempDiv.querySelectorAll('.toc-table td').forEach(td => {
-    td.style.cssText = (td.getAttribute('style') || '') + ' border:none; border-bottom:1px dotted #ccc;';
+    td.style.cssText = 'border:none; border-bottom:1px dotted #ccc; padding:6px 4px;';
+    const link = td.querySelector('a');
+    if (link) {
+      const span = document.createElement('span');
+      span.textContent = link.textContent;
+      span.style.cssText = 'color:#1a1a1a;';
+      link.parentNode.replaceChild(span, link);
+    }
   });
   
   // 16. Strip border-radius from all inline styles (Word doesn't support it)
@@ -232,6 +240,10 @@ export async function exportToWord(htmlContent, fileName) {
     }
   }
   
+  // Build footer text from company info
+  const footerParts = [companyName, companyAddress, companyPhone].filter(Boolean);
+  const footerText = footerParts.join(' | ');
+  
   // ============================================================
   // BUILD WORD-COMPATIBLE DOCUMENT
   // ============================================================
@@ -255,8 +267,9 @@ export async function exportToWord(htmlContent, fileName) {
     size: 8.5in 11.0in;
     mso-page-orientation: portrait;
     margin: 0.75in 0.75in 0.75in 0.75in;
-    mso-header-margin: 0.5in;
-    mso-footer-margin: 0.5in;
+    mso-header-margin: 0.3in;
+    mso-footer-margin: 0.3in;
+    mso-title-page: yes;
     mso-footer: f1;
   }
   div.WordSection1 { page: WordSection1; }
@@ -307,9 +320,12 @@ export async function exportToWord(htmlContent, fileName) {
 </head>
 <body>
 <div style='mso-element:footer' id=f1>
-  <p style='text-align:center; font-size:8pt; color:#666; font-family:Arial,sans-serif;'>
-    Page <span style='mso-field-code:" PAGE "'>1</span>
-  </p>
+  <table width='100%' style='border:none; border-top:1px solid #ccc; font-size:7pt; color:#666; font-family:Arial,sans-serif;'>
+    <tr>
+      <td style='border:none; padding:4px 0; text-align:left;'><b style='color:#1e3a5f;'>${companyName || ''}</b>${footerParts.length > 1 ? ' | ' + footerParts.slice(1).join(' | ') : ''}</td>
+      <td style='border:none; padding:4px 0; text-align:right;'>Page <span style='mso-field-code:" PAGE "'>1</span></td>
+    </tr>
+  </table>
 </div>
 <div class="WordSection1">
 ${bodyContent}
