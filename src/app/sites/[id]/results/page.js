@@ -10,8 +10,9 @@
 
 'use client';
 
-import { useEffect, useState, Fragment } from 'react';
-import { getSite, getProjections } from '@/lib/db';
+import { useEffect, useState, useCallback, useRef, Fragment } from 'react';
+import { getSite, getProjections, getComponents, updateSite, saveProjections } from '@/lib/db';
+import { calculateReserveStudy } from '@/lib/calculations';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
@@ -21,6 +22,17 @@ export default function ResultsPage() {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('summary');
+  const [components, setComponents] = useState([]);
+  
+  // Editable study parameters
+  const [editCAF, setEditCAF] = useState(null);
+  const [editInflation, setEditInflation] = useState(null);
+  const [editInterest, setEditInterest] = useState(null);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const originalResults = useRef(null);
+  
   const params = useParams();
   const siteId = params.id;
   const { user, loading: authLoading } = useAuth();
@@ -32,13 +44,23 @@ export default function ResultsPage() {
     
     const loadData = async () => {
       try {
-        const [siteData, projectionsData] = await Promise.all([
+        const [siteData, projectionsData, comps] = await Promise.all([
           getSite(siteId),
-          getProjections(siteId)
+          getProjections(siteId),
+          getComponents(siteId)
         ]);
         
         setSite(siteData);
         setResults(projectionsData);
+        originalResults.current = projectionsData;
+        setComponents(comps || []);
+        
+        // Initialize edit values from saved settings
+        if (projectionsData?.projectSettings) {
+          setEditCAF(projectionsData.projectSettings.costAdjustmentFactor || 1.0);
+          setEditInflation((projectionsData.projectSettings.inflationRate || 0) * 100);
+          setEditInterest((projectionsData.projectSettings.interestRate || 0) * 100);
+        }
       } catch (error) {
         console.error('Error:', error);
       } finally {
@@ -48,6 +70,357 @@ export default function ResultsPage() {
     
     loadData();
   }, [user, authLoading, siteId, router]);
+
+  // ============================================================
+  // CALCULATION HELPERS (mirrors calculate/page.js)
+  // ============================================================
+  const buildCashFlowWithCycling = (comps, projectInfo) => {
+    const cashFlow = [];
+    const startYear = projectInfo.beginningYear;
+    let runningBalance = projectInfo.beginningReserveBalance;
+    const caf = projectInfo.costAdjustmentFactor || 1.0;
+    const compStates = comps.map(comp => ({
+      ...comp,
+      counter: comp.estimatedRemainingLife !== undefined ? comp.estimatedRemainingLife : 0,
+      ul: comp.typicalUsefulLife || 20,
+      currentCost: (comp.totalCost || 0) * caf
+    }));
+    for (let year = 0; year < 31; year++) {
+      const fiscalYear = startYear + year;
+      const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year);
+      let yearExpenditures = 0;
+      let totalFFB = 0;
+      compStates.forEach(comp => {
+        if (Math.round(comp.counter) <= 0) {
+          yearExpenditures += comp.currentCost * inflationMultiplier;
+          comp.counter = comp.ul;
+        }
+        const inflatedReplacementCost = comp.currentCost * inflationMultiplier;
+        const remainingLife = Math.max(0, comp.counter);
+        const usefulLife = Math.max(1, comp.ul);
+        const effectiveAge = Math.max(0, usefulLife - remainingLife);
+        totalFFB += inflatedReplacementCost * (effectiveAge / usefulLife);
+      });
+      const beginningBalance = runningBalance;
+      const contributions = projectInfo.currentAnnualContribution * inflationMultiplier;
+      const interest = beginningBalance * projectInfo.interestRate;
+      const endingBalance = beginningBalance + contributions + interest - yearExpenditures;
+      const percentFunded = totalFFB > 0 ? (endingBalance / totalFFB) * 100 : 100;
+      cashFlow.push({
+        year: fiscalYear, beginningBalance: Math.round(beginningBalance),
+        contributions: Math.round(contributions), interest: Math.round(interest),
+        expenditures: Math.round(yearExpenditures), endingBalance: Math.round(endingBalance),
+        fullyFundedBalance: Math.round(totalFFB), percentFunded
+      });
+      runningBalance = endingBalance;
+      compStates.forEach(comp => { comp.counter -= 1; });
+    }
+    return cashFlow;
+  };
+
+  const buildReplacementSchedule = (comps, beginningYear, caf, infRate) => {
+    const sched = [];
+    comps.forEach(component => {
+      const rul = component.estimatedRemainingLife || 0;
+      const baseCost = component.totalCost || 0;
+      const cafAdjusted = baseCost * (caf || 1.0);
+      const inflationMultiplier = Math.pow(1 + (infRate || 0), rul);
+      sched.push({
+        year: beginningYear + rul, description: component.description,
+        cost: baseCost, baseCost, adjustedCost: Math.round(cafAdjusted * inflationMultiplier),
+        category: component.category, isPM: component.isPreventiveMaintenance || false,
+      });
+    });
+    sched.sort((a, b) => a.year - b.year);
+    return sched;
+  };
+
+  const runProjectionWithCycling = (comps, projectInfo, beginningBalance, initialAnnualContribution) => {
+    const projection = [];
+    const startYear = projectInfo.beginningYear;
+    let runningBalance = beginningBalance;
+    const caf = projectInfo.costAdjustmentFactor || 1.0;
+    const compStates = comps.map(comp => ({
+      ...comp, counter: comp.estimatedRemainingLife !== undefined ? comp.estimatedRemainingLife : 0,
+      ul: comp.typicalUsefulLife || 20
+    }));
+    for (let year = 0; year < 31; year++) {
+      const fiscalYear = startYear + year;
+      const inflationMultiplier = Math.pow(1 + projectInfo.inflationRate, year);
+      let yearExpenditures = 0;
+      compStates.forEach(comp => {
+        if (Math.round(comp.counter) <= 0) {
+          yearExpenditures += (comp.totalCost || 0) * caf * inflationMultiplier;
+          comp.counter = comp.ul;
+        }
+      });
+      const beginningBalanceYear = runningBalance;
+      const contributions = initialAnnualContribution * inflationMultiplier;
+      const interest = beginningBalanceYear * projectInfo.interestRate;
+      const endingBalance = beginningBalanceYear + contributions + interest - yearExpenditures;
+      projection.push({ year: fiscalYear, beginningBalance: beginningBalanceYear, contributions, interest, expenditures: yearExpenditures, endingBalance });
+      runningBalance = endingBalance;
+      compStates.forEach(comp => { comp.counter -= 1; });
+    }
+    return projection;
+  };
+
+  const findContributionForThreshold = (projectInfo, comps, beginningBalance, thresholdPercent) => {
+    const caf = projectInfo.costAdjustmentFactor || 1.0;
+    const totalReplacementCost = comps.reduce((sum, c) => sum + (c.totalCost || 0), 0) * caf;
+    const targetBalance = totalReplacementCost * thresholdPercent;
+    let low = 0, high = totalReplacementCost * 2;
+    if (isNaN(high) || high === 0) high = 1000000;
+    for (let i = 0; i < 100; i++) {
+      const mid = (low + high) / 2;
+      const proj = runProjectionWithCycling(comps, projectInfo, beginningBalance, mid);
+      if (Math.min(...proj.map(y => y.endingBalance)) >= targetBalance) high = mid;
+      else low = mid;
+      if ((high - low) < 1) break;
+    }
+    return high;
+  };
+
+  const calculateThresholdProjections = (projectInfo, comps, beginningBalance, recommendedFunding, fullFundingBenchmark) => {
+    const caf = projectInfo.costAdjustmentFactor || 1.0;
+    const totalReplacementCost = comps.reduce((sum, c) => sum + (c.totalCost || 0), 0) * caf;
+    const contributionBaseline = findContributionForThreshold(projectInfo, comps, beginningBalance, 0.00);
+    const contribution5 = findContributionForThreshold(projectInfo, comps, beginningBalance, 0.05);
+    const contribution10 = findContributionForThreshold(projectInfo, comps, beginningBalance, 0.10);
+    const contributionFull = fullFundingBenchmark || findContributionForThreshold(projectInfo, comps, beginningBalance, 0.20);
+    const projectionBaseline = runProjectionWithCycling(comps, projectInfo, beginningBalance, contributionBaseline);
+    const projection5 = runProjectionWithCycling(comps, projectInfo, beginningBalance, contribution5);
+    const projection10 = runProjectionWithCycling(comps, projectInfo, beginningBalance, contribution10);
+    const projectionFull = runProjectionWithCycling(comps, projectInfo, beginningBalance, contributionFull);
+    const base = contributionFull > 0 ? contributionFull : 1;
+    return {
+      contribution10, contribution5, contributionBaseline, contributionFull,
+      multiplier10: contribution10 / base, multiplier5: contribution5 / base,
+      multiplierBaseline: contributionBaseline / base, multiplierFull: contributionFull / base,
+      minBalance10: Math.min(...projection10.map(y => y.endingBalance)),
+      minBalance5: Math.min(...projection5.map(y => y.endingBalance)),
+      minBalanceBaseline: Math.min(...projectionBaseline.map(y => y.endingBalance)),
+      minBalanceFull: Math.min(...projectionFull.map(y => y.endingBalance)),
+      percentOfBeginning10: beginningBalance > 0 ? (Math.min(...projection10.map(y => y.endingBalance)) / beginningBalance) * 100 : 0,
+      percentOfBeginning5: beginningBalance > 0 ? (Math.min(...projection5.map(y => y.endingBalance)) / beginningBalance) * 100 : 0,
+      percentOfBeginningBaseline: beginningBalance > 0 ? (Math.min(...projectionBaseline.map(y => y.endingBalance)) / beginningBalance) * 100 : 0,
+      compliant10: Math.min(...projection10.map(y => y.endingBalance)) >= totalReplacementCost * 0.10,
+      compliant5: Math.min(...projection5.map(y => y.endingBalance)) >= totalReplacementCost * 0.05,
+      projection10, projection5, projectionBaseline, projectionFull
+    };
+  };
+
+  // ============================================================
+  // RECALCULATE WITH EDITED PARAMS
+  // ============================================================
+  const recalculate = useCallback(() => {
+    if (!site || !components.length || editCAF === null) return;
+    setIsRecalculating(true);
+    
+    // Use setTimeout to let the UI update with "recalculating" indicator
+    setTimeout(() => {
+      try {
+        const inflRate = (editInflation || 0) / 100;
+        const intRate = (editInterest || 0) / 100;
+        const caf = editCAF || 1.0;
+        const pmReq = originalResults.current?.pmRequired !== false;
+        
+        // Map components same as calculate page
+        const mappedComponents = components.map(comp => {
+          const quantity = parseFloat(comp.quantity) || 0;
+          const unitCost = parseFloat(comp.unitCost) || 0;
+          let totalCost = parseFloat(comp.totalCost);
+          if (isNaN(totalCost) || totalCost === 0) totalCost = quantity * unitCost;
+          const rul = (comp.remainingUsefulLife !== undefined && comp.remainingUsefulLife !== "") ? parseFloat(comp.remainingUsefulLife) : 0;
+          return {
+            ...comp, costPerUnit: unitCost, estimatedRemainingLife: rul,
+            typicalUsefulLife: parseFloat(comp.usefulLife) || 20, quantity,
+            description: comp.description || '', category: comp.category || '',
+            componentType: comp.isPreventiveMaintenance ? 'Preventive Maintenance' : (comp.category || ''),
+            itemName: comp.description || '', isPreventiveMaintenance: comp.isPreventiveMaintenance || false,
+            totalCost,
+          };
+        });
+        
+        const reserveComps = pmReq ? mappedComponents.filter(c => !c.isPreventiveMaintenance) : mappedComponents;
+        const pmComps = pmReq ? mappedComponents.filter(c => c.isPreventiveMaintenance) : [];
+        
+        const reserveProjectInfo = {
+          beginningYear: site.beginningYear || new Date().getFullYear(),
+          projectionYears: site.projectionYears || 30,
+          beginningReserveBalance: parseFloat(site.beginningReserveBalance) || 0,
+          currentAnnualContribution: parseFloat(site.currentAnnualContribution) || 0,
+          inflationRate: inflRate, interestRate: intRate, costAdjustmentFactor: caf,
+        };
+        
+        // 1. Reserve Fund
+        const reserveResults = calculateReserveStudy(reserveProjectInfo, reserveComps);
+        const yearlyFunding = reserveResults.thresholdScenarios.fullFunding.yearlyAnnualFunding || [];
+        const componentMethod30YrAvg = yearlyFunding.slice(0, 30).reduce((sum, val) => sum + (val || 0), 0) / 30;
+        const reserveCashFlowNew = buildCashFlowWithCycling(reserveComps, reserveProjectInfo);
+        
+        // Full Funding Cash Flow (Component Method average)
+        const ffRows = [];
+        let runBal = reserveProjectInfo.beginningReserveBalance;
+        for (let i = 0; i < 31; i++) {
+          const year = reserveResults.thresholdScenarios.fullFunding.years[i];
+          if (!year) break;
+          const exp = reserveCashFlowNew[i]?.expenditures || 0;
+          const interest = runBal * intRate;
+          const endBal = runBal + componentMethod30YrAvg + interest - exp;
+          ffRows.push({
+            year: year.fiscalYear, annualContribution: Math.round(yearlyFunding[i] || 0),
+            averageAnnualContribution: Math.round(componentMethod30YrAvg),
+            expenditures: Math.round(exp), endingBalance: Math.round(endBal),
+          });
+          runBal = endBal;
+        }
+        
+        // 2. PM Fund
+        let pmCashFlowNew = [];
+        let pmFFCashFlowNew = [];
+        let pmFundNew = { percentFunded: 0, fullyFundedBalance: 0, recommendedContribution: 0, currentBalance: 0, currentContribution: 0, componentCount: 0, totalReplacementCost: 0, byCategory: [] };
+        let pmCompMethodAvg = 0;
+        
+        if (pmReq && pmComps.length > 0) {
+          const pmProjectInfo = {
+            ...reserveProjectInfo,
+            beginningReserveBalance: parseFloat(site.pmBeginningBalance) || 0,
+            currentAnnualContribution: parseFloat(site.pmAnnualContribution) || 0,
+          };
+          const pmRes = calculateReserveStudy(pmProjectInfo, pmComps);
+          const pmYF = pmRes.thresholdScenarios.fullFunding.yearlyAnnualFunding || [];
+          pmCompMethodAvg = pmYF.slice(0, 30).reduce((sum, val) => sum + (val || 0), 0) / 30;
+          pmCashFlowNew = buildCashFlowWithCycling(pmComps, pmProjectInfo);
+          
+          let pmRunBal = parseFloat(site.pmBeginningBalance) || 0;
+          for (let i = 0; i < 31; i++) {
+            const year = pmRes.thresholdScenarios.fullFunding.years[i];
+            if (!year) break;
+            const exp = pmCashFlowNew[i]?.expenditures || 0;
+            const interest = pmRunBal * intRate;
+            const endBal = pmRunBal + pmCompMethodAvg + interest - exp;
+            pmFFCashFlowNew.push({
+              year: year.fiscalYear, annualContribution: Math.round(pmYF[i] || 0),
+              averageAnnualContribution: Math.round(pmCompMethodAvg),
+              expenditures: Math.round(exp), endingBalance: Math.round(endBal),
+            });
+            pmRunBal = endBal;
+          }
+          pmFundNew = {
+            percentFunded: (pmRes.years[0].reserveBalance?.percentFunded || 0) * 100,
+            fullyFundedBalance: pmRes.years[0].totals?.overall?.fullFundingBalance || 0,
+            recommendedContribution: pmCompMethodAvg,
+            currentBalance: parseFloat(site.pmBeginningBalance) || 0,
+            currentContribution: parseFloat(site.pmAnnualContribution) || 0,
+            componentCount: pmComps.length,
+            totalReplacementCost: pmRes.summary.totalReplacementCost || 0,
+            byCategory: pmRes.summary.byCategory || [],
+          };
+        }
+        
+        // 3. Threshold Projections
+        const thresholdResults = calculateThresholdProjections(
+          reserveProjectInfo, reserveComps,
+          reserveProjectInfo.beginningReserveBalance,
+          componentMethod30YrAvg, componentMethod30YrAvg
+        );
+        
+        // 4. Assemble new results (same shape as original)
+        const newResults = {
+          pmRequired: pmReq,
+          projectSettings: { beginningYear: reserveProjectInfo.beginningYear, inflationRate: inflRate, interestRate: intRate, costAdjustmentFactor: caf },
+          reserveFund: {
+            percentFunded: (reserveResults.years[0].reserveBalance?.percentFunded || 0) * 100,
+            fullyFundedBalance: reserveResults.years[0].totals?.overall?.fullFundingBalance || 0,
+            recommendedContribution: componentMethod30YrAvg,
+            currentBalance: reserveProjectInfo.beginningReserveBalance,
+            currentContribution: reserveProjectInfo.currentAnnualContribution,
+            componentCount: reserveComps.length,
+            totalReplacementCost: reserveResults.summary.totalReplacementCost || 0,
+            byCategory: reserveResults.summary.byCategory || [],
+          },
+          pmFund: pmReq ? pmFundNew : { percentFunded: 0, fullyFundedBalance: 0, recommendedContribution: 0, currentBalance: 0, currentContribution: 0, componentCount: 0, totalReplacementCost: 0, byCategory: [] },
+          thresholds: thresholdResults,
+          summary: {
+            percentFunded: (reserveResults.years[0].reserveBalance?.percentFunded || 0) * 100,
+            recommendedContribution: componentMethod30YrAvg,
+            currentReserveBalance: reserveProjectInfo.beginningReserveBalance,
+            fullyFundedBalance: reserveResults.years[0].totals?.overall?.fullFundingBalance || 0,
+            asOfYear: reserveProjectInfo.beginningYear,
+            totalComponents: mappedComponents.length,
+          },
+          reserveCashFlow: reserveCashFlowNew,
+          pmCashFlow: pmCashFlowNew,
+          pmFullFundingCashFlow: pmFFCashFlowNew,
+          fullFundingCashFlow: ffRows,
+          averageAnnualContribution: Math.round(componentMethod30YrAvg),
+          cashFlow: reserveCashFlowNew,
+          replacementSchedule: buildReplacementSchedule(mappedComponents, reserveProjectInfo.beginningYear, caf, inflRate),
+        };
+        
+        setResults(newResults);
+      } catch (err) {
+        console.error('Recalculation error:', err);
+      } finally {
+        setIsRecalculating(false);
+      }
+    }, 50);
+  }, [site, components, editCAF, editInflation, editInterest]);
+
+  // Check if params have changed from saved values
+  const savedSettings = originalResults.current?.projectSettings || {};
+  const hasParamChanges = editCAF !== null && (
+    Math.abs((editCAF || 1.0) - (savedSettings.costAdjustmentFactor || 1.0)) > 0.001 ||
+    Math.abs((editInflation || 0) - ((savedSettings.inflationRate || 0) * 100)) > 0.001 ||
+    Math.abs((editInterest || 0) - ((savedSettings.interestRate || 0) * 100)) > 0.001
+  );
+
+  // Handle parameter change + auto-recalculate
+  const handleParamChange = (setter, value) => {
+    setter(value);
+  };
+
+  // Debounced recalculation when params change
+  const debounceRef = useRef(null);
+  useEffect(() => {
+    if (editCAF === null || !components.length) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      recalculate();
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [editCAF, editInflation, editInterest]);
+
+  // Save changes to Project Info
+  const handleSaveParams = async () => {
+    setIsSaving(true);
+    try {
+      await updateSite(siteId, {
+        costAdjustmentFactor: editCAF,
+        inflationRate: editInflation,
+        interestRate: editInterest,
+      });
+      await saveProjections(siteId, results);
+      originalResults.current = results;
+      setShowSavePrompt(false);
+    } catch (err) {
+      console.error('Save error:', err);
+      alert('Failed to save. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Reset to original saved values
+  const handleResetParams = () => {
+    const saved = originalResults.current?.projectSettings || {};
+    setEditCAF(saved.costAdjustmentFactor || 1.0);
+    setEditInflation((saved.inflationRate || 0) * 100);
+    setEditInterest((saved.interestRate || 0) * 100);
+    setResults(originalResults.current);
+    setShowSavePrompt(false);
+  };
 
   if (loading) {
     return (
@@ -283,32 +656,106 @@ export default function ResultsPage() {
           )}
         </div>
 
-        {/* Project Settings Bar */}
-        <div className="bg-gray-100 border border-gray-300 rounded-lg px-6 py-3 mb-6 flex flex-wrap items-center gap-6">
-          <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Study Parameters:</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">Beginning Year</span>
-            <span className="text-sm font-semibold text-gray-900">{beginningYear}</span>
+        {/* Project Settings Bar - Editable */}
+        <div className={`border rounded-lg px-6 py-3 mb-6 ${hasParamChanges ? 'bg-blue-50 border-blue-300' : 'bg-gray-100 border-gray-300'}`}>
+          <div className="flex flex-wrap items-center gap-6">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Study Parameters:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500">Beginning Year</span>
+              <span className="text-sm font-semibold text-gray-900">{beginningYear}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-gray-500">Inflation Rate</label>
+              <input
+                type="number" step="0.01" min="0" max="20"
+                value={editInflation ?? ''}
+                onChange={(e) => handleParamChange(setEditInflation, parseFloat(e.target.value) || 0)}
+                className="w-20 px-2 py-1 text-sm font-semibold text-gray-900 border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white text-right"
+              />
+              <span className="text-xs text-gray-500">%</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-gray-500">Interest Rate</label>
+              <input
+                type="number" step="0.01" min="0" max="20"
+                value={editInterest ?? ''}
+                onChange={(e) => handleParamChange(setEditInterest, parseFloat(e.target.value) || 0)}
+                className="w-20 px-2 py-1 text-sm font-semibold text-gray-900 border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white text-right"
+              />
+              <span className="text-xs text-gray-500">%</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-gray-500">Cost Adj. Factor</label>
+              <input
+                type="number" step="0.01" min="0" max="5"
+                value={editCAF ?? ''}
+                onChange={(e) => handleParamChange(setEditCAF, parseFloat(e.target.value) || 1.0)}
+                className="w-20 px-2 py-1 text-sm font-semibold text-amber-700 border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white text-right"
+              />
+            </div>
+            {isRecalculating && (
+              <span className="text-xs text-blue-600 font-medium animate-pulse">⟳ Recalculating...</span>
+            )}
           </div>
-          {inflationRate > 0 && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-500">Inflation Rate</span>
-              <span className="text-sm font-semibold text-gray-900">{(inflationRate * 100).toFixed(2)}%</span>
-            </div>
-          )}
-          {interestRate > 0 && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-500">Interest Rate</span>
-              <span className="text-sm font-semibold text-gray-900">{(interestRate * 100).toFixed(2)}%</span>
-            </div>
-          )}
-          {costAdjustmentFactor !== 1.0 && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-500">Cost Adj. Factor (GF)</span>
-              <span className="text-sm font-semibold text-amber-700">{costAdjustmentFactor.toFixed(2)}</span>
+          {hasParamChanges && !isRecalculating && (
+            <div className="flex items-center gap-3 mt-3 pt-3 border-t border-blue-200">
+              <span className="text-xs text-blue-700 font-medium">Parameters changed from saved values</span>
+              <button
+                onClick={() => setShowSavePrompt(true)}
+                className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors"
+              >
+                Save to Project Info
+              </button>
+              <button
+                onClick={handleResetParams}
+                className="px-3 py-1 text-xs font-semibold text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              >
+                Reset
+              </button>
             </div>
           )}
         </div>
+
+        {/* Save Confirmation Modal */}
+        {showSavePrompt && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl p-6 max-w-md mx-4">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Save Parameter Changes?</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                This will update the Project Info with the new values and save the recalculated results. Future calculations will use these parameters.
+              </p>
+              <div className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 mb-4 space-y-1">
+                <div className="flex justify-between">
+                  <span>Inflation Rate:</span>
+                  <span className="font-semibold">{(editInflation || 0).toFixed(2)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Interest Rate:</span>
+                  <span className="font-semibold">{(editInterest || 0).toFixed(2)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Cost Adj. Factor:</span>
+                  <span className="font-semibold">{(editCAF || 1.0).toFixed(2)}</span>
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowSavePrompt(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveParams}
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="bg-white rounded-lg shadow mb-6">
