@@ -88,62 +88,88 @@ export default function ReportEditorPage() {
     const studyTypeName = site?.studyType || 'Reserve Study';
     const fileName = `${siteName} - ${studyTypeName} Report.doc`;
     
-    // Wrap HTML in Word-compatible format with proper styling
-    const wordDoc = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office"
-            xmlns:w="urn:schemas-microsoft-com:office:word"
-            xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta charset="utf-8">
-        <meta name="ProgId" content="Word.Document">
-        <!--[if gte mso 9]>
-        <xml>
-          <w:WordDocument>
-            <w:View>Print</w:View>
-            <w:Zoom>100</w:Zoom>
-            <w:DoNotOptimizeForBrowser/>
-          </w:WordDocument>
-        </xml>
-        <![endif]-->
-        <style>
-          @page { 
-            size: 8.5in 11in; 
-            margin: 1in; 
-          }
-          body { 
-            font-family: Arial, sans-serif; 
-            font-size: 12pt; 
-            line-height: 1.5;
-            color: #222;
-          }
-          table { 
-            border-collapse: collapse; 
-            width: 100%; 
-            margin: 12pt 0;
-          }
-          th, td { 
-            border: 1px solid #ccc; 
-            padding: 6pt 8pt; 
-            text-align: left;
-            font-size: 10pt;
-          }
-          th { 
-            background-color: #1d398f; 
-            color: white; 
-            font-weight: bold; 
-          }
-          h1 { font-size: 20pt; margin: 18pt 0 12pt 0; }
-          h2 { font-size: 16pt; margin: 16pt 0 10pt 0; }
-          h3 { font-size: 14pt; margin: 14pt 0 8pt 0; }
-          p { margin: 6pt 0; }
-          .page-break { page-break-before: always; }
-        </style>
-      </head>
-      <body>
-        ${content}
-      </body>
-      </html>
-    `;
+    // The report HTML may be a full document — extract styles and body content
+    let reportStyles = '';
+    let bodyContent = content;
+    
+    // Extract <style> blocks from content
+    const styleMatches = content.match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
+    if (styleMatches) {
+      reportStyles = styleMatches.map(s => s.replace(/<\/?style[^>]*>/gi, '')).join('\n');
+    }
+    
+    // Extract body content if it's a full HTML document
+    const bodyMatch = content.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) {
+      bodyContent = bodyMatch[1];
+    } else {
+      // If no body tag, strip any head/html tags and use the rest
+      bodyContent = content
+        .replace(/<!DOCTYPE[^>]*>/gi, '')
+        .replace(/<html[^>]*>/gi, '')
+        .replace(/<\/html>/gi, '')
+        .replace(/<head[\s\S]*?<\/head>/gi, '');
+    }
+    
+    // Strip editor-only elements
+    bodyContent = bodyContent
+      .replace(/<div[^>]*class="[^"]*page-break-indicator[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<div[^>]*class="[^"]*no-print[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+    
+    // Remove page-container wrapper divs (keep their content)
+    bodyContent = bodyContent
+      .replace(/<div[^>]*class="[^"]*page-container[^"]*"[^>]*>/gi, '')
+      .replace(/<!-- page-container end -->/gi, '');
+    
+    // Clean up report styles for Word compatibility
+    let cleanStyles = reportStyles
+      // Remove @media screen blocks (editor-only styles)
+      .replace(/@media\s+screen\s*\{[\s\S]*?\}\s*\}/g, '')
+      // Remove @media print blocks (Word handles its own print)
+      .replace(/@media\s+print\s*\{[\s\S]*?\}\s*\}/g, '')
+      // Keep the rest (cover page, section headers, tables, etc.)
+      .trim();
+    
+    // Build Word-compatible document
+    const wordDoc = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="utf-8">
+  <meta name="ProgId" content="Word.Document">
+  <!--[if gte mso 9]>
+  <xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+      <w:DoNotOptimizeForBrowser/>
+    </w:WordDocument>
+  </xml>
+  <![endif]-->
+  <style>
+    @page { 
+      size: 8.5in 11in; 
+      margin: 0.6in 0.6in 0.75in 0.6in; 
+    }
+    body { 
+      font-family: Arial, Helvetica, sans-serif; 
+      font-size: 10pt; 
+      line-height: 1.4;
+      color: #1a1a1a;
+      background: white;
+    }
+    /* Report styles */
+    ${cleanStyles}
+    /* Word-specific overrides */
+    .page-break { page-break-before: always; height: 0; margin: 0; padding: 0; }
+    .page-break-indicator { display: none; }
+    .no-print { display: none; }
+  </style>
+</head>
+<body>
+  ${bodyContent}
+</body>
+</html>`;
     
     const blob = new Blob([wordDoc], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
