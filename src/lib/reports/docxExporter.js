@@ -708,8 +708,9 @@ function buildBibliography(data) {
 // ============================================================
 // MAIN EXPORT FUNCTION
 // ============================================================
-export async function exportToDocx(reportData, fileName) {
+export async function exportToDocx(reportData, fileName, options = {}) {
   const { site, components, results, organization, notes } = reportData;
+  const { logoData: preloadedLogo } = options;
 
   const hasPM = results.pmRequired;
   const startYear = parseInt(site.beginningYear) || new Date().getFullYear();
@@ -724,17 +725,49 @@ export async function exportToDocx(reportData, fileName) {
   const footerText = footerParts.join(' | ');
   const beginBal = parseFloat(site.beginningReserveBalance) || (results.reserveFund || {}).currentBalance || 0;
 
-  // Fetch logo if available
-  let logoImageData = null;
+  // Logo: use pre-loaded data or try fetching
+  let logoImageData = preloadedLogo || null;
   const logoUrl = organization.logoUrl || '';
-  if (logoUrl) {
+  if (!logoImageData && logoUrl) {
     try {
-      const resp = await fetch(logoUrl);
-      const blob = await resp.blob();
-      const buffer = await blob.arrayBuffer();
-      logoImageData = new Uint8Array(buffer);
+      const resp = await fetch(logoUrl, { mode: 'cors' });
+      if (resp.ok) {
+        const blob = await resp.blob();
+        const buffer = await blob.arrayBuffer();
+        logoImageData = new Uint8Array(buffer);
+        console.log('Logo fetched successfully, size:', logoImageData.length);
+      } else {
+        console.warn('Logo fetch failed with status:', resp.status);
+      }
     } catch (e) {
-      console.warn('Could not fetch logo:', e);
+      console.warn('Could not fetch logo:', e.message);
+      // Try loading via Image element as fallback
+      try {
+        logoImageData = await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            canvas.toBlob(async (blob) => {
+              if (blob) {
+                const buf = await blob.arrayBuffer();
+                resolve(new Uint8Array(buf));
+              } else {
+                reject(new Error('Canvas toBlob failed'));
+              }
+            }, 'image/png');
+          };
+          img.onerror = () => reject(new Error('Image load failed'));
+          img.src = logoUrl;
+        });
+        console.log('Logo loaded via Image element, size:', logoImageData.length);
+      } catch (e2) {
+        console.warn('Logo fallback also failed:', e2.message);
+      }
     }
   }
 
@@ -805,19 +838,6 @@ export async function exportToDocx(reportData, fileName) {
       new TextRun({ text: 'SUBMITTED: ', bold: true, size: 22, font: 'Arial' }),
       new TextRun({ text: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }), size: 22, font: 'Arial' }),
     ]
-  }));
-
-  // Company footer on cover
-  coverChildren.push(emptyPara());
-  coverChildren.push(emptyPara());
-  coverChildren.push(emptyPara());
-  coverChildren.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    children: [new TextRun({ text: companyName, size: 18, color: GRAY, font: 'Arial' })]
-  }));
-  coverChildren.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    children: [new TextRun({ text: `${addressStr} ${phoneStr}`, size: 18, color: GRAY, font: 'Arial' })]
   }));
 
   // ========================================
@@ -938,6 +958,38 @@ export async function exportToDocx(reportData, fileName) {
   // ========================================
   // CREATE DOCUMENT
   // ========================================
+  // Cover page footer (company info, no page number)
+  const coverFooter = new Footer({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({ text: companyName, size: 18, color: GRAY, font: 'Arial' }),
+        ]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({ text: `${addressStr} ${phoneStr}`, size: 18, color: GRAY, font: 'Arial' }),
+        ]
+      }),
+    ]
+  });
+
+  // Main pages footer (company info + page number)
+  const mainFooter = new Footer({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        border: { top: { style: BorderStyle.SINGLE, size: 1, color: 'cccccc', space: 4 } },
+        children: [
+          new TextRun({ text: footerText + '  |  Page ', size: 14, color: GRAY, font: 'Arial' }),
+          new TextRun({ children: [PageNumber.CURRENT], size: 14, color: GRAY, font: 'Arial' }),
+        ]
+      })
+    ]
+  });
+
   const doc = new Document({
     styles: {
       default: {
@@ -950,18 +1002,20 @@ export async function exportToDocx(reportData, fileName) {
       }
     },
     sections: [
-      // COVER PAGE - no header/footer
+      // COVER PAGE - company info footer (no page number)
       {
         properties: {
           page: {
             size: { width: 12240, height: 15840 },
             margin: { top: 720, bottom: 720, left: 1080, right: 1080 },
           },
-          titlePage: true,
+        },
+        footers: {
+          default: coverFooter,
         },
         children: coverChildren,
       },
-      // MAIN CONTENT - with footer
+      // MAIN CONTENT - full footer with page numbers
       {
         properties: {
           page: {
@@ -974,18 +1028,7 @@ export async function exportToDocx(reportData, fileName) {
           default: new Header({ children: [emptyPara()] }),
         },
         footers: {
-          default: new Footer({
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                border: { top: { style: BorderStyle.SINGLE, size: 1, color: 'cccccc', space: 4 } },
-                children: [
-                  new TextRun({ text: footerText + '  |  Page ', size: 14, color: GRAY, font: 'Arial' }),
-                  new TextRun({ children: [PageNumber.CURRENT], size: 14, color: GRAY, font: 'Arial' }),
-                ]
-              })
-            ]
-          }),
+          default: mainFooter,
         },
         children: mainChildren,
       },
