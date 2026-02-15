@@ -8,7 +8,7 @@ import { collection, getDocs, doc, getDoc, addDoc, deleteDoc, updateDoc, query, 
 import { db } from '@/lib/firebase';
 import { loadReportData, generateReport } from '@/lib/reports/reportGenerator';
 import { DEFAULT_REPORT_TEMPLATE } from '@/lib/reports/DEFAULT_REPORT_TEMPLATE';
-import { exportToDocx } from '@/lib/reports/docxExporter';
+import { exportToDocxWithImages } from '@/lib/reports/docxImageExporter';
 
 export default function ReportsListPage() {
   const { user } = useAuth();
@@ -26,6 +26,7 @@ export default function ReportsListPage() {
   const [expandedReport, setExpandedReport] = useState(null);
   const [newNote, setNewNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
+  const [exportProgress, setExportProgress] = useState('');
 
   useEffect(() => {
     if (user) loadData();
@@ -125,41 +126,36 @@ export default function ReportsListPage() {
   const handleDownloadWord = async (report) => {
     try {
       setDownloadingId(report.id);
+      setExportProgress('Starting export...');
+      
       const siteName = site?.siteName || 'Site';
       const fileName = `${siteName} - ${report.title}.docx`;
       
-      const reportData = await loadReportData(siteId, organizationId);
+      // Build company info for footer
+      const org = organization || {};
+      const orgCity = org.city || '';
+      const orgState = org.state || '';
+      const orgZip = org.zipCode || org.zip || '';
+      const addressStr = [orgCity, orgState].filter(Boolean).join(', ') + (orgZip ? ' ' + orgZip : '');
+      const phoneStr = org.phone ? 'C:' + org.phone : '';
 
-      // Pre-fetch logo via Image+canvas (reliable for Firebase Storage)
-      let logoData = null;
-      const logoUrl = reportData.organization?.logoUrl;
-      if (logoUrl) {
-        try {
-          const img = new window.Image();
-          img.crossOrigin = 'anonymous';
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = logoUrl;
-          });
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          canvas.getContext('2d').drawImage(img, 0, 0);
-          const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-          if (blob) {
-            const buf = await blob.arrayBuffer();
-            logoData = new Uint8Array(buf);
-          }
-        } catch (e) {
-          console.warn('Logo pre-fetch failed:', e.message);
-        }
-      }
+      // Use the stored HTML content — render it as images in the docx
+      await exportToDocxWithImages(
+        report.htmlContent, 
+        fileName, 
+        {
+          companyName: org.name || site?.companyName || '',
+          companyAddress: addressStr,
+          companyPhone: phoneStr,
+        },
+        (msg) => setExportProgress(msg)
+      );
 
-      await exportToDocx(reportData, fileName, { logoData });
+      setExportProgress('');
     } catch (error) {
       console.error('Error downloading report:', error);
       alert('Error downloading: ' + error.message);
+      setExportProgress('');
     } finally {
       setDownloadingId(null);
     }
@@ -310,7 +306,7 @@ export default function ReportsListPage() {
                         disabled={downloadingId === report.id}
                         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
                       >
-                        {downloadingId === report.id ? '⏳ Preparing...' : '📄 Download .docx'}
+                        {downloadingId === report.id ? `⏳ ${exportProgress || 'Preparing...'}` : '📄 Download .docx'}
                       </button>
                       <button onClick={(e) => handleDeleteReport(report.id, e)}
                         className="px-3 py-2 text-red-600 hover:bg-red-50 rounded text-sm">
