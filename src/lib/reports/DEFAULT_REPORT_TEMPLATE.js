@@ -532,11 +532,6 @@ export const DEFAULT_REPORT_TEMPLATE = `
     Complies with New Jersey Residential Housing Bill S2760/A4384
   </div>
 <!--NJ_END-->
-  
-  <div class="cover-footer">
-    <div class="company-name">{companyName}</div>
-    <div>{companyAddress} {companyPhone}</div>
-  </div>
 </div>
 
 <div class="page-break"></div>
