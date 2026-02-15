@@ -24,7 +24,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <style>
     @page {
       size: letter;
-      margin: 0.6in 0.6in 1.1in 0.6in;
+      margin: 0.6in 0.6in 0.75in 0.6in;
     }
     
     @media print {
@@ -34,36 +34,12 @@ export const DEFAULT_REPORT_TEMPLATE = `
       body { 
         -webkit-print-color-adjust: exact; 
         print-color-adjust: exact;
-        padding-bottom: 40px;
       }
-      
-      /* Repeating footer on every printed page */
-      .print-footer {
-        display: block !important;
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        text-align: center;
-        font-size: 7pt;
-        color: #666;
-        border-top: 1px solid #ccc;
-        padding: 4px 0.6in;
-        background: white;
-      }
-      .print-footer .company-name {
-        font-weight: bold;
-        color: #1e3a5f;
-      }
-      
-      /* Hide footer on cover page */
-      .cover-page ~ .print-footer-spacer { display: none; }
+      .print-footer { display: none !important; }
     }
     
     /* ============ EDITOR VIEW - PAGE MARGIN INDICATORS ============ */
     @media screen {
-      .print-footer { display: none; }
-      
       body {
         background: #e0e0e0;
         padding: 20px;
@@ -195,22 +171,6 @@ export const DEFAULT_REPORT_TEMPLATE = `
       color: #666;
       border-top: 1px solid #ddd;
       padding-top: 0.2in;
-    }
-    
-    .cover-footer {
-      margin-top: auto;
-      padding-top: 0.3in;
-      text-align: center;
-      font-size: 9pt;
-      color: #666;
-      border-top: 2px solid #1e3a5f;
-      width: 100%;
-    }
-    
-    .cover-footer .company-name {
-      font-weight: bold;
-      font-size: 10pt;
-      color: #1e3a5f;
     }
     
     /* ============ TABLE OF CONTENTS ============ */
@@ -502,11 +462,6 @@ export const DEFAULT_REPORT_TEMPLATE = `
   </style>
 </head>
 <body>
-
-<!-- Print-only footer (repeats on every page when printed) -->
-<div class="print-footer">
-  <span class="company-name">{companyName}</span> | {companyAddress} {companyPhone}
-</div>
 
 <!-- ==================== COVER PAGE ==================== -->
 <div class="cover-page">
