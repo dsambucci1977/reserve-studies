@@ -749,6 +749,9 @@ export const DEFAULT_REPORT_TEMPLATE = `
   </div>
 </div>
 
+<div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
+
 <!-- ==================== RESPONSIBLE CHARGE ==================== -->
 <a name="_responsiblecharge"></a>
 <div id="responsible-charge" class="section-header">RESPONSIBLE CHARGE</div>
