@@ -8,7 +8,8 @@ import {
   Footer, Header, PageNumber, PageBreak, ImageRun,
   AlignmentType, WidthType, BorderStyle, ShadingType,
   BookmarkStart, BookmarkEnd, InternalHyperlink,
-  NumberFormat, TabStopType, TabStopPosition
+  NumberFormat, TabStopType, TabStopPosition,
+  HeadingLevel, TableOfContents
 } from 'docx';
 
 // ============================================================
@@ -90,6 +91,7 @@ function pageBreak() {
 
 function bookmarkPara(id, text, color = NAVY) {
   return new Paragraph({
+    heading: HeadingLevel.HEADING_1,
     spacing: { before: 240, after: 120 },
     shading: { type: ShadingType.SOLID, color: color },
     children: [
@@ -142,59 +144,26 @@ function thc(text, opts = {}) {
 // ============================================================
 
 function buildTOC(hasPM) {
-  const entries = [
-    ['intro', 'Introduction'],
-    ['description', 'Description of Development'],
-    ['reservechart', 'Reserve Study Chart'],
-    ['terms', 'Terms and Definitions'],
-    ['responsible', 'Responsible Charge'],
-    ['special', 'Special Assessment'],
-    ['physical', 'Physical Analysis'],
-    ['compsummary', 'Component Schedule Summary'],
-    ['capitalitems', 'Capital Items / Components'],
-    ['compnotes', 'Components Notes'],
-    ['financial', 'Financial Results'],
-    ['cashflow', 'Reserve Fund Thirty Year Cash Flow'],
-    ['threshold', 'Reserve Fund Thirty Year Threshold Funding'],
-    ['expenditures', 'Reserve Fund Expenditures'],
-  ];
-  if (hasPM) {
-    entries.push(['pmsection', 'Preventive Maintenance']);
-    entries.push(['pmexpend', 'PM Expenditures']);
-    entries.push(['pmcashflow', 'PM Thirty Year Cash Flow']);
-  }
-  entries.push(['recommendations', 'Recommendations']);
-  entries.push(['disclosures', 'Disclosures']);
-  entries.push(['bibliography', 'Bibliography']);
-
-  const children = [
+  // Use native Word Table of Contents field - auto-generates page numbers
+  // and clickable links from Heading 1 paragraphs throughout the document.
+  // Word will populate this when the document is opened (with updateFields: true).
+  return [
     new Paragraph({
-      spacing: { before: 200, after: 200 },
+      spacing: { before: 400, after: 300 },
       alignment: AlignmentType.CENTER,
-      border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: NAVY } },
+      border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: NAVY, space: 8 } },
       children: [
         new TextRun({ text: 'TABLE OF CONTENTS', bold: true, size: 32, color: NAVY, font: 'Arial' })
       ],
     }),
-  ];
-
-  entries.forEach(([id, label]) => {
-    children.push(new Paragraph({
-      spacing: { before: 80, after: 80 },
-      border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: 'cccccc', space: 1 } },
-      tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
-      children: [
-        new InternalHyperlink({
-          anchor: id,
-          children: [
-            new TextRun({ text: label, size: 22, font: 'Arial', style: 'Hyperlink' })
-          ]
-        }),
+    new TableOfContents("Table of Contents", {
+      hyperlink: true,
+      headingStyleRange: "1-1",
+      stylesWithLevels: [
+        { styleName: "heading 1", level: 1 }
       ],
-    }));
-  });
-
-  return children;
+    }),
+  ];
 }
 
 function buildIntroduction(data) {
@@ -231,11 +200,18 @@ function buildDescription(data) {
   const units = site.totalUnits || 'N/A';
   const location = [site.city, site.state].filter(Boolean).join(', ') || 'Location';
 
-  return [
+  const children = [
     bookmarkPara('description', 'DESCRIPTION OF DEVELOPMENT'),
     bodyPara(`${name} consists of a ${type} comprising ${units} residential units. The community is located in ${location}.`),
-    bodyPara('Residents access the building through both front and rear entrance stoops. Additional common areas within the community include the front sidewalk, front paver walkway, fencing, exterior building and landscape lighting, the building\'s exterior, interior hallways and lobbies, as well as the common area HVAC system and domestic hot water infrastructure.'),
   ];
+
+  if (site.buildingDescription) {
+    children.push(bodyPara(site.buildingDescription));
+  } else {
+    children.push(bodyPara('Residents access the building through both front and rear entrance stoops. Additional common areas within the community include the front sidewalk, front paver walkway, fencing, exterior building and landscape lighting, the building\'s exterior, interior hallways and lobbies, as well as the common area HVAC system and domestic hot water infrastructure.'));
+  }
+
+  return children;
 }
 
 function buildReserveChart(data) {
@@ -248,22 +224,71 @@ function buildReserveChart(data) {
 
   const children = [
     bookmarkPara('reservechart', 'RESERVE STUDY CHART'),
-    subHeader('Reserve Fund Information'),
-    bodyPara(`Beginning Reserve Balance: ${fmt(beginBal)}`),
-    bodyPara(`Current Annual Contribution: ${fmt(curContrib)}`),
-    bodyPara(`Current Percent Funded: ${fmtPct(rf.percentFunded)}`),
-    bodyPara(`Recommended Annual Funding: ${fmt(rf.recommendedContribution)}`),
-    bodyPara('Averaging Length in Years: 30'),
   ];
+
+  // Reserve Fund summary table
+  const rfRows = [
+    new TableRow({
+      children: [
+        tc('RESERVE FUND INFORMATION', { bold: true, color: WHITE, shading: NAVY, span: 2, size: 18, align: AlignmentType.CENTER }),
+      ]
+    }),
+    new TableRow({ children: [
+      tc('Beginning Reserve Balance:', { bold: true, size: 18, shading: 'f0f4ff' }),
+      tc(fmt(beginBal), { size: 18, shading: 'f0f4ff', align: AlignmentType.RIGHT }),
+    ]}),
+    new TableRow({ children: [
+      tc('Current Annual Contribution:', { bold: true, size: 18 }),
+      tc(fmt(curContrib), { size: 18, align: AlignmentType.RIGHT }),
+    ]}),
+    new TableRow({ children: [
+      tc('Current Percent Funded:', { bold: true, size: 18, shading: 'f0f4ff' }),
+      tc(fmtPct(rf.percentFunded), { size: 18, shading: 'f0f4ff', align: AlignmentType.RIGHT }),
+    ]}),
+    new TableRow({ children: [
+      tc('Recommended Annual Funding:', { bold: true, size: 18 }),
+      tc(fmt(rf.recommendedContribution), { size: 18, align: AlignmentType.RIGHT, bold: true }),
+    ]}),
+    new TableRow({ children: [
+      tc('Averaging Length in Years:', { bold: true, size: 18, shading: 'f0f4ff' }),
+      tc('30', { size: 18, shading: 'f0f4ff', align: AlignmentType.RIGHT }),
+    ]}),
+  ];
+
+  children.push(new Table({ rows: rfRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
 
   if (hasPM) {
     children.push(emptyPara());
-    children.push(subHeader('Preventive Maintenance Fund Information'));
-    children.push(bodyPara(`Beginning PM Balance: ${fmt(site.beginningPMBalance || pf.currentBalance)}`));
-    children.push(bodyPara(`Current Annual Contribution: ${fmt(site.currentPMContribution || pf.currentContribution)}`));
-    children.push(bodyPara(`Current Percent Funded: ${fmtPct(pf.percentFunded)}`));
-    children.push(bodyPara(`Recommended Annual Funding: ${fmt(pf.recommendedContribution)}`));
-    children.push(bodyPara('Averaging Length in Years: 30'));
+
+    const pmRows = [
+      new TableRow({
+        children: [
+          tc('PREVENTIVE MAINTENANCE FUND INFORMATION', { bold: true, color: WHITE, shading: GREEN, span: 2, size: 18, align: AlignmentType.CENTER }),
+        ]
+      }),
+      new TableRow({ children: [
+        tc('Beginning PM Balance:', { bold: true, size: 18, shading: 'f0fff4' }),
+        tc(fmt(site.beginningPMBalance || pf.currentBalance), { size: 18, shading: 'f0fff4', align: AlignmentType.RIGHT }),
+      ]}),
+      new TableRow({ children: [
+        tc('Current Annual Contribution:', { bold: true, size: 18 }),
+        tc(fmt(site.currentPMContribution || pf.currentContribution), { size: 18, align: AlignmentType.RIGHT }),
+      ]}),
+      new TableRow({ children: [
+        tc('Current Percent Funded:', { bold: true, size: 18, shading: 'f0fff4' }),
+        tc(fmtPct(pf.percentFunded), { size: 18, shading: 'f0fff4', align: AlignmentType.RIGHT }),
+      ]}),
+      new TableRow({ children: [
+        tc('Recommended Annual Funding:', { bold: true, size: 18 }),
+        tc(fmt(pf.recommendedContribution), { size: 18, align: AlignmentType.RIGHT, bold: true }),
+      ]}),
+      new TableRow({ children: [
+        tc('Averaging Length in Years:', { bold: true, size: 18, shading: 'f0fff4' }),
+        tc('30', { size: 18, shading: 'f0fff4', align: AlignmentType.RIGHT }),
+      ]}),
+    ];
+
+    children.push(new Table({ rows: pmRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
   }
 
   return children;
@@ -272,16 +297,27 @@ function buildReserveChart(data) {
 function buildTerms() {
   const terms = [
     ['Capital Improvements', 'Additions to the association\'s common elements that were not previously part of the community. While these new components should be incorporated into future reserve studies for ongoing replacement planning, the initial construction costs should not be paid from the reserve fund.'],
-    ['Cash Flow Method', 'A method of creating a reserve funding plan in which contributions are structured to align with projected, fluctuating annual reserve expenditures.'],
-    ['Component', 'Individual items listed in the reserve study as identified through the physical analysis. These components represent the common elements of the community.'],
+    ['Cash Flow Method', 'A method of creating a reserve funding plan in which contributions are structured to align with projected, fluctuating annual reserve expenditures. Various funding scenarios are modeled against anticipated expense timelines to determine the most suitable funding strategy.'],
+    ['Component', 'Individual items listed in the reserve study as identified through the physical analysis. These components represent the common elements of the community and generally meet the following criteria: 1) The association is responsible for their upkeep. 2) They have a limited useful life. 3) Their remaining useful life can be reasonably predicted. 4) They exceed a minimum threshold cost.'],
+    ['Component Inventory', 'The process of identifying and quantifying all components to be included in the reserve study. This is achieved through on-site visual inspection, a review of association documents, past practices, and discussions with relevant association representatives.'],
+    ['Component Method', 'A funding method where the total reserve contribution is calculated based on the individual funding needs of each component.'],
+    ['Condition Assessment', 'The evaluation of a component\'s current condition, based on either visual observation or reported data.'],
+    ['Effective Age', 'The difference between a component\'s useful life and its remaining useful life. This figure may differ from chronological age due to irregular patterns of wear or usage.'],
+    ['Financial Analysis', 'The portion of the reserve study that assesses the current status of reserves (as cash or percent funded) and recommends a reserve contribution strategy.'],
     ['Fully Funded', 'A reserve fund is considered fully funded when the actual or projected balance equals the fully funded balance (FFB), or 100% funded.'],
-    ['Fully Funded Balance (FFB)', 'An ideal benchmark reserve balance. Formula: FFB = Current Cost × (Effective Age ÷ Useful Life)'],
-    ['Funding Goals', 'Primary reserve funding objectives: Full Funding (most conservative), Threshold Funding (maintain above a minimum), and Baseline Funding (never below zero).'],
-    ['Percent Funded', 'The ratio of the actual reserve balance to the fully funded balance at a specific point in time.'],
-    ['Remaining Useful Life (RUL)', 'The estimated number of years a component will continue to function before replacement is necessary.'],
-    ['Replacement Cost', 'The total cost to repair, restore, or replace a component to its original functional condition.'],
-    ['Reserve Study', 'A strategic budgeting tool that identifies components the association must maintain or replace, assesses the current reserve fund status, and recommends a funding plan.'],
-    ['Useful Life (UL)', 'The total expected lifespan of a component from installation to replacement.'],
+    ['Fully Funded Balance (FFB)', 'An ideal benchmark reserve balance, representing the proportion of repair or replacement cost that corresponds with the fraction of the component\'s life that has been "used up." Formula: FFB = Current Cost × (Effective Age ÷ Useful Life)'],
+    ['Fund Status', 'The financial position of the reserve fund, typically expressed in terms of cash value or percent funded.'],
+    ['Funding Goals', 'Primary reserve funding objectives: Full Funding (aim to keep reserves at or near 100% funded), Threshold Funding (maintain reserve balances above a specific dollar amount or funding percentage), and Baseline Funding (ensure the reserve fund never drops below zero during the projection period).'],
+    ['Funding Plan', 'A long-term strategy (minimum 20 years) that outlines how an association will fund anticipated reserve expenditures through scheduled contributions.'],
+    ['Life and Valuation Estimates', 'The task of determining each component\'s useful life, remaining useful life, and current repair or replacement cost.'],
+    ['Percent Funded', 'The ratio (as a percentage) of the actual or projected reserve balance to the fully funded balance at a specific point in time.'],
+    ['Physical Analysis', 'One of the two primary components of a reserve study, encompassing the component inventory, condition assessments, and life and cost estimates.'],
+    ['Remaining Useful Life (RUL)', 'The estimated number of years a component will continue to function before replacement is necessary. Items scheduled for replacement in the current year are assigned a remaining life of zero.'],
+    ['Replacement Cost', 'The total cost to repair, restore, or replace a component to its original functional condition. This includes associated expenses such as design, permits, engineering, shipping, installation, and disposal.'],
+    ['Reserve Balance', 'The actual or projected amount of money available in the reserve fund at a given time, designated for major repairs or replacements.'],
+    ['Reserve Provider', 'A professional who prepares reserve studies. Many hold credentials such as the Reserve Specialist (RS) designation from the Community Associations Institute (CAI).'],
+    ['Reserve Study', 'A strategic budgeting tool that identifies components the association must maintain or replace, assesses the current reserve fund status, and recommends a funding plan. It consists of two parts: the physical analysis and the financial analysis.'],
+    ['Useful Life (UL)', 'The total expected lifespan of a component from installation to replacement, assuming proper construction and maintenance in its current application.'],
   ];
 
   const children = [bookmarkPara('terms', 'TERMS AND DEFINITIONS')];
@@ -301,6 +337,12 @@ function buildResponsibleCharge() {
   return [
     bookmarkPara('responsible', 'RESPONSIBLE CHARGE'),
     bodyPara('A Reserve Specialist (RS) who is in responsible charge of a reserve study must provide consistent and effective oversight of all individuals performing tasks that directly impact the quality and accuracy of the study. The RS must retain sufficient records to demonstrate that they exercised appropriate and regular supervision throughout the course of the project.'),
+    emptyPara(),
+    bodyPara('A Reserve Specialist will be considered not to have provided adequate supervision under the following circumstances:'),
+    bulletPara('Frequent or prolonged absence from the principal office where professional services are rendered—except when engaged in fieldwork or assigned to a project-specific field office.'),
+    bulletPara('Failure to personally inspect or review subordinate work when such review is necessary or appropriate to ensure quality.'),
+    bulletPara('Performing only a superficial or minimal review of plans or projects, rather than a thorough and detailed evaluation.'),
+    bulletPara('Not being personally available for consultation or site inspections when circumstances reasonably require it, or failing to provide adequate notice of availability.'),
   ];
 }
 
@@ -308,6 +350,8 @@ function buildSpecialAssessment() {
   return [
     bookmarkPara('special', 'SPECIAL ASSESSMENT'),
     bodyPara('A Special Assessment is a temporary fee imposed on association members in addition to regular dues or assessments. These assessments are typically used to cover unexpected or one-time expenses and are often subject to limitations or procedures outlined in the association\'s governing documents or applicable local laws.'),
+    emptyPara(),
+    bodyPara('Useful Life (UL) - Useful Life refers to the estimated number of years a reserve component is expected to remain functional and perform its intended purpose—assuming it has been properly constructed and maintained in its current application or installation.'),
   ];
 }
 
@@ -318,8 +362,10 @@ function buildPhysicalAnalysis(data) {
 
   return [
     bookmarkPara('physical', 'PHYSICAL ANALYSIS'),
-    bodyPara(`The quantities used in the replacement cost estimates of the common elements were generated from field measurements taken during our site visit on ${inspDate}, and/or from take-offs based on architectural and site design drawings. The remaining life expectancies of the common elements were determined through a visual site inspection of the Community, as well as information provided by the Property Manager and maintenance contractors familiar with the common elements of the Community.`),
-    bodyPara(`Current replacement costs were estimated using published construction cost data referenced in the Bibliography section of this report, along with average costs provided by contractors who have performed similar projects bid out by ${companyName}. Useful life and remaining useful life estimates were based on field observations and the assumption that an adequate maintenance schedule is in place and will be followed.`),
+    bodyPara(`The quantities used in the replacement cost estimates of the common elements were generated from field measurements taken during our site visit on ${inspDate}, and/or from take-offs based on architectural and site design drawings. The remaining life expectancies of the common elements were determined through a visual site inspection of the Community, as well as information provided by the Property Manager and maintenance contractors familiar with the common elements of the Community. The common elements were identified through a review of the governing documents.`),
+    bodyPara(`Current replacement costs were estimated using published construction cost data referenced in the Bibliography section of this report, along with average costs provided by contractors who have performed similar projects bid out by ${companyName}.`),
+    bodyPara('Useful life and remaining useful life estimates were based on field observations and the assumption that an adequate maintenance schedule is in place and will be followed. Without proper maintenance, common elements may deteriorate more rapidly and require earlier replacement, resulting in a greater draw on reserve funds.'),
+    bodyPara('Please note that these estimates are based on the professional judgment and experience of this firm and were developed in accordance with generally accepted industry standards. However, actual costs and useful life expectancies may vary due to factors beyond our control, such as market fluctuations, usage patterns, maintenance practices, deterioration rates, and weather conditions. Future updates of this report will include adjustments to reflect any significant variances in actual costs or life expectancies.'),
     bodyPara('It is recommended that this reserve study be updated every three (3) to five (5) years.'),
   ];
 }
@@ -394,17 +440,29 @@ function buildCashFlowTable(cashFlow, fundInfo, startingBalance, isPM = false) {
 
   const rows = [];
 
-  // Header rows
+  // Group header row (Current Funding | Full Funding Analysis)
+  const currentFundingColor = '1d398f';
+  const fullFundingColor = 'dbebff';
+  rows.push(new TableRow({
+    tableHeader: true,
+    children: [
+      tc('', { shading: headerColor, width: 8 }),
+      tc('Current Funding', { bold: true, color: WHITE, shading: currentFundingColor, span: 3, size: 16, align: AlignmentType.CENTER }),
+      tc('Full Funding Analysis', { bold: true, color: '1d398f', shading: fullFundingColor, span: 3, size: 16, align: AlignmentType.CENTER }),
+    ]
+  }));
+
+  // Column header row
   rows.push(new TableRow({
     tableHeader: true,
     children: [
       thc('Fiscal\nYear', { shading: headerColor, width: 8 }),
-      thc('Current\nContribution', { shading: headerColor, width: 13 }),
-      thc('Annual\nExpenditures', { shading: headerColor, width: 13 }),
-      thc('Ending\nBalance', { shading: headerColor, width: 13 }),
-      thc('Annual\nContribution', { shading: headerColor, width: 13 }),
-      thc('Average Annual\nContribution', { shading: headerColor, width: 13 }),
-      thc('Ending\nBalance', { shading: headerColor, width: 13 }),
+      thc('Current\nContribution', { shading: currentFundingColor, width: 13 }),
+      thc('Annual\nExpenditures', { shading: currentFundingColor, width: 13 }),
+      thc('Ending\nBalance', { shading: currentFundingColor, width: 13 }),
+      thc('Annual\nContribution', { shading: fullFundingColor, width: 13, color: '1d398f' }),
+      thc('Average Annual\nContribution', { shading: fullFundingColor, width: 13, color: '1d398f' }),
+      thc('Ending\nBalance', { shading: fullFundingColor, width: 13, color: '1d398f' }),
     ]
   }));
 
@@ -611,8 +669,9 @@ function buildFinancialResults(data) {
     bodyPara(`The primary goal of capital reserve planning is to provide adequate funding for the replacement of the capital components within the community. Effective planning ensures that expenditures for these projects are spread across many years, making funds available when they are needed.`),
     bodyPara(`The charts shown in this report provide a 30-year projection of the funding requirements for ${name}. This reserve study funding analysis includes funding options: Full Funding, Current Funding, and Threshold Funding.`),
     bodyPara(`Current Funding: reflects the beginning balance with the current annual contribution added and projected expenses subtracted each year. The beginning balance and current annual contribution of ${beginBal} and ${curContrib} were provided by the Property Manager.`),
-    bodyPara('Full Funding: is the annual contribution and fund balances for each year as if each component were Fully Funded.'),
-    bodyPara('Threshold Funding: represents the annual contribution and fund balance for each year as if the reserve balance were to be maintained at or above a specified amount.'),
+    bodyPara('Full Funding: is the annual contribution and fund balances for each year as if each component were Fully Funded. Full funding is the amount necessary so each component will accrue its full replacement cost during its remaining life expectancy.'),
+    bodyPara('Threshold Funding: represents the annual contribution and fund balance for each year as if the reserve balance were to be maintained at or above a specified amount, but no lower (lowest balance). Threshold funding is calculated by adjusting Full Funding to produce the lowest acceptable balance.'),
+    bodyPara('If the Association implements Threshold Funding, it is imperative that the Reserve Study be updated regularly to minimize the chances of creating a reserve fund deficit.'),
     emptyPara(),
     subHeader('Reserve Study Funding Summary'),
     bodyPara(`Current Annual Contribution: ${curContrib}`),
@@ -659,6 +718,12 @@ function buildRecommendations(data) {
   children.push(bodyPara(`${company} recommends updating the reserve study Every Three (3) Years.`));
   children.push(bodyPara('Regular updates will help avoid the necessity of large increases in the future.'));
 
+  children.push(emptyPara());
+  children.push(subHeader('Final Statements'));
+  children.push(bodyPara(`In the opinion of ${company}, the components and conditions at ${name} are correctly and reasonably represented. This opinion is based on the information provided by the Association and other sources noted within the report.`));
+  children.push(bodyPara('There are several variables that affect the useful lives and replacement costs of the common components. Economic forces, including material and labor prices, the overall economy, the construction industry, and local conditions, can have an effect on costs. Weather, maintenance procedures, usage, and other factors will also affect the longevity or life expectancy of the components.'));
+  children.push(bodyPara('This report is a financial budgetary tool and should not be used for contracting or bid proposals. The replacement costs used within this report were derived from comparable projects and other sources listed in this report. The costs provided are intended to replace the components with materials of similar quality. Generally, upgrades to components are not included in the costs unless specifically noted. Unforeseen conditions can have an adverse effect on projected costs, resulting in higher replacement costs than planned.'));
+
   return children;
 }
 
@@ -671,11 +736,14 @@ function buildDisclosures(data) {
   return [
     bookmarkPara('disclosures', 'DISCLOSURES'),
     bodyPara(`${company} is not aware of any involvement with ${name} that could result in any actual or perceived conflicts of interest that would influence the preparation of this study.`),
-    bodyPara('The physical on-site observations performed in the preparation of this study were cursory in nature and only included the accessible common and limited common elements.'),
+    bodyPara('The physical on-site observations performed in the preparation of this study were cursory in nature and only included the accessible common and limited common elements. The surfaces of the roofs were not walked unless specifically noted within this report, and no invasive testing was employed.'),
     bodyPara(`Unless specifically noted within this report, ${company} has not utilized any assumptions regarding interest, inflation, taxes, or any other outside economic factors.`),
     bodyPara(`This study was prepared by ${preparedBy}, ${company}.`),
     bodyPara(`${company} is not aware of any material issues which, if not disclosed, would cause a distortion of the Association's situation.`),
-    bodyPara(`Information provided by the official representative of the Association regarding financial, physical, quantity, or historical issues will be deemed reliable by ${company}.`),
+    bodyPara(`Information provided by the official representative of the Association regarding financial, physical, quantity, or historical issues will be deemed reliable by ${company}. The Reserve Study will reflect the information provided to the consultant and assembled for the Association's use, not for the purpose of performing an audit, quality/forensic analyses, or background checks of historical records.`),
+    bodyPara('The actual or projected total presented in the Reserve Study is based upon the information provided and was not audited.'),
+    bodyPara(`Information provided to ${company} about the reserve project will be considered reliable. Any on-site inspection should not be considered a project audit or quality inspection.`),
+    bodyPara('The items included in the Component Inventory are based on information provided in the governing documents and by the association\'s managing agent. The quantities have not been field measured by a representative of the consultant unless specifically noted.'),
   ];
 }
 
@@ -853,15 +921,13 @@ export async function exportToDocx(reportData, fileName, options = {}) {
   mainChildren.push(...buildIntroduction(reportData));
   mainChildren.push(pageBreak());
 
-  // Description
+  // Description + Reserve Chart (combined on same page)
   mainChildren.push(...buildDescription(reportData));
-  mainChildren.push(pageBreak());
-
-  // Reserve Chart
+  mainChildren.push(emptyPara());
   mainChildren.push(...buildReserveChart(reportData));
   mainChildren.push(pageBreak());
 
-  // Terms
+  // Terms (starts on its own page)
   mainChildren.push(...buildTerms());
   mainChildren.push(pageBreak());
 
@@ -991,15 +1057,54 @@ export async function exportToDocx(reportData, fileName, options = {}) {
   });
 
   const doc = new Document({
+    features: {
+      updateFields: true,  // Auto-update TOC page numbers when opened in Word
+    },
     styles: {
       default: {
         document: {
           run: { font: 'Arial', size: 20 }
         },
+        heading1: {
+          run: {
+            font: 'Arial',
+            size: 24,
+            bold: true,
+            color: WHITE,
+          },
+          paragraph: {
+            spacing: { before: 240, after: 120 },
+          }
+        },
         hyperlink: {
-          run: { color: '1a1a1a', underline: {} }
+          run: { color: '1a1a1a' }  // No underline for TOC links
+        },
+        listParagraph: {
+          run: { font: 'Arial', size: 20 }
         }
-      }
+      },
+      paragraphStyles: [
+        {
+          id: 'TOC1',
+          name: 'toc 1',
+          basedOn: 'Normal',
+          next: 'Normal',
+          run: {
+            font: 'Arial',
+            size: 22,
+          },
+          paragraph: {
+            spacing: { before: 80, after: 80 },
+            tabStops: [
+              {
+                type: TabStopType.RIGHT,
+                position: TabStopPosition.MAX,
+                leader: 'dot',
+              }
+            ],
+          }
+        }
+      ]
     },
     sections: [
       // COVER PAGE - company info footer (no page number)
