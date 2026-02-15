@@ -24,7 +24,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <style>
     @page {
       size: letter;
-      margin: 0.6in 0.6in 0.75in 0.6in;
+      margin: 0.6in 0.6in 0.9in 0.6in;
     }
     
     @media print {
@@ -32,10 +32,34 @@ export const DEFAULT_REPORT_TEMPLATE = `
       .page-break { page-break-before: always; }
       .page-break-indicator { display: none !important; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      
+      /* Repeating footer on every printed page */
+      .print-footer {
+        display: block !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 7pt;
+        color: #666;
+        border-top: 1px solid #ccc;
+        padding: 4px 0.6in;
+        background: white;
+      }
+      .print-footer .company-name {
+        font-weight: bold;
+        color: #1e3a5f;
+      }
+      .print-footer::after {
+        content: " | Page " counter(page);
+      }
     }
     
     /* ============ EDITOR VIEW - PAGE MARGIN INDICATORS ============ */
     @media screen {
+      .print-footer { display: none; }
+      
       body {
         background: #e0e0e0;
         padding: 20px;
@@ -89,21 +113,6 @@ export const DEFAULT_REPORT_TEMPLATE = `
       background: white;
       max-width: 8.5in;
       margin: 0 auto;
-    }
-    
-    /* ============ COMPACT PAGE FOOTER ============ */
-    .page-footer {
-      text-align: center;
-      padding: 6px 0;
-      margin-top: 20px;
-      border-top: 1px solid #ccc;
-      font-size: 7pt;
-      color: #666;
-    }
-    
-    .page-footer .company-name {
-      font-weight: bold;
-      color: #1e3a5f;
     }
     
     /* ============ COVER PAGE ============ */
@@ -208,22 +217,32 @@ export const DEFAULT_REPORT_TEMPLATE = `
       font-weight: bold;
       color: #1e3a5f;
       text-align: center;
-      margin-bottom: 0.2in;
+      margin-bottom: 0.3in;
       padding-bottom: 0.1in;
       border-bottom: 2px solid #1e3a5f;
     }
     
-    .toc-section {
-      display: flex;
-      justify-content: space-between;
-      padding: 3px 8px;
-      border-bottom: 1px dotted #ccc;
-      font-size: 9pt;
-      text-decoration: none;
-      color: inherit;
+    .toc-entries {
+      padding: 0 0.2in;
     }
     
-    .toc-section:hover { background: #e8f4f8; color: #1e3a5f; }
+    .toc-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 6px 4px;
+      border-bottom: 1px dotted #ccc;
+      font-size: 11pt;
+      line-height: 2;
+    }
+    
+    .toc-entry a {
+      text-decoration: none;
+      color: #1a1a1a;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    
+    .toc-entry a:hover { color: #1e3a5f; }
     
     /* ============ SECTION HEADERS ============ */
     .section-header {
@@ -480,6 +499,11 @@ export const DEFAULT_REPORT_TEMPLATE = `
 </head>
 <body>
 
+<!-- Print-only footer (repeats on every page when printed) -->
+<div class="print-footer">
+  <span class="company-name">{companyName}</span> | {companyAddress} {companyPhone}
+</div>
+
 <!-- ==================== COVER PAGE ==================== -->
 <div class="cover-page">
   <div class="cover-logo">
@@ -522,7 +546,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
 <div class="toc-page">
   <div class="toc-title">TABLE OF CONTENTS</div>
   
-  <div class="toc-entries" style="font-size:11pt; line-height:2.2;">
+  <div class="toc-entries">
     <p class="toc-entry"><a href="#_introduction">Introduction</a></p>
     <p class="toc-entry"><a href="#_description">Description of Development</a></p>
     <p class="toc-entry"><a href="#_reservechart">Reserve Study Chart</a></p>
@@ -586,10 +610,7 @@ export const DEFAULT_REPORT_TEMPLATE = `
   </div>
 </div>
 
-<div class="page-break"></div>
-<div class="page-break-indicator no-print"></div>
-
-<!-- ==================== RESERVE STUDY CHART (own page) ==================== -->
+<!-- ==================== RESERVE STUDY CHART (same page as Description) ==================== -->
 <a name="_reservechart"></a>
 <div id="reserve-chart" class="section-header">RESERVE STUDY CHART</div>
 
@@ -694,6 +715,9 @@ export const DEFAULT_REPORT_TEMPLATE = `
   </table>
 </div>
 <!--PM_END-->
+
+<div class="page-break"></div>
+<div class="page-break-indicator no-print"></div>
 
 <!-- ==================== TERMS ==================== -->
 <a name="_terms"></a>
@@ -1074,11 +1098,6 @@ export const DEFAULT_REPORT_TEMPLATE = `
     Dated 2024</li>
 <!--NJ_END-->
   </ol>
-</div>
-
-<!-- ==================== PAGE FOOTER ==================== -->
-<div class="page-footer">
-  <span class="company-name">{companyName}</span> | {companyFullAddress} | {companyPhone}
 </div>
 
 </body>

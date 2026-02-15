@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { exportToWord } from '@/lib/reports/wordExporter';
 
 export default function ReportEditorPage() {
   const { user } = useAuth();
@@ -19,7 +18,6 @@ export default function ReportEditorPage() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [htmlContent, setHtmlContent] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
@@ -77,27 +75,57 @@ export default function ReportEditorPage() {
   };
 
   const handlePrint = () => {
-    const content = editorRef.current ? editorRef.current.innerHTML : htmlContent;
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(content);
-    printWindow.document.close();
-    printWindow.print();
-  };
-
-  const handleDownloadWord = async () => {
-    setDownloading(true);
-    try {
-      const content = editorRef.current ? editorRef.current.innerHTML : htmlContent;
-      const siteName = site?.siteName || 'Site';
-      const studyTypeName = site?.studyType || 'Reserve Study';
-      const fileName = `${siteName} - ${studyTypeName} Report.doc`;
-      await exportToWord(content, fileName);
-    } catch (err) {
-      console.error('Word download error:', err);
-      alert('Error generating Word document. Please try again.');
-    } finally {
-      setDownloading(false);
+    // Get current content (may include editor changes)
+    const currentBody = editorRef.current ? editorRef.current.innerHTML : '';
+    
+    // htmlContent has the full document with styles - extract styles
+    let styles = '';
+    const styleMatches = htmlContent.match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
+    if (styleMatches) {
+      styles = styleMatches.join('\n');
     }
+    
+    // Get body content: use editor DOM if editing, otherwise use stored HTML body
+    let bodyContent;
+    if (editorRef.current && editMode) {
+      bodyContent = currentBody;
+    } else {
+      const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      bodyContent = bodyMatch ? bodyMatch[1] : htmlContent;
+    }
+    
+    // Build clean print document
+    const printDoc = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${site?.siteName || 'Report'} - Print</title>
+  ${styles}
+  <style>
+    /* Print-specific overrides */
+    @media print {
+      .no-print, .page-break-indicator { display: none !important; }
+      .page-break { page-break-before: always; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+    @page {
+      size: letter;
+      margin: 0.6in 0.6in 0.75in 0.6in;
+    }
+  </style>
+</head>
+<body>
+  ${bodyContent}
+</body>
+</html>`;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printDoc);
+    printWindow.document.close();
+    // Wait for images to load before printing
+    printWindow.onload = () => {
+      setTimeout(() => printWindow.print(), 300);
+    };
   };
 
   const execCommand = (command, value) => {
@@ -206,14 +234,6 @@ export default function ReportEditorPage() {
               className="px-4 py-2 bg-purple-600 text-white font-medium text-sm hover:bg-purple-700 flex items-center gap-1 border border-purple-700"
             >
               🖨️ Print
-            </button>
-            
-            <button
-              onClick={handleDownloadWord}
-              disabled={downloading}
-              className="px-4 py-2 bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1 border border-blue-700"
-            >
-              {downloading ? '⏳ Preparing...' : '📄 Download Word'}
             </button>
           </div>
         </div>
