@@ -8,7 +8,6 @@ import { collection, getDocs, doc, getDoc, addDoc, deleteDoc, updateDoc, query, 
 import { db } from '@/lib/firebase';
 import { loadReportData, generateReport } from '@/lib/reports/reportGenerator';
 import { DEFAULT_REPORT_TEMPLATE } from '@/lib/reports/DEFAULT_REPORT_TEMPLATE';
-import { exportToDocx } from '@/lib/reports/docxExporter';
 
 export default function ReportsListPage() {
   const { user } = useAuth();
@@ -20,7 +19,6 @@ export default function ReportsListPage() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [downloadingId, setDownloadingId] = useState(null);
   const [organizationId, setOrganizationId] = useState(null);
   const [organization, setOrganization] = useState(null);
   const [expandedReport, setExpandedReport] = useState(null);
@@ -122,49 +120,6 @@ export default function ReportsListPage() {
     }
   };
 
-  const handleDownloadWord = async (report) => {
-    try {
-      setDownloadingId(report.id);
-      const siteName = site?.siteName || 'Site';
-      const fileName = `${siteName} - ${report.title}.docx`;
-      
-      // Load fresh report data for docx generation
-      const reportData = await loadReportData(siteId, organizationId);
-
-      // Pre-fetch logo via Image+canvas (reliable for Firebase Storage)
-      let logoData = null;
-      const logoUrl = reportData.organization?.logoUrl;
-      if (logoUrl) {
-        try {
-          const img = new window.Image();
-          img.crossOrigin = 'anonymous';
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = logoUrl;
-          });
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          canvas.getContext('2d').drawImage(img, 0, 0);
-          const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-          if (blob) {
-            const buf = await blob.arrayBuffer();
-            logoData = new Uint8Array(buf);
-          }
-        } catch (e) {
-          console.warn('Logo pre-fetch failed:', e.message);
-        }
-      }
-
-      await exportToDocx(reportData, fileName, { logoData });
-    } catch (error) {
-      console.error('Error downloading report:', error);
-      alert('Error downloading: ' + error.message);
-    } finally {
-      setDownloadingId(null);
-    }
-  };
 
   const handleDeleteReport = async (reportId, e) => {
     e.preventDefault();
@@ -283,15 +238,20 @@ export default function ReportsListPage() {
                 {/* Report header row */}
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className="text-lg font-bold text-gray-900">{report.title}</h3>
-                        <span className={'px-2 py-1 text-xs rounded-full ' + (report.status === 'final' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>
-                          {report.status === 'final' ? 'Final' : 'Draft'}
-                        </span>
+                    <Link
+                      href={`/sites/${siteId}/reports/${report.id}`}
+                      className="flex items-center gap-4 hover:opacity-80 flex-1"
+                    >
+                      <div>
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="text-lg font-bold text-gray-900">{report.title}</h3>
+                          <span className={'px-2 py-1 text-xs rounded-full ' + (report.status === 'final' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>
+                            {report.status === 'final' ? 'Final' : 'Draft'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-500">Created {formatDateShort(report.createdAt)}</p>
                       </div>
-                      <p className="text-sm text-gray-500">Created {formatDateShort(report.createdAt)}</p>
-                    </div>
+                    </Link>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => {
@@ -306,13 +266,12 @@ export default function ReportsListPage() {
                           </span>
                         )}
                       </button>
-                      <button
-                        onClick={() => handleDownloadWord(report)}
-                        disabled={downloadingId === report.id}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
+                      <Link
+                        href={`/sites/${siteId}/reports/${report.id}`}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
                       >
-                        {downloadingId === report.id ? '⏳ Preparing...' : '📄 Download .docx'}
-                      </button>
+                        ✏️ Edit Report
+                      </Link>
                       <button onClick={(e) => handleDeleteReport(report.id, e)}
                         className="px-3 py-2 text-red-600 hover:bg-red-50 rounded text-sm">
                         Delete
