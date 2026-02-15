@@ -51,9 +51,9 @@ export const DEFAULT_REPORT_TEMPLATE = `
         font-weight: bold;
         color: #1e3a5f;
       }
-      .print-footer::after {
-        content: " | Page " counter(page);
-      }
+      
+      /* Hide footer on cover page */
+      .cover-page ~ .print-footer-spacer { display: none; }
     }
     
     /* ============ EDITOR VIEW - PAGE MARGIN INDICATORS ============ */

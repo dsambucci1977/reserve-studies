@@ -94,15 +94,16 @@ export default function ReportEditorPage() {
       bodyContent = bodyMatch ? bodyMatch[1] : htmlContent;
     }
     
+    const siteName = site?.siteName || 'Report';
+    
     // Build clean print document
     const printDoc = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>${site?.siteName || 'Report'} - Print</title>
+  <title>${siteName} - Reserve Study Report</title>
   ${styles}
   <style>
-    /* Print-specific overrides */
     @media print {
       .no-print, .page-break-indicator { display: none !important; }
       .page-break { page-break-before: always; }
@@ -110,7 +111,7 @@ export default function ReportEditorPage() {
     }
     @page {
       size: letter;
-      margin: 0.6in 0.6in 0.75in 0.6in;
+      margin: 0.6in 0.6in 0.9in 0.6in;
     }
   </style>
 </head>
@@ -119,12 +120,16 @@ export default function ReportEditorPage() {
 </body>
 </html>`;
     
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(printDoc);
-    printWindow.document.close();
-    // Wait for images to load before printing
+    // Use blob URL instead of about:blank to get proper title in print dialog
+    const blob = new Blob([printDoc], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url, '_blank');
     printWindow.onload = () => {
-      setTimeout(() => printWindow.print(), 300);
+      setTimeout(() => {
+        printWindow.print();
+        // Clean up blob URL after print dialog closes
+        printWindow.onafterprint = () => URL.revokeObjectURL(url);
+      }, 500);
     };
   };
 
