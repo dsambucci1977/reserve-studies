@@ -230,10 +230,10 @@ export const DEFAULT_REPORT_TEMPLATE = `
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      padding: 6px 4px;
+      padding: 3px 4px;
       border-bottom: 1px dotted #ccc;
-      font-size: 11pt;
-      line-height: 2;
+      font-size: 10pt;
+      line-height: 1.6;
     }
     
     .toc-entry a {
