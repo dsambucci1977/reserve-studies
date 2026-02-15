@@ -24,14 +24,18 @@ export const DEFAULT_REPORT_TEMPLATE = `
   <style>
     @page {
       size: letter;
-      margin: 0.6in 0.6in 0.9in 0.6in;
+      margin: 0.6in 0.6in 1.1in 0.6in;
     }
     
     @media print {
       .no-print { display: none !important; }
       .page-break { page-break-before: always; }
       .page-break-indicator { display: none !important; }
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      body { 
+        -webkit-print-color-adjust: exact; 
+        print-color-adjust: exact;
+        padding-bottom: 40px;
+      }
       
       /* Repeating footer on every printed page */
       .print-footer {

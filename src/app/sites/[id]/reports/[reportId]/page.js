@@ -111,7 +111,7 @@ export default function ReportEditorPage() {
     }
     @page {
       size: letter;
-      margin: 0.6in 0.6in 0.9in 0.6in;
+      margin: 0.6in 0.6in 1.1in 0.6in;
     }
   </style>
 </head>
